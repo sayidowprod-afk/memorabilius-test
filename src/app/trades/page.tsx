@@ -23,7 +23,7 @@ export default function Trades() {
   const loadTrades = async () => {
     const { data } = await supabase
       .from('trades')
-      .select('*, profiles(id, display_name, avatar_url, lien_csv)')
+      .select('*, profiles(id, display_name, avatar_url, instagram, twitter, discord)')
       .eq('statut', 'actif')
       .order('created_at', { ascending: false })
     setTrades(data || [])
@@ -103,6 +103,26 @@ export default function Trades() {
                     <Link href={`/galerie/${trade.profiles?.id}`} style={{ fontSize: 13, fontWeight: 700, color: '#121212' }}>
                       {trade.profiles?.display_name}
                     </Link>
+                  </div>
+                  {/* Réseaux sociaux */}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                    {trade.profiles?.instagram && (
+                      <a href={`https://instagram.com/${trade.profiles.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer"
+                        style={{ fontSize: 11, fontWeight: 700, color: '#E1306C', background: '#fce4ec', padding: '3px 8px', borderRadius: 20, textDecoration: 'none' }}>
+                        📸 {trade.profiles.instagram.startsWith('@') ? trade.profiles.instagram : `@${trade.profiles.instagram}`}
+                      </a>
+                    )}
+                    {trade.profiles?.twitter && (
+                      <a href={`https://x.com/${trade.profiles.twitter.replace('@', '')}`} target="_blank" rel="noopener noreferrer"
+                        style={{ fontSize: 11, fontWeight: 700, color: '#121212', background: '#f0f0f0', padding: '3px 8px', borderRadius: 20, textDecoration: 'none' }}>
+                        𝕏 {trade.profiles.twitter.startsWith('@') ? trade.profiles.twitter : `@${trade.profiles.twitter}`}
+                      </a>
+                    )}
+                    {trade.profiles?.discord && (
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#5865F2', background: '#eef0ff', padding: '3px 8px', borderRadius: 20 }}>
+                        🎮 {trade.profiles.discord}
+                      </span>
+                    )}
                   </div>
 
                   {/* Actions */}
