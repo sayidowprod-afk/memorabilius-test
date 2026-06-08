@@ -205,6 +205,7 @@ function MessagesContent() {
           </>
         )}
       </div>
+      </div>
     </div>
   )
 }
