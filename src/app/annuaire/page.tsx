@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
@@ -7,17 +8,33 @@ interface Stats { total: number; rc: number; auto: number; num: number; patch: n
 interface Collector { id: string; display_name: string; avatar_url: string; lien_csv: string; stats?: Stats }
 
 export default function Annuaire() {
+  const searchParams = useSearchParams()
+  const teamIdFromUrl = searchParams.get('team_id') || ''
+
+  const [allCollectors, setAllCollectors] = useState<Collector[]>([])
   const [collectors, setCollectors] = useState<Collector[]>([])
   const [loading, setLoading] = useState(true)
   const [sortKey, setSortKey] = useState<'display_name' | 'total' | 'rc' | 'auto' | 'num' | 'patch'>('total')
   const [sortAsc, setSortAsc] = useState(false)
-  const [teamFilter, setTeamFilter] = useState<string>('')
+  const [teamFilter, setTeamFilter] = useState<string>(teamIdFromUrl)
   const [teams, setTeams] = useState<any[]>([])
+  const [teamName, setTeamName] = useState<string>('')
 
   useEffect(() => {
+    supabase.from('teams').select('id, name').then(({ data }) => {
+      setTeams(data || [])
+      if (teamIdFromUrl && data) {
+        const t = data.find((t: any) => String(t.id) === teamIdFromUrl)
+        if (t) setTeamName(t.name)
+      }
+    })
     loadData()
-    supabase.from('teams').select('id, name').then(({ data }) => setTeams(data || []))
   }, [])
+
+  // Appliquer le filtre team quand les données changent
+  useEffect(() => {
+    applyTeamFilter(teamFilter)
+  }, [allCollectors, teamFilter])
 
   const loadData = async () => {
     const { data: profiles } = await supabase
@@ -26,18 +43,47 @@ export default function Annuaire() {
       .not('lien_csv', 'is', null)
       .neq('lien_csv', '')
     if (!profiles) { setLoading(false); return }
-    setCollectors(profiles.map(p => ({ ...p, stats: undefined })))
+    setAllCollectors(profiles.map(p => ({ ...p, stats: undefined })))
     setLoading(false)
 
-    // Charger les stats en arrière-plan via un proxy
     profiles.forEach(async p => {
       try {
         const r = await fetch(`/api/csv-stats?url=${encodeURIComponent(p.lien_csv)}`)
         if (!r.ok) return
         const stats = await r.json()
-        setCollectors(prev => prev.map(c => c.id === p.id ? { ...c, stats } : c))
+        setAllCollectors(prev => prev.map(c => c.id === p.id ? { ...c, stats } : c))
       } catch { }
     })
+  }
+
+  const applyTeamFilter = async (tid: string) => {
+    if (!tid) {
+      setCollectors(allCollectors)
+      return
+    }
+    // Récupérer les membres de la team
+    const { data: members } = await supabase
+      .from('team_members')
+      .select('user_id')
+      .eq('team_id', parseInt(tid))
+    if (!members) { setCollectors([]); return }
+    const ids = members.map((m: any) => m.user_id)
+    setCollectors(allCollectors.filter(c => ids.includes(c.id)))
+  }
+
+  const handleTeamChange = async (tid: string) => {
+    setTeamFilter(tid)
+    if (tid) {
+      const t = teams.find(t => String(t.id) === tid)
+      setTeamName(t?.name || '')
+    } else {
+      setTeamName('')
+    }
+    // Mettre à jour l'URL sans recharger
+    const url = new URL(window.location.href)
+    if (tid) url.searchParams.set('team_id', tid)
+    else url.searchParams.delete('team_id')
+    window.history.pushState({}, '', url.toString())
   }
 
   const sorted = [...collectors].sort((a, b) => {
@@ -59,17 +105,26 @@ export default function Annuaire() {
   )
 
   const badge = (val: number, bg: string, color: string) => (
-    <span style={{ padding: '6px 12px', borderRadius: 6, fontWeight: 900, fontSize: 13, display: 'inline-block', minWidth: 40, textAlign: 'center', background: bg, color }}>{val}</span>
+    <span style={{ padding: '6px 12px', borderRadius: 6, fontWeight: 900, fontSize: 13, display: 'inline-block', minWidth: 40, textAlign: 'center', background: bg, color }}>{val ?? '—'}</span>
   )
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
-      <h1 style={{ fontWeight: 900, fontSize: 28, marginBottom: 24 }}>Annuaire des collectionneurs</h1>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
+        <h1 style={{ fontWeight: 900, fontSize: 28, margin: 0 }}>
+          {teamName ? `Team : ${teamName}` : 'Annuaire des collectionneurs'}
+        </h1>
+        {teamName && (
+          <button onClick={() => handleTeamChange('')} style={{ fontSize: 12, color: '#999', background: 'none', border: '1px solid #ddd', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
+            ← Toutes les teams
+          </button>
+        )}
+      </div>
 
       <div style={{ marginBottom: 16 }}>
-        <select value={teamFilter} onChange={e => setTeamFilter(e.target.value)} style={{ width: 'auto', minWidth: 200 }}>
+        <select value={teamFilter} onChange={e => handleTeamChange(e.target.value)} style={{ width: 'auto', minWidth: 200 }}>
           <option value="">Toutes les teams</option>
-          {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          {teams.map(t => <option key={t.id} value={String(t.id)}>{t.name}</option>)}
         </select>
       </div>
 
@@ -85,19 +140,22 @@ export default function Annuaire() {
               {th('patch', 'Patch')}
             </tr></thead>
             <tbody>
+              {sorted.length === 0 && (
+                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 40, color: '#bbb' }}>Aucun collectionneur dans cette team.</td></tr>
+              )}
               {sorted.map(c => (
                 <tr key={c.id}>
                   <td style={{ padding: 15, borderBottom: '1px solid #f5f5f5' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
-                      <img src={c.avatar_url || `https://ui-avatars.com/api/?name=${c.display_name}&background=003DA6&color=fff`} style={{ width: 42, height: 42, borderRadius: '50%', border: '2px solid #eee', objectFit: 'cover' }} alt={c.display_name} />
+                      <img src={c.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.display_name || 'U')}&background=003DA6&color=fff`} style={{ width: 42, height: 42, borderRadius: '50%', border: '2px solid #eee', objectFit: 'cover' }} alt={c.display_name} />
                       <Link href={`/galerie/${c.id}`} style={{ fontWeight: 800, color: '#121212' }}>{c.display_name || 'Collectionneur'}</Link>
                     </div>
                   </td>
-                  <td style={{ padding: 15, borderBottom: '1px solid #f5f5f5' }}>{badge(c.stats?.total || 0, '#f0f0f0', '#333')}</td>
-                  <td style={{ padding: 15, borderBottom: '1px solid #f5f5f5' }}>{badge(c.stats?.rc || 0, '#fff3e0', '#e67e22')}</td>
-                  <td style={{ padding: 15, borderBottom: '1px solid #f5f5f5' }}>{badge(c.stats?.auto || 0, '#e8f5e9', '#2e7d32')}</td>
-                  <td style={{ padding: 15, borderBottom: '1px solid #f5f5f5' }}>{badge(c.stats?.num || 0, '#f5f5f5', '#444')}</td>
-                  <td style={{ padding: 15, borderBottom: '1px solid #f5f5f5' }}>{badge(c.stats?.patch || 0, '#e3f2fd', '#1976d2')}</td>
+                  <td style={{ padding: 15, borderBottom: '1px solid #f5f5f5' }}>{badge(c.stats?.total ?? 0, '#f0f0f0', '#333')}</td>
+                  <td style={{ padding: 15, borderBottom: '1px solid #f5f5f5' }}>{badge(c.stats?.rc ?? 0, '#fff3e0', '#e67e22')}</td>
+                  <td style={{ padding: 15, borderBottom: '1px solid #f5f5f5' }}>{badge(c.stats?.auto ?? 0, '#e8f5e9', '#2e7d32')}</td>
+                  <td style={{ padding: 15, borderBottom: '1px solid #f5f5f5' }}>{badge(c.stats?.num ?? 0, '#f5f5f5', '#444')}</td>
+                  <td style={{ padding: 15, borderBottom: '1px solid #f5f5f5' }}>{badge(c.stats?.patch ?? 0, '#e3f2fd', '#1976d2')}</td>
                 </tr>
               ))}
             </tbody>
