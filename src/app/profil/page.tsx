@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
@@ -8,9 +8,12 @@ export default function Profil() {
   const router = useRouter()
   const [userId, setUserId] = useState<string | null>(null)
   const [form, setForm] = useState({ display_name: '', lien_csv: '', couleur_bordure: '#003DA6', lien_logo: '' })
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [csvLinked, setCsvLinked] = useState(false)
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -25,10 +28,40 @@ export default function Profil() {
           lien_logo: p.lien_logo || ''
         })
         setCsvLinked(!!p.lien_csv)
+        setAvatarUrl(p.avatar_url || null)
       }
       setLoading(false)
     })
   }, [])
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !userId) return
+
+    // Vérifications
+    if (file.size > 2 * 1024 * 1024) { alert('Image trop lourde (max 2 Mo)'); return }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { alert('Format accepté : JPG, PNG, WEBP'); return }
+
+    setUploading(true)
+    const ext = file.name.split('.').pop()
+    const path = `${userId}/avatar.${ext}`
+
+    // Upload dans Supabase Storage
+    const { error: upErr } = await supabase.storage
+      .from('avatars')
+      .upload(path, file, { upsert: true })
+
+    if (upErr) { alert('Erreur upload : ' + upErr.message); setUploading(false); return }
+
+    // Récupérer l'URL publique
+    const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path)
+    const publicUrl = urlData.publicUrl + '?t=' + Date.now()
+
+    // Sauvegarder dans le profil
+    await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', userId)
+    setAvatarUrl(publicUrl)
+    setUploading(false)
+  }
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,7 +78,7 @@ export default function Profil() {
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
     } else {
-      alert('Erreur lors de la sauvegarde : ' + error.message)
+      alert('Erreur : ' + error.message)
     }
   }
 
@@ -67,6 +100,37 @@ export default function Profil() {
         </div>
       )}
 
+      {/* Avatar */}
+      <div style={{ background: 'white', borderRadius: 16, padding: 30, boxShadow: '0 10px 40px rgba(0,0,0,0.08)', marginBottom: 20 }}>
+        <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 16 }}>Photo de profil</label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          <div style={{ position: 'relative' }}>
+            <img
+              src={avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(form.display_name || 'U')}&background=003DA6&color=fff&size=128`}
+              style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '3px solid #eee' }}
+              alt="Avatar"
+            />
+            {uploading && (
+              <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ color: 'white', fontSize: 11 }}>...</span>
+              </div>
+            )}
+          </div>
+          <div>
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              style={{ background: '#003DA6', color: 'white', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'block', marginBottom: 6 }}
+            >
+              {uploading ? 'Upload en cours...' : '📷 Changer ma photo'}
+            </button>
+            <p style={{ fontSize: 11, color: '#999', margin: 0 }}>JPG, PNG ou WEBP · Max 2 Mo</p>
+          </div>
+          <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={handleAvatarUpload} />
+        </div>
+      </div>
+
+      {/* Formulaire */}
       <div style={{ background: 'white', borderRadius: 16, padding: 40, boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div>
@@ -79,7 +143,7 @@ export default function Profil() {
             <p style={{ fontSize: 11, color: '#999', marginTop: 4 }}>Fichier &gt; Partager &gt; Publier sur le web &gt; CSV</p>
           </div>
           <div>
-            <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 6 }}>URL de votre logo</label>
+            <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 6 }}>URL de votre logo (galerie)</label>
             <input value={form.lien_logo} onChange={e => setForm({ ...form, lien_logo: e.target.value })} placeholder="https://..." />
           </div>
           <div>
