@@ -19,7 +19,6 @@ function AnnuaireContent() {
   const searchParams = useSearchParams()
   const teamIdFromUrl = searchParams.get('team_id') || ''
 
-  const [allCollectors, setAllCollectors] = useState<Collector[]>([])
   const [collectors, setCollectors] = useState<Collector[]>([])
   const [loading, setLoading] = useState(true)
   const [sortKey, setSortKey] = useState<'display_name' | 'total' | 'rc' | 'auto' | 'num' | 'patch'>('total')
@@ -42,41 +41,62 @@ function AnnuaireContent() {
   // Appliquer le filtre team quand les données changent
   useEffect(() => {
     applyTeamFilter(teamFilter)
-  }, [allCollectors, teamFilter])
+  }, [collectors, teamFilter])
 
   const loadData = async () => {
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, display_name, avatar_url, lien_csv')
+      .select('id, display_name, avatar_url, lien_csv, stats_total, stats_rc, stats_auto, stats_num, stats_patch, stats_updated_at')
       .not('lien_csv', 'is', null)
       .neq('lien_csv', '')
+
     if (!profiles) { setLoading(false); return }
-    setAllCollectors(profiles.map(p => ({ ...p, stats: undefined })))
+
+    // Utiliser les stats en cache directement
+    setCollectors(profiles.map(p => ({
+      ...p,
+      stats: {
+        total: p.stats_total || 0,
+        rc: p.stats_rc || 0,
+        auto: p.stats_auto || 0,
+        num: p.stats_num || 0,
+        patch: p.stats_patch || 0,
+      }
+    })))
     setLoading(false)
 
+    // Recalculer les stats si pas à jour depuis 24h
     profiles.forEach(async p => {
-      try {
-        const r = await fetch(`/api/csv-stats?url=${encodeURIComponent(p.lien_csv)}`)
-        if (!r.ok) return
-        const stats = await r.json()
-        setAllCollectors(prev => prev.map(c => c.id === p.id ? { ...c, stats } : c))
-      } catch { }
+      const lastUpdate = p.stats_updated_at ? new Date(p.stats_updated_at) : null
+      const isStale = !lastUpdate || (Date.now() - lastUpdate.getTime() > 24 * 60 * 60 * 1000)
+      if (isStale && p.lien_csv) {
+        try {
+          const r = await fetch('/api/update-stats', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: p.id, csvUrl: p.lien_csv }),
+          })
+          const data = await r.json()
+          if (data.stats) {
+            setCollectors(prev => prev.map(c => c.id === p.id ? { ...c, stats: data.stats } : c))
+          }
+        } catch { }
+      }
     })
   }
 
   const applyTeamFilter = async (tid: string) => {
     if (!tid) {
-      setCollectors(allCollectors)
+      // pas besoin de setCollectors ici car loadData le fait déjà
       return
     }
-    // Récupérer les membres de la team
     const { data: members } = await supabase
       .from('team_members')
       .select('user_id')
       .eq('team_id', parseInt(tid))
     if (!members) { setCollectors([]); return }
     const ids = members.map((m: any) => m.user_id)
-    setCollectors(allCollectors.filter(c => ids.includes(c.id)))
+    setCollectors(prev => prev.filter(c => ids.includes(c.id)))
   }
 
   const handleTeamChange = async (tid: string) => {

@@ -81,6 +81,14 @@ export default function Profil() {
 
     if (!error) {
       setCsvLinked(!!form.lien_csv)
+      // Recalculer les stats en arrière-plan
+      if (form.lien_csv) {
+        fetch('/api/update-stats', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, csvUrl: form.lien_csv }),
+        })
+      }
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
     } else {
