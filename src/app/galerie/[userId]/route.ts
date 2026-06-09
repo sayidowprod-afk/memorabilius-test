@@ -1,6 +1,5 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { supabase } from '@/lib/supabase'
 
 interface Card {
   f: string; b: string; n: string; t: string; y: string
@@ -12,17 +11,14 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ userId: string }> | { userId: string } }
 ) {
-  // Gestion de la compatibilité Next.js (params peut être une Promise ou un objet direct)
+  // Résolution propre des paramètres dynamiques pour éviter les erreurs de build Next.js
   const resolvedParams = 'then' in context.params ? await context.params : context.params
   const userId = resolvedParams.userId
 
-  const cookieStore = cookies()
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
-
   try {
-    // 1. Récupérer l'utilisateur actuellement connecté (celui qui regarde la page)
-    const { data: { session } } = await supabase.auth.getSession()
-    const currentUserId = session?.user?.id || null
+    // 1. Récupérer l'utilisateur connecté via le client Supabase standard
+    const { data: { user } } = await supabase.auth.getUser()
+    const currentUserId = user?.id || null
     const isOwner = currentUserId === userId
 
     // 2. Récupérer le profil pour avoir le lien CSV
@@ -65,7 +61,7 @@ export async function GET(
       })
       .filter(Boolean) as Card[]
 
-    // 5. Filtrage de sécurité
+    // 5. Filtrage de sécurité strict côté serveur
     const filteredCards = parsed.filter((card) => {
       if (!isOwner && privateKeys.has(card.f)) {
         return false 
@@ -76,6 +72,6 @@ export async function GET(
     return NextResponse.json({ cards: filteredCards })
   } catch (error) {
     console.error(error)
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
+    return NextResponse.json({ error: 'Erreur interne du serveur' }, { status: 500 })
   }
 }
