@@ -1,13 +1,17 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 export default function Teams() {
+  const router = useRouter()
   const [teams, setTeams] = useState<any[]>([])
+  const [teamsStats, setTeamsStats] = useState<any[]>([])
   const [search, setSearch] = useState('')
   const [userId, setUserId] = useState<string | null>(null)
   const [userTeamId, setUserTeamId] = useState<number | null>(null)
+  const [hasCandidature, setHasCandidature] = useState<Set<number>>(new Set())
   const [loading, setLoading] = useState(false)
   const [newTeamName, setNewTeamName] = useState('')
   const [showCreate, setShowCreate] = useState(false)
@@ -19,20 +23,40 @@ export default function Teams() {
       setUserId(data.user.id)
       const { data: m } = await supabase.from('team_members').select('team_id').eq('user_id', data.user.id).single()
       if (m) setUserTeamId(m.team_id)
+      // Candidatures en attente
+      const { data: cands } = await supabase.from('team_candidatures').select('team_id').eq('user_id', data.user.id).eq('statut', 'en_attente')
+      if (cands) setHasCandidature(new Set(cands.map((c: any) => c.team_id)))
     })
   }, [])
 
   const loadTeams = async () => {
-    const { data } = await supabase.from('teams').select('*, team_members(count)')
+    const { data } = await supabase.from('teams').select('*, team_members(count)').order('created_at', { ascending: false })
     setTeams(data || [])
+    loadTeamsStats(data || [])
+  }
+
+  const loadTeamsStats = async (teamsList: any[]) => {
+    const stats = await Promise.all(teamsList.map(async (team) => {
+      const { data: members } = await supabase.from('team_members').select('profiles(lien_csv)').eq('team_id', team.id)
+      let total = 0
+      await Promise.all((members || []).map(async (m: any) => {
+        if (!m.profiles?.lien_csv) return
+        try {
+          const r = await fetch(`/api/csv-stats?url=${encodeURIComponent(m.profiles.lien_csv)}`)
+          const s = await r.json()
+          total += s.total || 0
+        } catch {}
+      }))
+      return { teamId: team.id, total }
+    }))
+    setTeamsStats(stats)
   }
 
   const joinTeam = async (teamId: number) => {
     if (!userId) return
     setLoading(true)
-    await supabase.from('team_members').insert({ team_id: teamId, user_id: userId })
-    setUserTeamId(teamId)
-    await loadTeams()
+    await supabase.from('team_candidatures').insert({ team_id: teamId, user_id: userId })
+    setHasCandidature(prev => new Set([...prev, teamId]))
     setLoading(false)
   }
 
@@ -43,27 +67,40 @@ export default function Teams() {
     if (data) {
       await supabase.from('team_members').insert({ team_id: data.id, user_id: userId })
       setUserTeamId(data.id)
+      router.push(`/teams/${data.id}`)
     }
     setNewTeamName('')
     setShowCreate(false)
-    await loadTeams()
     setLoading(false)
   }
 
-  const filtered = teams.filter(t => t.name.toLowerCase().includes(search.toLowerCase()))
+  // Trier par nombre de cartes total
+  const sorted = [...teams].sort((a, b) => {
+    const aStats = teamsStats.find(s => s.teamId === a.id)?.total || 0
+    const bStats = teamsStats.find(s => s.teamId === b.id)?.total || 0
+    return bStats - aStats
+  })
+
+  const filtered = sorted.filter(t => t.name.toLowerCase().includes(search.toLowerCase()))
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
-      <h1 style={{ fontWeight: 900, fontSize: 28, marginBottom: 24 }}>Annuaire des Teams</h1>
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 20, marginBottom: 20, flexWrap: 'wrap' }}>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher une team..." style={{ maxWidth: 400 }} />
+    <div style={{ maxWidth: 1000, margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+        <h1 style={{ fontWeight: 900, fontSize: 28, margin: 0 }}>Annuaire des Teams</h1>
         {userId && !userTeamId && (
           <button onClick={() => setShowCreate(!showCreate)} className="btn-main btn-primary" style={{ padding: '10px 20px', fontSize: 13 }}>
             + Créer ma Team
           </button>
         )}
-        {userId && userTeamId && <span style={{ color: '#999', fontSize: 13, fontStyle: 'italic' }}>Vous avez déjà rejoint une team.</span>}
+        {userId && userTeamId && (
+          <Link href={`/teams/${userTeamId}`} style={{ background: '#003DA6', color: 'white', padding: '10px 20px', borderRadius: 50, fontWeight: 700, fontSize: 13 }}>
+            Voir ma team →
+          </Link>
+        )}
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher une team..." style={{ maxWidth: 400 }} />
       </div>
 
       {showCreate && (
@@ -78,35 +115,59 @@ export default function Teams() {
         </div>
       )}
 
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', borderRadius: 12, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+      <div style={{ background: 'white', borderRadius: 16, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr>
-            {['Nom de la Team', 'Membres', 'Action'].map(h => (
-              <th key={h} style={{ background: '#fdfdfd', padding: '18px 15px', textAlign: 'left', fontSize: 11, textTransform: 'uppercase', color: '#999', borderBottom: '2px solid #f0f0f0' }}>{h}</th>
+            {['#', 'Team', 'Membres', 'Total cartes', 'Action'].map(h => (
+              <th key={h} style={{ background: '#fdfdfd', padding: '16px', textAlign: 'left', fontSize: 11, textTransform: 'uppercase', color: '#999', borderBottom: '2px solid #f0f0f0' }}>{h}</th>
             ))}
           </tr></thead>
           <tbody>
-            {filtered.map(team => (
-              <tr key={team.id}>
-                <td style={{ padding: 15, borderBottom: '1px solid #f5f5f5' }}>
-                  <Link href={`/annuaire?team_id=${team.id}`} style={{ fontWeight: 800, color: '#121212' }}>{team.name}</Link>
-                </td>
-                <td style={{ padding: 15, borderBottom: '1px solid #f5f5f5' }}>
-                  <span style={{ background: '#f0f0f0', padding: '4px 8px', borderRadius: 4, fontWeight: 700 }}>
-                    {team.team_members?.[0]?.count || 0}
-                  </span>
-                </td>
-                <td style={{ padding: 15, borderBottom: '1px solid #f5f5f5' }}>
-                  {userId && userTeamId === team.id ? (
-                    <span style={{ color: '#003DA6', fontWeight: 700 }}>Ma Team ✓</span>
-                  ) : userId && !userTeamId ? (
-                    <button onClick={() => joinTeam(team.id)} disabled={loading} style={{ background: '#e8f5e9', color: '#2e7d32', padding: '6px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 900 }}>
-                      Rejoindre
-                    </button>
-                  ) : null}
-                </td>
-              </tr>
-            ))}
+            {filtered.map((team, i) => {
+              const stats = teamsStats.find(s => s.teamId === team.id)
+              const memberCount = team.team_members?.[0]?.count || 0
+              const isMyTeam = userTeamId === team.id
+              const pending = hasCandidature.has(team.id)
+              return (
+                <tr key={team.id}>
+                  <td style={{ padding: '14px 16px', borderBottom: '1px solid #f5f5f5', fontWeight: 900, color: i === 0 ? '#f39c12' : i === 1 ? '#95a5a6' : i === 2 ? '#cd7f32' : '#999', fontSize: 16 }}>
+                    {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
+                  </td>
+                  <td style={{ padding: '14px 16px', borderBottom: '1px solid #f5f5f5' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#003DA6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 900, fontSize: 14, flexShrink: 0 }}>
+                        {team.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <Link href={`/teams/${team.id}`} style={{ fontWeight: 800, color: '#121212', display: 'block' }}>{team.name}</Link>
+                        {team.description && <p style={{ fontSize: 11, color: '#999', margin: 0 }}>{team.description}</p>}
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ padding: '14px 16px', borderBottom: '1px solid #f5f5f5' }}>
+                    <span style={{ background: '#f0f0f0', padding: '4px 10px', borderRadius: 6, fontWeight: 700 }}>{memberCount}</span>
+                  </td>
+                  <td style={{ padding: '14px 16px', borderBottom: '1px solid #f5f5f5' }}>
+                    <span style={{ background: '#e3f2fd', color: '#1976d2', padding: '4px 10px', borderRadius: 6, fontWeight: 700 }}>
+                      {stats?.total ?? '...'}
+                    </span>
+                  </td>
+                  <td style={{ padding: '14px 16px', borderBottom: '1px solid #f5f5f5' }}>
+                    {isMyTeam ? (
+                      <Link href={`/teams/${team.id}`} style={{ color: '#003DA6', fontWeight: 700, fontSize: 13 }}>Ma Team ✓</Link>
+                    ) : pending ? (
+                      <span style={{ color: '#e67e22', fontWeight: 700, fontSize: 13 }}>⏳ En attente</span>
+                    ) : userId && !userTeamId ? (
+                      <button onClick={() => joinTeam(team.id)} disabled={loading} style={{ background: '#e8f5e9', color: '#2e7d32', padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 900 }}>
+                        Rejoindre
+                      </button>
+                    ) : (
+                      <Link href={`/teams/${team.id}`} style={{ color: '#003DA6', fontWeight: 700, fontSize: 13 }}>Voir →</Link>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
