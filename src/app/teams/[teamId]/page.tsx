@@ -69,16 +69,22 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
       setCandidatures(cands || [])
     }
 
-    // Vérifier si candidature existante
-    if (user) {
-   const { data: cand } = await supabase.from('team_candidatures')
-  .select('id')
-  .eq('team_id', parseInt(teamId))
-  .eq('user_id', user.id)
-  .limit(1) as { data: any[] | null }
+   // Vérifier si candidature existante
+if (user) {
+  const { data: cand, error: candError } = await supabase.from('team_candidatures')
+    .select('id')
+    .eq('team_id', parseInt(teamId))
+    .eq('user_id', user.id)
+    .limit(1)
 
-setHasCandidature(cand && cand.length > 0)
-    }
+  if (candError) {
+    console.error("Erreur de récupération :", candError)
+    setHasCandidature(false)
+  } else {
+    // cand est maintenant un tableau (grâce à .limit), on vérifie s'il contient au moins 1 élément
+    setHasCandidature(Array.isArray(cand) && cand.length > 0)
+  }
+}
 
     // Charger stats membres
     loadMembersStats(m || [])
