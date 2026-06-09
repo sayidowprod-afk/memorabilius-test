@@ -41,17 +41,17 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
     setTeam(t)
     setIsChef(user?.id === t.created_by)
 
- // Charger les membres
+    // Charger les membres
     const { data: m } = await supabase.from('team_members')
       .select('*, profiles(id, display_name, avatar_url, lien_csv, couleur_bordure)')
       .eq('team_id', parseInt(teamId))
     setMembers(m || [])
     setIsMember(m?.some((x: any) => x.user_id === user?.id) || false)
     
-    // Détection du rôle Admin / Chef
+    // 1. ON CALCULE LE RÔLE ADMIN ICI
     const currentUserMemberObj = m?.find((x: any) => x.user_id === user?.id)
     const userIsAdmin = currentUserMemberObj?.role === 'admin'
-    setIsAdmin(userIsAdmin) // On l'enregistre dans le state global
+    setIsAdmin(userIsAdmin) // Met à jour le state global pour l'onglet
 
     // Charger le profil utilisateur
     if (user) {
@@ -66,7 +66,7 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
       .order('created_at', { ascending: true })
     setMessages(msgs || [])
 
-    // Candidatures (chef OU admin)
+    // 2. CONDITION MODIFIÉE : CHEF OU ADMIN VOIENT LES CANDIDATURES
     if (user?.id === t.created_by || userIsAdmin) {
       const { data: cands } = await supabase.from('team_candidatures')
         .select('*, profiles(id, display_name, avatar_url, lien_csv)')
@@ -75,22 +75,21 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
       setCandidatures(cands || [])
     }
 
-   // Vérifier si candidature existante
-if (user) {
-  const { data: cand, error: candError } = await supabase.from('team_candidatures')
-    .select('id')
-    .eq('team_id', parseInt(teamId))
-    .eq('user_id', user.id)
-    .limit(1)
+    // Vérifier si candidature existante
+    if (user) {
+      const { data: cand, error: candError } = await supabase.from('team_candidatures')
+        .select('id')
+        .eq('team_id', parseInt(teamId))
+        .eq('user_id', user.id)
+        .limit(1)
 
-  if (candError) {
-    console.error("Erreur de récupération :", candError)
-    setHasCandidature(false)
-  } else {
-    // cand est maintenant un tableau (grâce à .limit), on vérifie s'il contient au moins 1 élément
-    setHasCandidature(Array.isArray(cand) && cand.length > 0)
-  }
-}
+      if (candError) {
+        console.error("Erreur de récupération :", candError)
+        setHasCandidature(false)
+      } else {
+        setHasCandidature(Array.isArray(cand) && cand.length > 0)
+      }
+    }
 
     // Charger stats membres
     loadMembersStats(m || [])
