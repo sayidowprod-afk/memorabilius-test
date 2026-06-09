@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 
+// Cette ligne indique à Vercel de NE PAS compiler cette route au build
 export const dynamic = 'force-dynamic'
 
 interface Card {
@@ -13,6 +14,7 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ userId: string }> | { userId: string } }
 ) {
+  // Résolution sécurisée des paramètres pour éviter les blocages TypeScript au build
   const resolvedParams = 'then' in context.params ? await context.params : context.params
   const userId = resolvedParams?.userId
 
@@ -21,10 +23,12 @@ export async function GET(
   }
 
   try {
+    // 1. Récupérer l'utilisateur connecté via le client Supabase standard
     const { data: { user } } = await supabase.auth.getUser()
     const currentUserId = user?.id || null
     const isOwner = currentUserId === userId
 
+    // 2. Récupérer le profil pour avoir le lien CSV
     const { data: profile } = await supabase
       .from('profiles')
       .select('lien_csv')
@@ -35,6 +39,7 @@ export async function GET(
       return NextResponse.json({ cards: [] })
     }
 
+    // 3. Récupérer les clés des cartes privées
     const { data: privateData } = await supabase
       .from('cartes_privees')
       .select('card_key')
@@ -42,6 +47,7 @@ export async function GET(
 
     const privateKeys = new Set(privateData?.map((d) => d.card_key) || [])
 
+    // 4. Charger et parser le CSV
     const r = await fetch(profile.lien_csv + '&t=' + Date.now())
     const t = await r.text()
     const rows = t.split(/\r?\n/).slice(4)
@@ -62,6 +68,7 @@ export async function GET(
       })
       .filter(Boolean) as Card[]
 
+    // 5. Filtrage de sécurité strict côté serveur
     const filteredCards = parsed.filter((card) => {
       if (!isOwner && privateKeys.has(card.f)) {
         return false 
