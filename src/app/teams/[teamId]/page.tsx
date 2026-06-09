@@ -133,11 +133,19 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
 }
 
   const accepterCandidature = async (cand: any) => {
-    // Accepter et ajouter comme membre
-    await supabase.from('team_candidatures').update({ statut: 'accepte' }).eq('id', cand.id)
-    await supabase.from('team_members').insert({ team_id: parseInt(teamId), user_id: cand.user_id })
-    setCandidatures(prev => prev.filter(c => c.id !== cand.id))
-    init()
+    try {
+      // 1. Accepter et ajouter comme membre
+      await supabase.from('team_candidatures').update({ statut: 'accepte' }).eq('id', cand.id)
+      await supabase.from('team_members').insert({ team_id: parseInt(teamId), user_id: cand.user_id })
+      
+      // 2. Filtrer immédiatement l'interface locale
+      setCandidatures(prev => prev.filter(c => c.id !== cand.id))
+      
+      // 3. Recharger les listes globales
+      init()
+    } catch (error) {
+      console.error("Erreur lors de l'acceptation :", error)
+    }
   }
 
   const refuserCandidature = async (cand: any) => {
