@@ -163,14 +163,17 @@ export default function Trades() {
         {/* Ligne 2 : sports + tags */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: '#888' }}>Sport :</span>
-          {Object.entries(SPORTS).map(([key, emoji]) => (
-            <button key={key} onClick={() => setFSport(fSport === key ? '' : key)} style={{
-              padding: '5px 12px', border: 'none', borderRadius: 20, cursor: 'pointer',
-              fontWeight: 700, fontSize: 13,
-              background: fSport === key ? '#003DA6' : '#f0f0f0',
-              color: fSport === key ? 'white' : '#333',
-            }}>{emoji}</button>
-          ))}
+          {Object.entries(SPORTS).map(([key, emoji]) => {
+            const labels: Record<string, string> = { basket: 'Basket', foot: 'Football', football_us: 'Football US', baseball: 'Baseball', hockey: 'Hockey', pokemon: 'Pokémon', tcg: 'TCG' }
+            return (
+              <button key={key} onClick={() => setFSport(fSport === key ? '' : key)} title={labels[key]} style={{
+                padding: '5px 12px', border: 'none', borderRadius: 20, cursor: 'pointer',
+                fontWeight: 700, fontSize: 13,
+                background: fSport === key ? '#003DA6' : '#f0f0f0',
+                color: fSport === key ? 'white' : '#333',
+              }}>{emoji}</button>
+            )
+          })}
           <span style={{ fontSize: 12, fontWeight: 700, color: '#888', marginLeft: 8 }}>Tags :</span>
           {(['rc', 'auto', 'num', 'patch'] as const).map(k => (
             <button key={k} onClick={() => setFTags(prev => ({ ...prev, [k]: !prev[k] }))} style={{

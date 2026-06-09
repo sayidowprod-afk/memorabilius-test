@@ -73,14 +73,14 @@ export default function NouveauTrade() {
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {[
                 { key: 'basket', label: '🏀 Basket' },
-                { key: 'foot', label: '⚽ Foot' },
+                { key: 'foot', label: '⚽ Football' },
                 { key: 'football_us', label: '🏈 Football US' },
                 { key: 'baseball', label: '⚾ Baseball' },
                 { key: 'hockey', label: '🏒 Hockey' },
                 { key: 'pokemon', label: '🟡 Pokémon' },
                 { key: 'tcg', label: '🃏 TCG' },
               ].map(s => (
-                <button key={s.key} type="button" onClick={() => setForm({ ...form, sport: s.key })} style={{
+                <button key={s.key} type="button" onClick={() => setForm({ ...form, sport: s.key })} title={s.label.split(' ').slice(1).join(' ')} style={{
                   padding: '8px 14px', border: `2px solid ${form.sport === s.key ? '#003DA6' : '#eee'}`,
                   borderRadius: 20, cursor: 'pointer', fontWeight: 700, fontSize: 13,
                   background: form.sport === s.key ? '#003DA6' : 'white',
