@@ -103,11 +103,19 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
     setNewMsg('')
   }
 
-  const postuler = async () => {
-    if (!currentUser) { router.push('/connexion'); return }
-    await supabase.from('team_candidatures').insert({ team_id: parseInt(teamId), user_id: currentUser })
-    setHasCandidature(true)
-  }
+ const postuler = async () => {
+  if (!currentUser) { router.push('/connexion'); return }
+  
+  // Utilise upsert en précisant qu'on repasse le statut en_attente
+  await supabase.from('team_candidatures').upsert({ 
+    team_id: parseInt(teamId), 
+    user_id: currentUser,
+    statut: 'en_attente',
+    created_at: new Date().toISOString() // Optionnel : pour mettre à jour la date
+  }, { onConflict: 'team_id,user_id' }) // À adapter selon tes clés uniques en BDD
+
+  setHasCandidature(true)
+}
 
   const accepterCandidature = async (cand: any) => {
     // Accepter et ajouter comme membre
