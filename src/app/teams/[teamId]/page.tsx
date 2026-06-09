@@ -217,10 +217,14 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
               </span>
             )}
             {isMember && <span style={{ color: accent, fontWeight: 700, fontSize: 14 }}>✓ Membre</span>}
-            {isMember && !isChef && (
+           {isMember && !isChef && (
               <button onClick={async () => {
                 if (!confirm('Quitter la team ?')) return
+                // 1. On retire le membre
                 await supabase.from('team_members').delete().eq('team_id', parseInt(teamId)).eq('user_id', currentUser)
+                // 2. On supprime son ancienne candidature pour libérer le bouton s'il revient
+                await supabase.from('team_candidatures').delete().eq('team_id', parseInt(teamId)).eq('user_id', currentUser)
+                
                 router.push('/teams')
               }} style={{ background: '#fff5f5', color: '#e74c3c', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
                 Quitter la team
@@ -297,10 +301,14 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                             {role === 'admin' ? '↓ Rétrograder' : '↑ Promouvoir'}
                           </button>
                         )}
-                        {role !== 'chef' && (
+                       {role !== 'chef' && (
                           <button onClick={async () => {
                             if (!confirm(`Exclure ${m.display_name} de la team ?`)) return
+                            // 1. Supprime le membre
                             await supabase.from('team_members').delete().eq('team_id', parseInt(teamId)).eq('user_id', m.id)
+                            // 2. Nettoie sa candidature pour lui permettre de re-postuler un jour
+                            await supabase.from('team_candidatures').delete().eq('team_id', parseInt(teamId)).eq('user_id', m.id)
+                            
                             init()
                           }} style={{
                             background: '#fff5f5', color: '#e74c3c',
