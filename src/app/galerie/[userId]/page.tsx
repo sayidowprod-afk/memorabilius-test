@@ -215,8 +215,6 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
               )}
             </div>
           )}
-            </div>
-          )}
         </div>
 
         <div style={{ background: '#fff', padding: 10, borderRadius: 8, marginBottom: 15, border: '1px solid #eee' }}>
