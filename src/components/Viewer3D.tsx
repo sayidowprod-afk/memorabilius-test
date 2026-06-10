@@ -136,11 +136,11 @@ export default function Viewer3D({ popup, accent, onClose, getTags }: {
       <style>{`
         .viewer-layout { display: flex; width: 100%; height: 100%; overflow: hidden; }
         .viewer-zone { flex: 1.2; position: relative; overflow: hidden; background: #f8f8f8; display: flex; align-items: center; justify-content: center; perspective: 2000px; cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none; }
-        .viewer-info { flex: 0 0 300px; width: 300px; padding: 24px; display: flex; flex-direction: column; justify-content: center; background: white; overflow-y: auto; }
+        .viewer-info { flex: 0.8; padding: 30px; display: flex; flex-direction: column; justify-content: center; background: white; overflow-y: auto; }
         @media (max-width: 600px) {
           .viewer-layout { flex-direction: column; }
           .viewer-zone { flex: 0 0 65% !important; width: 100% !important; }
-          .viewer-info { flex: 1 !important; width: 100% !important; padding: 10px 14px !important; justify-content: flex-start !important; overflow-y: auto; }
+          .viewer-info { flex: 1 !important; width: 100% !important; padding: 10px 14px !important; justify-content: flex-start !important; }
           .viewer-info h2 { font-size: 1rem !important; margin: 2px 0 !important; }
           .viewer-hint { display: none !important; }
         }
