@@ -131,22 +131,26 @@ export default function Viewer3D({ popup, accent, onClose, getTags }: {
     <div style={{
       position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
       background: '#fff', zIndex: 9999999, display: 'flex',
+      overflow: 'hidden',
     }}>
       <style>{`
-        .viewer-layout { display: flex; flex-direction: row; width: 100%; height: 100%; }
+        .viewer-layout { display: flex; flex-direction: row; width: 100%; height: 100%; overflow: hidden; }
         .viewer-zone { flex: 1.2; display: flex; align-items: center; justify-content: center; background: #f8f8f8; perspective: 2000px; cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none; overflow: hidden; position: relative; }
-        .viewer-info { flex: 0.8; padding: 30px; display: flex; flex-direction: column; justify-content: center; background: white; overflow-y: auto; }
+        .viewer-info { flex: 0.8; padding: 24px; display: flex; flex-direction: column; justify-content: center; background: white; overflow-y: auto; min-width: 0; }
         @media (max-width: 600px) {
           .viewer-layout { flex-direction: column; }
-          .viewer-zone { flex: 0 0 55vh; }
-          .viewer-info { flex: 1; padding: 16px; justify-content: flex-start; }
+          .viewer-zone { flex: 0 0 62vh !important; min-height: 0; }
+          .viewer-info { flex: 1; padding: 12px 14px; justify-content: flex-start; overflow-y: auto; }
+          .viewer-info h2 { font-size: 1.1rem !important; margin: 3px 0 !important; }
+          .viewer-info .v-sub { font-size: 0.85rem !important; margin-bottom: 6px !important; }
+          .viewer-hint { display: none !important; }
         }
       `}</style>
       <button onClick={onClose} style={{
-        position: 'absolute', top: 12, right: 12, fontSize: 20, cursor: 'pointer',
-        background: 'rgba(255,255,255,0.95)', width: 36, height: 36, borderRadius: '50%',
+        position: 'absolute', top: 12, right: 12, fontSize: 18, cursor: 'pointer',
+        background: 'rgba(255,255,255,0.95)', width: 32, height: 32, borderRadius: '50%',
         border: '1px solid #eee', display: 'flex', alignItems: 'center',
-        justifyContent: 'center', zIndex: 10001, lineHeight: 1,
+        justifyContent: 'center', zIndex: 10001, lineHeight: 1, flexShrink: 0,
       }}>×</button>
 
       <div className="viewer-layout">
@@ -164,55 +168,38 @@ export default function Viewer3D({ popup, accent, onClose, getTags }: {
           onTouchEnd={() => { isDragging.current = false }}
         >
           <div ref={wrapRef} style={{ willChange: 'transform' }}>
-            <div style={{ transform: 'scale(0.4)', transformOrigin: 'center center' }}>
+            <div style={{ transform: 'scale(0.35)', transformOrigin: 'center center' }}>
             <div ref={cardRef} style={{
               width: 1000, height: 1400,
               position: 'relative',
               transformStyle: 'preserve-3d',
               willChange: 'transform',
             }}>
-              {/* Face avant */}
-              <div style={{
-                position: 'absolute', inset: 0,
-                backfaceVisibility: 'hidden',
-                WebkitBackfaceVisibility: 'hidden',
-                borderRadius: 0,
-                boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-                overflow: 'hidden',
-              }}>
+              <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
                 <img src={popup.f} draggable={false} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} alt={popup.n} />
               </div>
-              {/* Face arrière */}
-              <div style={{
-                position: 'absolute', inset: 0,
-                backfaceVisibility: 'hidden',
-                WebkitBackfaceVisibility: 'hidden',
-                transform: 'rotateY(180deg)',
-                borderRadius: 0,
-                boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-                overflow: 'hidden',
-              }}>
+              <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
                 <img src={popup.b} draggable={false} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} alt={popup.n} />
               </div>
             </div>
             </div>
           </div>
-          <p style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', fontSize: 10, color: '#bbb', whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+          <p className="viewer-hint" style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', fontSize: 10, color: '#bbb', whiteSpace: 'nowrap', pointerEvents: 'none' }}>
             Glisser · Scroll pour zoomer · Double-clic pour reset
           </p>
         </div>
 
         {/* Infos */}
         <div className="viewer-info">
-          <div style={{ color: accent, fontWeight: 900, fontSize: 11, textTransform: 'uppercase' }}>{popup.t}</div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 900, margin: '5px 0' }}>{popup.n}</h2>
-          <div style={{ fontSize: '1rem', color: accent, fontWeight: 700, marginBottom: 10, fontStyle: 'italic' }}>{popup.v}</div>
+          <div style={{ color: accent, fontWeight: 900, fontSize: 10, textTransform: 'uppercase', marginBottom: 2 }}>{popup.t}</div>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 900, margin: '4px 0' }}>{popup.n}</h2>
+          <div className="v-sub" style={{ fontSize: '0.95rem', color: accent, fontWeight: 700, marginBottom: 8, fontStyle: 'italic' }}>{popup.v}</div>
           {getTags(popup)}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, borderTop: '1px solid #eee', marginTop: 12, paddingTop: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, borderTop: '1px solid #eee', marginTop: 10, paddingTop: 10 }}>
             {[['Année', popup.y], ['Numérotation', popup.num || 'N/A'], ['Grade', popup.g], ['Collection', `${popup.br} ${popup.s}`]].map(([l, v]) => (
               <div key={l}>
                 <label style={{ display: 'block', fontSize: 9, fontWeight: 800, color: '#999', textTransform: 'uppercase' }}>{l}</label>
-                <span style={{ fontSize: 13, fontWeight: 700 }}>{v}</span>
+                <span style={{ fontSize: 12, fontWeight: 700 }}>{v}</span>
               </div>
             ))}
           </div>
