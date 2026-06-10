@@ -125,14 +125,23 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
 
   const toggleFilter = (k: keyof typeof activeFilters) => setActiveFilters(p => ({ ...p, [k]: !p[k] }))
 
-  const getTags = (d: Card) => (
-    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', minHeight: 18 }}>
-      {d.rc && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, textTransform: 'uppercase', background: '#e67e22', color: 'white' }}>RC</span>}
-      {d.auto && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, textTransform: 'uppercase', background: '#2e7d32', color: 'white' }}>AUTO</span>}
-      {d.num && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, textTransform: 'uppercase', background: '#7b1fa2', color: 'white' }}>{d.num}</span>}
-      {d.patch && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, textTransform: 'uppercase', background: '#1976d2', color: 'white' }}>PATCH</span>}
-    </div>
-  )
+  const getTags = (d: Card) => {
+    const isRPA = d.rc && d.auto && d.patch
+    return (
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', minHeight: 18 }}>
+        {isRPA ? (
+          <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 8px', borderRadius: 4, background: 'linear-gradient(135deg, #e67e22, #2e7d32, #1976d2)', color: 'white', letterSpacing: 1 }}>RPA</span>
+        ) : (
+          <>
+            {d.rc && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, background: '#e67e22', color: 'white' }}>RC</span>}
+            {d.auto && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, background: '#2e7d32', color: 'white' }}>AUTO</span>}
+            {d.patch && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, background: '#1976d2', color: 'white' }}>PATCH</span>}
+          </>
+        )}
+        {d.num && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, background: '#7b1fa2', color: 'white' }}>/{d.num}</span>}
+      </div>
+    )
+  }
 
   const accent = profile?.couleur_bordure || '#003DA6'
 
