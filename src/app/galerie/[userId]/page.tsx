@@ -282,16 +282,6 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
               position: 'relative',
               overflow: 'visible',
             }}>
-              {/* Badge RPA image - à cheval entre photo et infos */}
-              {d.rc && d.auto && d.patch && (
-                <img src="/rpa-badge.png" alt="RPA" style={{
-                  position: 'absolute', bottom: -18, right: 6,
-                  width: 52, height: 52, objectFit: 'contain',
-                  filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))',
-                  zIndex: 3, pointerEvents: 'none',
-                }} />
-              )}
-              {/* Badge privé pour le propriétaire */}
               {isOwner && privateCards.has(d.f) && (
                 <div style={{ position: 'absolute', top: 6, left: 6, background: '#e74c3c', color: 'white', fontSize: 9, fontWeight: 900, padding: '2px 6px', borderRadius: 4, zIndex: 2 }}>
                   🔒 PRIVÉ
@@ -308,8 +298,17 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
                   {privateCards.has(d.f) ? '🔓 Rendre public' : '🔒 Rendre privé'}
                 </button>
               )}
-              <div style={{ width: '100%', aspectRatio: '2.5/3.5', marginBottom: 8, overflow: 'hidden' }}>
-                <img src={d.f} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={d.n} />
+              <div style={{ width: '100%', aspectRatio: '2.5/3.5', marginBottom: 8, overflow: 'visible', position: 'relative' }}>
+                <img src={d.f} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt={d.n} />
+                {/* Badge RPA à cheval entre image et infos */}
+                {d.rc && d.auto && d.patch && (
+                  <img src="/rpa-badge.png" alt="RPA" style={{
+                    position: 'absolute', bottom: -22, right: 4,
+                    width: 48, height: 48, objectFit: 'contain',
+                    filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))',
+                    zIndex: 4, pointerEvents: 'none',
+                  }} />
+                )}
               </div>
               {getTags(d)}
               <p style={{ fontWeight: 800, fontSize: 13, margin: '4px 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.n}</p>
