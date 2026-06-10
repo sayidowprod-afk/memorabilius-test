@@ -222,8 +222,7 @@ export default function Viewer3D({ popup, accent, onClose, getTags }: {
                 style={{
                   width: '100%', height: '100%',
                   objectFit: 'cover', display: 'block',
-                  imageRendering: 'high-quality',
-                  WebkitImageRendering: '-webkit-optimize-contrast',
+                  imageRendering: 'auto',
                 } as React.CSSProperties}
                 alt={popup.n}
               />
@@ -244,8 +243,7 @@ export default function Viewer3D({ popup, accent, onClose, getTags }: {
                 style={{
                   width: '100%', height: '100%',
                   objectFit: 'cover', display: 'block',
-                  imageRendering: 'high-quality',
-                  WebkitImageRendering: '-webkit-optimize-contrast',
+                  imageRendering: 'auto',
                 } as React.CSSProperties}
                 alt={popup.n}
               />
