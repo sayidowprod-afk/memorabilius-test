@@ -29,10 +29,10 @@ export default function Recherche() {
 
   const getTags = (card: any) => (
     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-      {card.rc && <span style={{ fontSize: 8, fontWeight: 900, padding: '2px 5px', borderRadius: 2, background: '#fff3e0', color: '#e67e22' }}>RC</span>}
-      {card.auto && <span style={{ fontSize: 8, fontWeight: 900, padding: '2px 5px', borderRadius: 2, background: '#e8f5e9', color: '#2e7d32' }}>AUTO</span>}
-      {card.num && <span style={{ fontSize: 8, fontWeight: 900, padding: '2px 5px', borderRadius: 2, background: '#f5f5f5', color: '#444' }}>#{card.num}</span>}
-      {card.patch && <span style={{ fontSize: 8, fontWeight: 900, padding: '2px 5px', borderRadius: 2, background: '#e3f2fd', color: '#1976d2' }}>PATCH</span>}
+      {card.rc && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, background: '#e67e22', color: 'white' }}>RC</span>}
+      {card.auto && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, background: '#2e7d32', color: 'white' }}>AUTO</span>}
+      {card.num && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, background: '#7b1fa2', color: 'white' }}>/{card.num}</span>}
+      {card.patch && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, background: '#1976d2', color: 'white' }}>PATCH</span>}
     </div>
   )
 

@@ -14,6 +14,7 @@ export default async function Home() {
     .select('stats_total')
     .not('lien_csv', 'is', null)
     .neq('lien_csv', '')
+    .gt('stats_total', 0)
   const totalCartes = statsData?.reduce((acc, p) => acc + (p.stats_total || 0), 0) ?? 0
 
   const { data: profiles } = await supabase
