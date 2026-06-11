@@ -162,7 +162,7 @@ export default function Viewer3D({ popup, accent, onClose, getTags }: {
         >
           <div ref={wrapRef} style={{ willChange: 'transform' }}>
             <div ref={cardRef} style={{
-              width: 260, height: 364,
+              width: 420, height: 588,
               position: 'relative', transformStyle: 'preserve-3d', willChange: 'transform',
             }}>
               <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
