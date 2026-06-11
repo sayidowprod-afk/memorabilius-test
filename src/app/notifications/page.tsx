@@ -3,9 +3,11 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { useLang } from '@/lib/LangContext'
 
 export default function Notifications() {
   const router = useRouter()
+  const { t } = useLang()
   const [notifs, setNotifs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -47,12 +49,12 @@ export default function Notifications() {
 
   return (
     <div style={{ maxWidth: 700, margin: '40px auto', fontFamily: 'Inter, sans-serif' }}>
-      <h1 style={{ fontWeight: 900, fontSize: 28, marginBottom: 24 }}>🔔 Notifications</h1>
+      <h1 style={{ fontWeight: 900, fontSize: 28, marginBottom: 24 }}>{t('notif_title')}</h1>
 
       {notifs.length === 0 ? (
         <div style={{ background: 'white', borderRadius: 16, padding: 60, textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>🔔</div>
-          <p style={{ color: '#bbb', fontSize: 16 }}>Aucune notification pour l'instant</p>
+          <p style={{ color: '#bbb', fontSize: 16 }}>{t('notif_none')}</p>
         </div>
       ) : (
         <div style={{ background: 'white', borderRadius: 16, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>

@@ -3,6 +3,7 @@ import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import { useLang } from '@/lib/LangContext'
 
 interface Stats { total: number; rc: number; auto: number; num: number; patch: number }
 interface Collector { id: string; display_name: string; avatar_url: string; lien_csv: string; stats?: Stats }
@@ -16,6 +17,7 @@ export default function Annuaire() {
 }
 
 function AnnuaireContent() {
+  const { t, lang } = useLang()
   const searchParams = useSearchParams()
   const teamIdFromUrl = searchParams.get('team_id') || ''
 
@@ -140,7 +142,7 @@ function AnnuaireContent() {
     <div style={{ maxWidth: 1200, margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
         <h1 style={{ fontWeight: 900, fontSize: 28, margin: 0 }}>
-          {teamName ? `Team : ${teamName}` : 'Annuaire des collectionneurs'}
+          {teamName ? `${lang === 'fr' ? 'Team' : 'Team'} : ${teamName}` : t('directory_title')}
         </h1>
         {teamName && (
           <button onClick={() => handleTeamChange('')} style={{ fontSize: 12, color: '#999', background: 'none', border: '1px solid #ddd', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
@@ -160,8 +162,8 @@ function AnnuaireContent() {
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', borderRadius: 12, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
             <thead><tr>
-              {th('display_name', 'Collectionneur')}
-              {th('total', 'Total')}
+              {th('display_name', t('directory_collector'))}
+              {th('total', t('directory_total'))}
               {th('rc', 'RC')}
               {th('auto', 'Auto')}
               {th('num', '# Num')}
@@ -169,7 +171,7 @@ function AnnuaireContent() {
             </tr></thead>
             <tbody>
               {sorted.length === 0 && (
-                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 40, color: '#bbb' }}>Aucun collectionneur dans cette team.</td></tr>
+                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 40, color: '#bbb' }}>{lang === 'fr' ? 'Aucun collectionneur dans cette team.' : 'No collectors in this team.'}</td></tr>
               )}
               {sorted.map(c => (
                 <tr key={c.id}>
