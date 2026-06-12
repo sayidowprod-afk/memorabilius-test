@@ -243,15 +243,15 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('gallery_search')} /></div>
             <div><label style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 3 }}>Équipe</label>
               <select value={fTeam} onChange={e => setFTeam(e.target.value)}>
-                <option value=""{t('gallery_all')}</option>{teams.map(t => <option key={t}>{t}</option>)}
+                <option value="">{t('gallery_all')}</option>{teams.map(team => <option key={team}>{team}</option>)}
               </select></div>
             <div><label style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 3 }}>Collection</label>
               <select value={fBrand} onChange={e => setFBrand(e.target.value)}>
-                <option value=""{t('gallery_all')}</option>{brands.map(b => <option key={b}>{b}</option>)}
+                <option value="">{t('gallery_all')}</option>{brands.map(brand => <option key={brand}>{brand}</option>)}
               </select></div>
             <div><label style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 3 }}>Année</label>
               <select value={fYear} onChange={e => setFYear(e.target.value)}>
-                <option value=""{t('gallery_all')}</option>{years.map(y => <option key={y}>{y}</option>)}
+                <option value="">{t('gallery_all')}</option>{years.map(year => <option key={year}>{year}</option>)}
               </select></div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 5 }}>

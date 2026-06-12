@@ -88,10 +88,10 @@ export default function Teams() {
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
-        <h1 style={{ fontWeight: 900, fontSize: 28, margin: 0 }}{t('teams_title')}</h1>
+        <h1 style={{ fontWeight: 900, fontSize: 28, margin: 0 }}>{t('teams_title')}</h1>
         {userId && !userTeamId && (
           <button onClick={() => setShowCreate(!showCreate)} className="btn-main btn-primary" style={{ padding: '10px 20px', fontSize: 13 }}>
-            + {t('teams_create')}
+            {t('teams_create')}
           </button>
         )}
         {userId && userTeamId && (

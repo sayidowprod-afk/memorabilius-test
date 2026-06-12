@@ -126,7 +126,7 @@ function MessagesContent() {
         </div>
         <div style={{ overflowY: 'auto', flex: 1 }}>
           {conversations.length === 0 && (
-            <p style={{ padding: 20, color: '#bbb', fontSize: 13, textAlign: 'center' }}{t('messages_none')}</p>
+            <p style={{ padding: 20, color: '#bbb', fontSize: 13, textAlign: 'center' }}>{t('messages_none')}</p>
           )}
           {conversations.map(conv => (
             <div key={conv.id} onClick={() => selectConv(conv.id)} style={{
@@ -152,7 +152,7 @@ function MessagesContent() {
       <div className="msg-chat" style={{ flex: 1, background: 'white', borderRadius: 16, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {!activeConv ? (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bbb' }}>
-            <p{t('messages_select')}</p>
+            <p>{t('messages_select')}</p>
           </div>
         ) : (
           <>
@@ -202,7 +202,7 @@ function MessagesContent() {
               <button onClick={sendMessage} style={{
                 background: '#003DA6', color: 'white', border: 'none',
                 padding: '10px 20px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer'
-              }}{t('messages_send')}</button>
+              }}>{t('messages_send')}</button>
             </div>
           </>
         )}

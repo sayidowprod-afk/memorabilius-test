@@ -93,7 +93,7 @@ export default function Profil() {
 
   return (
     <div style={{ maxWidth: 600, margin: '40px auto' }}>
-      <h1 style={{ fontWeight: 900, fontSize: 28, marginBottom: 30 }}{t('profile_title')}</h1>
+      <h1 style={{ fontWeight: 900, fontSize: 28, marginBottom: 30 }}>{t('profile_title')}</h1>
 
       {csvLinked ? (
         <div style={{ background: '#eef2f7', borderLeft: '4px solid #2ecc71', padding: 15, borderRadius: 8, marginBottom: 24 }}>
@@ -109,7 +109,7 @@ export default function Profil() {
 
       {/* Avatar */}
       <div style={{ background: 'white', borderRadius: 16, padding: 30, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', marginBottom: 20 }}>
-        <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 16 }}{t('profile_photo')}</label>
+        <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 16 }}>{t('profile_photo')}</label>
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
           <div style={{ position: 'relative' }}>
             <img src={avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(form.display_name || 'U')}&background=003DA6&color=fff&size=128`}
@@ -118,7 +118,7 @@ export default function Profil() {
           </div>
           <div>
             <button onClick={() => fileRef.current?.click()} disabled={uploading} style={{ background: '#003DA6', color: 'white', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'block', marginBottom: 6 }}>
-              {uploading ? 'Upload en cours...' : '{t('profile_change_photo')}'}
+              {uploading ? (lang === 'fr' ? 'Upload en cours...' : 'Uploading...') : t('profile_change_photo')}
             </button>
             <p style={{ fontSize: 11, color: '#999', margin: 0 }}>JPG, PNG ou WEBP · Max 2 Mo</p>
           </div>
@@ -130,7 +130,7 @@ export default function Profil() {
       <div style={{ background: 'white', borderRadius: 16, padding: 40, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', marginBottom: 20 }}>
         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div>
-            <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 6 }}{t('profile_pseudo')}</label>
+            <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 6 }}>{t('profile_pseudo')}</label>
             <input value={form.display_name} onChange={e => setForm({ ...form, display_name: e.target.value })} placeholder="Votre pseudo" />
           </div>
           <div>
@@ -157,7 +157,7 @@ export default function Profil() {
             </div>
           </div>
           <div>
-            <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 6 }}{t('profile_border')}</label>
+            <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 6 }}>{t('profile_border')}</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <input type="color" value={form.couleur_bordure} onChange={e => setForm({ ...form, couleur_bordure: e.target.value })} style={{ width: 50, height: 40, padding: 2, cursor: 'pointer' }} />
               <span style={{ fontSize: 13, color: '#666' }}>{form.couleur_bordure}</span>
@@ -171,7 +171,7 @@ export default function Profil() {
 
       {/* Zone danger */}
       <div style={{ background: 'white', borderRadius: 16, padding: 30, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid #ffebee' }}>
-        <h3 style={{ fontWeight: 800, color: '#e74c3c', marginBottom: 8 }}{t('profile_danger')}</h3>
+        <h3 style={{ fontWeight: 800, color: '#e74c3c', marginBottom: 8 }}>{t('profile_danger')}</h3>
         <p style={{ fontSize: 13, color: '#666', marginBottom: 16, lineHeight: 1.5 }}>La suppression de votre compte est irréversible. Toutes vos données seront perdues.</p>
         {!showDelete ? (
           <button onClick={() => setShowDelete(true)} style={{ background: '#fff5f5', color: '#e74c3c', border: '1px solid #ffcdd2', borderRadius: 8, padding: '10px 20px', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
@@ -187,7 +187,7 @@ export default function Profil() {
                 color: deleteConfirm === 'SUPPRIMER' ? 'white' : '#999',
                 border: 'none', borderRadius: 8, padding: '10px 20px', fontWeight: 700, cursor: 'pointer', fontSize: 13
               }}>
-                {deleting ? 'Suppression...' : '{t('profile_delete_btn')}'}
+               {deleting ? 'Suppression...' : t('profile_delete_btn')}
               </button>
               <button onClick={() => { setShowDelete(false); setDeleteConfirm('') }} style={{ background: '#f0f0f0', color: '#333', border: 'none', borderRadius: 8, padding: '10px 20px', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
                 Annuler

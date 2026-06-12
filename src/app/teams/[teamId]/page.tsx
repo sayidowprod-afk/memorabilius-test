@@ -190,7 +190,7 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
             {isMember && <span style={{ color: accent, fontWeight: 700, fontSize: 14 }}>✓ Membre</span>}
             {isMember && !isChef && (
               <button onClick={async () => {
-                if (!confirm('{t('teams_leave')} ?')) return
+                if (!confirm(`${t('teams_leave')} ?`)) return
                 await supabase.from('team_members').delete().eq('team_id', parseInt(teamId)).eq('user_id', currentUser)
                 router.push('/teams')
               }} style={{ background: '#fff5f5', color: '#e74c3c', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
@@ -266,7 +266,7 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                             border: 'none', borderRadius: 6, padding: '5px 10px',
                             fontWeight: 700, fontSize: 11, cursor: 'pointer'
                           }}>
-                            {role === 'admin' ? '{t('teams_demote')}' : '{t('teams_promote')}'}
+                            {role === 'admin' ? t('teams_demote') : t('teams_promote')}
                           </button>
                         )}
                         {role !== 'chef' && (
@@ -320,7 +320,7 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
           </div>
           <div style={{ padding: '12px 16px', borderTop: '1px solid #f0f0f0', display: 'flex', gap: 10 }}>
             <input value={newMsg} onChange={e => setNewMsg(e.target.value)} onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()} placeholder="Votre message..." style={{ flex: 1 }} />
-            <button onClick={sendMessage} style={{ background: accent, color: 'white', border: 'none', borderRadius: 8, padding: '10px 20px', fontWeight: 700, cursor: 'pointer' }}{t('teams_send')}</button>
+            <button onClick={sendMessage} style={{ background: accent, color: 'white', border: 'none', borderRadius: 8, padding: '10px 20px', fontWeight: 700, cursor: 'pointer' }}>{t('teams_send')}</button>
           </div>
         </div>
       )}
