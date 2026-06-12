@@ -39,6 +39,7 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
 
   const isOwner = currentUser === userId
   const { t, lang } = useLang()
+  const [cartesManuellesCount, setCartesManuellesCount] = useState(0)
 
   useEffect(() => {
     const init = async () => {
@@ -98,12 +99,25 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
           g: c[12] || 'Raw'
         }
       }).filter(Boolean) as Card[]
-      setCards(parsed)
-      setTeams([...new Set(parsed.map(d => d.t).filter(Boolean))].sort())
-      setBrands([...new Set(parsed.map(d => d.s).filter(Boolean))].sort())
-      setYears([...new Set(parsed.map(d => d.y).filter(Boolean))].sort())
+
+      // Charger les cartes manuelles
+      const { data: manuelles } = await supabase.from('cartes_manuelles').select('*').eq('user_id', userId)
+      const cartesM: Card[] = (manuelles || []).map((m: any) => ({
+        f: m.image_recto || 'https://placehold.co/300x420?text=No+Image',
+        b: m.image_verso || m.image_recto || 'https://placehold.co/300x420?text=No+Image',
+        n: m.nom || '', t: m.equipe || '', y: m.annee || '',
+        br: m.collection || '', s: m.collection || '', v: m.variation || '',
+        num: m.num || '', auto: m.auto || false, rc: m.rc || false,
+        patch: m.patch || false, g: m.grade || 'Raw',
+      }))
+
+      const allCards = [...parsed, ...cartesM]
+      setCards(allCards)
+      setTeams([...new Set(allCards.map(d => d.t).filter(Boolean))].sort())
+      setBrands([...new Set(allCards.map(d => d.s).filter(Boolean))].sort())
+      setYears([...new Set(allCards.map(d => d.y).filter(Boolean))].sort())
       setLoaded(true)
-    } catch (e) { console.error('CSV error', e) }
+    } catch (e) { console.error('CSV error', e); setLoaded(true) }
   }
 
   useEffect(() => {
@@ -233,23 +247,33 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
                   {editMode ? t('gallery_done') : t('gallery_privacy')}
                 </button>
               )}
+              {isOwner && !editMode && (
+                <a href={`/galerie/${userId}/ajouter`} style={{
+                  background: '#003DA6', color: 'white',
+                  border: 'none', borderRadius: 8, padding: '8px 14px',
+                  fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                  marginLeft: 4, textDecoration: 'none', display: 'inline-block',
+                }}>
+                  ➕ {lang === 'fr' ? 'Ajouter' : 'Add'}
+                </a>
+              )}
             </div>
           )}
         </div>
 
         <div style={{ background: '#fff', padding: 10, borderRadius: 8, marginBottom: 15, border: '1px solid #eee' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8, marginBottom: 10 }}>
-            <div><label style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 3 }}>{t('gallery_search_label')}</label>
+            <div><label style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 3 }}{t('gallery_search_label')}</label>
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('gallery_search')} /></div>
-            <div><label style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 3 }}>{t('gallery_team_label')}</label>
+            <div><label style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 3 }}{t('gallery_team_label')}</label>
               <select value={fTeam} onChange={e => setFTeam(e.target.value)}>
                 <option value="">{t('gallery_all')}</option>{teams.map(team => <option key={team}>{team}</option>)}
               </select></div>
-            <div><label style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 3 }}>{t('gallery_collection_label')}</label>
+            <div><label style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 3 }}{t('gallery_collection_label')}</label>
               <select value={fBrand} onChange={e => setFBrand(e.target.value)}>
                 <option value="">{t('gallery_all')}</option>{brands.map(brand => <option key={brand}>{brand}</option>)}
               </select></div>
-            <div><label style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 3 }}>{t('gallery_year_label')}</label>
+            <div><label style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 3 }}{t('gallery_year_label')}</label>
               <select value={fYear} onChange={e => setFYear(e.target.value)}>
                 <option value="">{t('gallery_all')}</option>{years.map(year => <option key={year}>{year}</option>)}
               </select></div>
