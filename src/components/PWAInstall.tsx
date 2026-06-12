@@ -42,8 +42,8 @@ export default function PWAInstall() {
     }}>
       <span style={{ fontSize: 28 }}>📲</span>
       <div style={{ flex: 1 }}>
-        <p style={{ fontWeight: 800, fontSize: 14, margin: 0 }}{t('pwa_install')}</p>
-        <p style={{ fontSize: 12, margin: '2px 0 0', opacity: 0.8 }}{t('pwa_sub')}</p>
+        <p style={{ fontWeight: 800, fontSize: 14, margin: 0 }}>{t('pwa_install')}</p>
+        <p style={{ fontSize: 12, margin: '2px 0 0', opacity: 0.8 }}>{t('pwa_sub')}</p>
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         <button onClick={() => setShow(false)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 8, padding: '6px 12px', color: 'white', cursor: 'pointer', fontSize: 13 }}>

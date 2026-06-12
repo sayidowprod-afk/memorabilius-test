@@ -42,7 +42,7 @@ export default function Recherche() {
     <div style={{ maxWidth: 1200, margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
       {/* Header */}
       <div style={{ textAlign: 'center', padding: '40px 20px 30px' }}>
-        <h1 style={{ fontWeight: 900, fontSize: 32, marginBottom: 8 }}{t('search_title')}</h1>
+        <h1 style={{ fontWeight: 900, fontSize: 32, marginBottom: 8 }}>{t('search_title')}</h1>
         <p style={{ color: '#666', fontSize: 16, marginBottom: 30 }}>
           {t('search_sub')}
         </p>
@@ -62,7 +62,7 @@ export default function Recherche() {
           {loading && <span style={{ position: 'absolute', right: 18, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: '#999' }}>...</span>}
         </div>
         {query.length > 0 && query.length < 2 && (
-          <p style={{ color: '#999', fontSize: 13, marginTop: 8 }}{t('search_min_chars')}</p>
+          <p style={{ color: '#999', fontSize: 13, marginTop: 8 }}>{t('search_min_chars')}</p>
         )}
       </div>
 
@@ -71,7 +71,7 @@ export default function Recherche() {
         <div style={{ textAlign: 'center', padding: '60px 20px', color: '#bbb' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>🃏</div>
           <p style={{ fontSize: 18, fontWeight: 700 }}>Aucune carte trouvée pour "{query}"</p>
-          <p style={{ fontSize: 14, marginTop: 8 }}{t('search_none_sub')}</p>
+          <p style={{ fontSize: 14, marginTop: 8 }}>{t('search_none_sub')}</p>
         </div>
       )}
 

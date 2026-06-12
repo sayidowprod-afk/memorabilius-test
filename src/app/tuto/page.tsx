@@ -8,7 +8,7 @@ export default function Tuto() {
     <div style={{ maxWidth: 800, margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
 
       {/* Tutoriel Vidéo */}
-      <h2 style={{ fontWeight: 900, fontSize: 28, marginBottom: 16 }}{t('tuto_video')}</h2>
+      <h2 style={{ fontWeight: 900, fontSize: 28, marginBottom: 16 }}>{t('tuto_video')}</h2>
       <div style={{ borderRadius: 16, overflow: 'hidden', marginBottom: 48, boxShadow: '0 4px 20px rgba(0,0,0,0.1)', aspectRatio: '16/9', position: 'relative' }}>
         <iframe
           src="https://www.youtube.com/embed/bMnV8jGQbGU"
@@ -19,8 +19,8 @@ export default function Tuto() {
         />
       </div>
 
-      <h1 style={{ fontWeight: 900, fontSize: 32, marginBottom: 8 }}{t('tuto_title')}</h1>
-      <p style={{ color: '#666', marginBottom: 40, fontSize: 16 }}{t('tuto_sub')}</p>
+      <h1 style={{ fontWeight: 900, fontSize: 32, marginBottom: 8 }}>{t('tuto_title')}</h1>
+      <p style={{ color: '#666', marginBottom: 40, fontSize: 16 }}>{t('tuto_sub')}</p>
 
       {/* Étape 1 */}
       <div style={{ background: 'white', borderRadius: 16, padding: 32, marginBottom: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderLeft: '4px solid #003DA6' }}>
