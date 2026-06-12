@@ -9,9 +9,11 @@ import { useLang } from '@/lib/LangContext'
 const PAGE_SIZE = 48
 
 interface Card {
+  id?: string; // Permet d'identifier la carte manuelle pour sa suppression
   f: string; b: string; n: string; t: string; y: string
   br: string; s: string; v: string; num: string
   auto: boolean; rc: boolean; patch: boolean; g: string
+  isManuelle?: boolean; // Permet de savoir si la carte provient de la table manuelle
 }
 
 export default function Galerie({ params }: { params: Promise<{ userId: string }> }) {
@@ -81,6 +83,20 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
     }
   }
 
+  // Fonction pour supprimer définitivement une carte manuelle
+  const deleteManuelleCard = async (cardId: string, e: React.MouseEvent) => {
+    e.stopPropagation() // Évite d'ouvrir le Viewer3D
+    if (!confirm(lang === 'fr' ? 'Voulez-vous vraiment supprimer cette carte de votre galerie ?' : 'Are you sure you want to delete this card?')) return
+
+    const { error } = await supabase.from('cartes_manuelles').delete().eq('id', cardId).eq('user_id', userId)
+    if (error) {
+      alert('Erreur lors de la suppression : ' + error.message)
+    } else {
+      // Filtrage instantané du state local
+      setCards(prev => prev.filter(c => c.id !== cardId))
+    }
+  }
+
   const loadCSV = async (url: string) => {
     try {
       const r = await fetch(url + '&t=' + Date.now())
@@ -96,19 +112,22 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
           num: c[8] || '', auto: c[9]?.toLowerCase().includes('oui') || false,
           rc: c[10]?.toLowerCase().includes('oui') || false,
           patch: c[11]?.toLowerCase().includes('oui') || false,
-          g: c[12] || 'Raw'
+          g: c[12] || 'Raw',
+          isManuelle: false
         }
       }).filter(Boolean) as Card[]
 
       // Charger les cartes manuelles
       const { data: manuelles } = await supabase.from('cartes_manuelles').select('*').eq('user_id', userId)
       const cartesM: Card[] = (manuelles || []).map((m: any) => ({
+        id: m.id, // Garder l'id de Supabase
         f: m.image_recto || 'https://placehold.co/300x420?text=No+Image',
         b: m.image_verso || m.image_recto || 'https://placehold.co/300x420?text=No+Image',
         n: m.nom || '', t: m.equipe || '', y: m.annee || '',
         br: m.collection || '', s: m.collection || '', v: m.variation || '',
         num: m.num || '', auto: m.auto || false, rc: m.rc || false,
         patch: m.patch || false, g: m.grade || 'Raw',
+        isManuelle: true
       }))
 
       const allCards = [...parsed, ...cartesM]
@@ -172,7 +191,6 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
 
   return (
     <>
-
       <div style={{ maxWidth: 1400, margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
 
         {/* Header profil */}
@@ -327,16 +345,28 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
                   {t('gallery_private')}
                 </div>
               )}
-              {/* Bouton toggle privé en mode édition */}
+              {/* Boutons d'administration en mode édition */}
               {editMode && isOwner && (
-                <button onClick={e => { e.stopPropagation(); togglePrivate(d.f) }} style={{
-                  position: 'absolute', top: 6, right: 6, zIndex: 2,
-                  background: privateCards.has(d.f) ? '#e74c3c' : '#003DA6',
-                  color: 'white', border: 'none', borderRadius: 6,
-                  padding: '4px 8px', fontSize: 10, fontWeight: 900, cursor: 'pointer',
-                }}>
-                  {privateCards.has(d.f) ? t('gallery_make_public') : t('gallery_make_private')}
-                </button>
+                <div style={{ position: 'absolute', top: 6, right: 6, zIndex: 2, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
+                  <button onClick={e => { e.stopPropagation(); togglePrivate(d.f) }} style={{
+                    background: privateCards.has(d.f) ? '#e74c3c' : '#003DA6',
+                    color: 'white', border: 'none', borderRadius: 6,
+                    padding: '4px 8px', fontSize: 10, fontWeight: 900, cursor: 'pointer',
+                  }}>
+                    {privateCards.has(d.f) ? t('gallery_make_public') : t('gallery_make_private')}
+                  </button>
+                  
+                  {/* Bouton de suppression : N'apparaît que si la carte est manuelle */}
+                  {d.isManuelle && d.id && (
+                    <button onClick={e => deleteManuelleCard(d.id!, e)} style={{
+                      background: '#d32f2f', color: 'white', border: 'none', borderRadius: 6,
+                      padding: '4px 8px', fontSize: 10, fontWeight: 900, cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                    }}>
+                      🗑️ {lang === 'fr' ? 'Supprimer' : 'Delete'}
+                    </button>
+                  )}
+                </div>
               )}
               <div style={{ width: '100%', aspectRatio: '2.5/3.5', marginBottom: 8, overflow: 'hidden', position: 'relative' }}>
                 <img src={d.f} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt={d.n} />
@@ -351,7 +381,7 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
 
         {/* Scroll infini */}
         {loaded && (
-          <div style={{ textAlign: 'center', padding: '20px 0', color: '#999', fontSize: 13 }}>
+          <div style={{ textTransform: 'none', textAlign: 'center', padding: '20px 0', color: '#999', fontSize: 13 }}>
             {displayed.length < filtered.length ? (
               <div ref={loaderRef} style={{ padding: 20 }}>
                 <div style={{ display: 'inline-block', width: 24, height: 24, border: '3px solid #eee', borderTopColor: '#003DA6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />

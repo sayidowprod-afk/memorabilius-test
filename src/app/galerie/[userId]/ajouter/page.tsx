@@ -1,5 +1,5 @@
 'use client'
-import { useState, use } from 'react'
+import { useState, use, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
@@ -20,31 +20,98 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
     image_recto: '', image_verso: '',
   })
 
-  const uploadImage = async (file: File, side: 'recto' | 'verso') => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+  // États pour la modale de recadrage manuel
+  const [cropModal, setCropModal] = useState<{ side: 'recto' | 'verso'; src: string } | null>(null)
+  const imageRef = useRef<HTMLImageElement | null>(null)
+  const [cropArea, setCropArea] = useState({ x: 10, y: 10, width: 60 }) // largeur en %
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, side: 'recto' | 'verso') => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (reader.result) {
+        setCropModal({ side, src: reader.result as string })
+        setCropArea({ x: 10, y: 10, width: 60 }) // Réinitialiser le cadre
+      }
+    }
+    reader.readAsDataURL(file)
+    e.target.value = '' // Reset input pour autoriser le même fichier
+  }
+
+  const applyCropAndUpload = async () => {
+    if (!cropModal || !imageRef.current) return
+    const side = cropModal.side
+    
     if (side === 'recto') setUploadingRecto(true)
     else setUploadingVerso(true)
+    
+    const image = imageRef.current
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    
+    if (!ctx) return
 
-    const ext = file.name.split('.').pop()
-    const path = `cartes/${user.id}/${Date.now()}_${side}.${ext}`
+    // Facteurs d'échelle entre l'image affichée à l'écran et sa vraie taille
+    const scaleX = image.naturalWidth / image.width
+    const scaleY = image.naturalHeight / image.height
+    
+    // Ratio cible d'une carte : 2.5 / 3.5
+    const targetRatio = 2.5 / 3.5
+    
+    // Calcul des dimensions du rectangle de rognage
+    const cropWidthPx = (cropArea.width / 100) * image.width * scaleX
+    const cropHeightPx = cropWidthPx / targetRatio
 
-    const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true })
-    if (error) { alert('Erreur upload : ' + error.message); setUploadingRecto(false); setUploadingVerso(false); return }
+    const cropXPx = (cropArea.x / 100) * image.width * scaleX
+    const cropYPx = (cropArea.y / 100) * image.height * scaleY
 
-    const { data } = supabase.storage.from('avatars').getPublicUrl(path)
-    const url = data.publicUrl
+    // Dimensions finales de l'image stockée (haute qualité proportionnelle)
+    canvas.width = 600
+    canvas.height = 840
 
-    if (side === 'recto') {
-      setForm(f => ({ ...f, image_recto: url }))
-      setPreviewRecto(url)
-      setUploadingRecto(false)
-    } else {
-      setForm(f => ({ ...f, image_verso: url }))
-      setPreviewVerso(url)
-      setUploadingVerso(false)
-    }
+    ctx.drawImage(
+      image,
+      cropXPx, cropYPx, cropWidthPx, cropHeightPx, // Zone source découpée
+      0, 0, canvas.width, canvas.height // Rendu final sur le canvas
+    )
+
+    setCropModal(null)
+
+    canvas.toBlob(async (blob) => {
+      if (!blob) {
+        setUploadingRecto(false)
+        setUploadingVerso(false)
+        return
+      }
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const path = `cartes/${user.id}/${Date.now()}_${side}.jpg`
+      const fileToUpload = new File([blob], `${Date.now()}_${side}.jpg`, { type: 'image/jpeg' })
+
+      const { error } = await supabase.storage.from('avatars').upload(path, fileToUpload, { upsert: true })
+      if (error) { 
+        alert('Erreur upload : ' + error.message)
+        setUploadingRecto(false)
+        setUploadingVerso(false)
+        return 
+      }
+
+      const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+      const url = data.publicUrl
+
+      if (side === 'recto') {
+        setForm(f => ({ ...f, image_recto: url }))
+        setPreviewRecto(url)
+        setUploadingRecto(false)
+      } else {
+        setForm(f => ({ ...f, image_verso: url }))
+        setPreviewVerso(url)
+        setUploadingVerso(false)
+      }
+    }, 'image/jpeg', 0.88)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -95,7 +162,7 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
         )}
       </div>
       <input id={`upload-${side}`} type="file" accept="image/*" style={{ display: 'none' }}
-        onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage(f, side) }} />
+        onChange={e => handleFileChange(e, side)} />
       {preview && (
         <button type="button" onClick={() => { setForm(f => ({ ...f, [`image_${side}`]: '' })); side === 'recto' ? setPreviewRecto(null) : setPreviewVerso(null) }}
           style={{ marginTop: 6, width: '100%', background: '#fff5f5', color: '#e74c3c', border: 'none', borderRadius: 6, padding: '6px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
@@ -209,6 +276,62 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
           </button>
         </div>
       </form>
+
+      {/* Modale interactive de recadrage manuel */}
+      {cropModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: '#fff', padding: 20, borderRadius: 16, maxWidth: 500, width: '100%', textAlign: 'center' }}>
+            <h3 style={{ margin: '0 0 15px', fontWeight: 800 }}>{lang === 'fr' ? 'Recadrer l\'image manuellement' : 'Crop image manually'}</h3>
+            
+            {/* Zone de prévisualisation avec le guide de sélection */}
+            <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%', maxHeight: '55vh', overflow: 'hidden', background: '#222', borderRadius: 8 }}>
+              <img ref={imageRef} src={cropModal.src} alt="To crop" style={{ maxWidth: '100%', maxHeight: '55vh', display: 'block', userSelect: 'none' }} />
+              
+              {/* Box de recadrage manuelle superposée */}
+              <div style={{
+                position: 'absolute',
+                border: '3px solid #003DA6',
+                boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.6)',
+                aspectRatio: '2.5/3.5',
+                top: `${cropArea.y}%`,
+                left: `${cropArea.x}%`,
+                width: `${cropArea.width}%`,
+                pointerEvents: 'none',
+                transition: 'all 0.05s ease'
+              }}>
+                <div style={{ position: 'absolute', inset: 0, border: '1px dashed rgba(255,255,255,0.7)' }} />
+              </div>
+            </div>
+
+            {/* Télécommandes manuelles précises */}
+            <div style={{ marginTop: 15, display: 'flex', flexDirection: 'column', gap: 10, textAlign: 'left', background: '#f9f9f9', padding: 12, borderRadius: 10 }}>
+              <div>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#555' }}>📐 {lang === 'fr' ? 'Dimension du cadre' : 'Frame size'}</span>
+                <input type="range" min="15" max="100" value={cropArea.width} onChange={e => setCropArea(p => ({ ...p, width: Number(e.target.value) }))} style={{ width: '100%', accentColor: '#003DA6' }} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#555' }}>↔️ {lang === 'fr' ? 'Position Horizontale' : 'Horizontal Pos'}</span>
+                  <input type="range" min="0" max={Math.max(0, 100 - cropArea.width)} value={cropArea.x} onChange={e => setCropArea(p => ({ ...p, x: Number(e.target.value) }))} style={{ width: '100%', accentColor: '#003DA6' }} />
+                </div>
+                <div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#555' }}>↕️ {lang === 'fr' ? 'Position Verticale' : 'Vertical Pos'}</span>
+                  <input type="range" min="0" max={80} value={cropArea.y} onChange={e => setCropArea(p => ({ ...p, y: Number(e.target.value) }))} style={{ width: '100%', accentColor: '#003DA6' }} />
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+              <button type="button" onClick={() => setCropModal(null)} style={{ flex: 1, padding: 12, background: '#eee', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer', color: '#555' }}>
+                {lang === 'fr' ? 'Annuler' : 'Cancel'}
+              </button>
+              <button type="button" onClick={applyCropAndUpload} style={{ flex: 1, padding: 12, background: '#003DA6', color: 'white', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>
+                {lang === 'fr' ? 'Valider le rognage' : 'Crop & Upload'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
