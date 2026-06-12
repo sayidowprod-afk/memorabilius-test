@@ -1,25 +1,21 @@
 'use client'
-import { useEffect, useState, useRef, use, useCallback } from 'react'
+import { useEffect, useState, useRef, use } from 'react'
 import { supabase } from '@/lib/supabase'
 import Viewer3D from '@/components/Viewer3D'
-import ShareButton from '@/components/ShareButton'
 import OnlineIndicator from '@/components/OnlineIndicator'
 import { useLang } from '@/lib/LangContext'
 
 const PAGE_SIZE = 48
 
 interface Card {
-  id?: string; // Permet d'identifier la carte manuelle pour sa suppression
   f: string; b: string; n: string; t: string; y: string
   br: string; s: string; v: string; num: string
   auto: boolean; rc: boolean; patch: boolean; g: string
-  isManuelle?: boolean; // Permet de savoir si la carte provient de la table manuelle
 }
 
 export default function Galerie({ params }: { params: Promise<{ userId: string }> }) {
   const { userId } = use(params)
   const [profile, setProfile] = useState<any>(null)
-  const [resolvedUserId, setResolvedUserId] = useState<string | null>(null)
   const [cards, setCards] = useState<Card[]>([])
   const [filtered, setFiltered] = useState<Card[]>([])
   const [displayed, setDisplayed] = useState<Card[]>([])
@@ -41,15 +37,12 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
 
   const isOwner = currentUser === userId
   const { t, lang } = useLang()
-  const [cartesManuellesCount, setCartesManuellesCount] = useState(0)
 
   useEffect(() => {
     const init = async () => {
       supabase.auth.getUser().then(({ data }) => setCurrentUser(data.user?.id || null))
       
       let resolvedId = userId
-      
-      // Si ce n'est pas un UUID, chercher par slug
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
       if (!uuidRegex.test(userId)) {
         const { data: p } = await supabase.from('profiles').select('id').eq('slug', userId).single()
@@ -64,7 +57,6 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
     init()
   }, [userId])
 
-  // Charger les cartes privées — toujours, pas seulement pour le propriétaire
   useEffect(() => {
     supabase.from('cartes_privees').select('card_key').eq('user_id', userId)
       .then(({ data }) => {
@@ -83,20 +75,6 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
     }
   }
 
-  // Fonction pour supprimer définitivement une carte manuelle
-  const deleteManuelleCard = async (cardId: string, e: React.MouseEvent) => {
-    e.stopPropagation() // Évite d'ouvrir le Viewer3D
-    if (!confirm(lang === 'fr' ? 'Voulez-vous vraiment supprimer cette carte de votre galerie ?' : 'Are you sure you want to delete this card?')) return
-
-    const { error } = await supabase.from('cartes_manuelles').delete().eq('id', cardId).eq('user_id', userId)
-    if (error) {
-      alert('Erreur lors de la suppression : ' + error.message)
-    } else {
-      // Filtrage instantané du state local
-      setCards(prev => prev.filter(c => c.id !== cardId))
-    }
-  }
-
   const loadCSV = async (url: string) => {
     try {
       const r = await fetch(url + '&t=' + Date.now())
@@ -112,22 +90,18 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
           num: c[8] || '', auto: c[9]?.toLowerCase().includes('oui') || false,
           rc: c[10]?.toLowerCase().includes('oui') || false,
           patch: c[11]?.toLowerCase().includes('oui') || false,
-          g: c[12] || 'Raw',
-          isManuelle: false
+          g: c[12] || 'Raw'
         }
       }).filter(Boolean) as Card[]
 
-      // Charger les cartes manuelles
       const { data: manuelles } = await supabase.from('cartes_manuelles').select('*').eq('user_id', userId)
       const cartesM: Card[] = (manuelles || []).map((m: any) => ({
-        id: m.id, // Garder l'id de Supabase
         f: m.image_recto || 'https://placehold.co/300x420?text=No+Image',
         b: m.image_verso || m.image_recto || 'https://placehold.co/300x420?text=No+Image',
         n: m.nom || '', t: m.equipe || '', y: m.annee || '',
         br: m.collection || '', s: m.collection || '', v: m.variation || '',
         num: m.num || '', auto: m.auto || false, rc: m.rc || false,
         patch: m.patch || false, g: m.grade || 'Raw',
-        isManuelle: true
       }))
 
       const allCards = [...parsed, ...cartesM]
@@ -158,7 +132,6 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
     setDisplayed(f.slice(0, PAGE_SIZE))
   }, [cards, search, fTeam, fBrand, fYear, activeFilters, privateCards, isOwner])
 
-  // Charger plus au scroll
   useEffect(() => {
     const observer = new IntersectionObserver(entries => {
       if (entries[0].isIntersecting && displayed.length < filtered.length) {
@@ -176,7 +149,6 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
   const toggleFilter = (k: keyof typeof activeFilters) => setActiveFilters(p => ({ ...p, [k]: !p[k] }))
 
   const getTags = (d: Card) => {
-    const isRPA = d.rc && d.auto && d.patch
     return (
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', minHeight: 18 }}>
         {d.rc && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, background: '#e67e22', color: 'white' }}>RC</span>}
@@ -191,94 +163,104 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
 
   return (
     <>
-      <div style={{ maxWidth: 1400, margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
+      <div style={{ maxWidth: 1400, margin: '0 auto', fontFamily: 'Inter, sans-serif', padding: '0 10px' }}>
 
-        {/* Header profil */}
-        <div style={{ background: 'white', borderRadius: 16, padding: '24px 30px', marginBottom: 20, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
-          {/* Avatar */}
-          <img
-            src={profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.display_name || 'U')}&background=003DA6&color=fff&size=128`}
-            style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: `3px solid ${accent}`, flexShrink: 0 }}
-            alt={profile?.display_name}
-          />
-          {/* Infos */}
-          <div style={{ flex: 1, minWidth: 200 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 6 }}>
-              <h1 style={{ fontSize: 24, fontWeight: 900, margin: 0 }}>{profile?.display_name || 'Collectionneur'}</h1>
-              <OnlineIndicator lastSeen={profile?.last_seen} size={12} />
-              {profile?.lien_logo && <img src={profile.lien_logo} style={{ maxHeight: 32, objectFit: 'contain' }} alt="logo" />}
-              <ShareButton url={`/galerie/${userId}`} title={`Galerie de ${profile?.display_name || 'Collectionneur'} sur Memorabilius`} />
-            </div>
-            {/* Réseaux sociaux */}
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              {profile?.instagram && (
-                <a href={`https://instagram.com/${profile.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer"
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 700, color: '#E1306C', textDecoration: 'none', background: '#fce4ec', padding: '4px 10px', borderRadius: 20 }}>
-                  <span>📸</span> {profile.instagram.startsWith('@') ? profile.instagram : `@${profile.instagram}`}
-                </a>
-              )}
-              {profile?.twitter && (
-                <a href={`https://x.com/${profile.twitter.replace('@', '')}`} target="_blank" rel="noopener noreferrer"
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 700, color: '#121212', textDecoration: 'none', background: '#f0f0f0', padding: '4px 10px', borderRadius: 20 }}>
-                  <span>𝕏</span> {profile.twitter.startsWith('@') ? profile.twitter : `@${profile.twitter}`}
-                </a>
-              )}
-              {profile?.discord && (
-                <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 700, color: '#5865F2', background: '#eef0ff', padding: '4px 10px', borderRadius: 20 }}>
-                  <span>🎮</span> {profile.discord}
-                </span>
-              )}
-              {/* Bouton message */}
-              {currentUser && currentUser !== userId && (
-                <a href={`/messages?to=${userId}`} style={{
-                  display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 700,
-                  color: 'white', background: accent, padding: '6px 14px', borderRadius: 20, textDecoration: 'none'
-                }}>
-                  {t('gallery_message')}
-                </a>
-              )}
+        {/* Header profil optimisé */}
+        <div style={{ background: 'white', borderRadius: 16, padding: '24px 20px', marginBottom: 20, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', gap: 20 }}>
+          
+          {/* Ligne principale : Avatar + Infos */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
+            <img
+              src={profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.display_name || 'U')}&background=003DA6&color=fff&size=128`}
+              style={{ width: 74, height: 74, borderRadius: '50%', objectFit: 'cover', border: `3px solid ${accent}`, flexShrink: 0 }}
+              alt={profile?.display_name}
+            />
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+                <h1 style={{ fontSize: 22, fontWeight: 900, margin: 0 }}>{profile?.display_name || 'Collectionneur'}</h1>
+                <OnlineIndicator lastSeen={profile?.last_seen} size={11} />
+                {profile?.lien_logo && <img src={profile.lien_logo} style={{ maxHeight: 28, objectFit: 'contain' }} alt="logo" />}
+              </div>
+              
+              {/* Réseaux sociaux */}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {profile?.instagram && (
+                  <a href={`https://instagram.com/${profile.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer"
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, color: '#E1306C', textDecoration: 'none', background: '#fce4ec', padding: '4px 10px', borderRadius: 20 }}>
+                    <span>📸</span> {profile.instagram.startsWith('@') ? profile.instagram : `@${profile.instagram}`}
+                  </a>
+                )}
+                {profile?.twitter && (
+                  <a href={`https://x.com/${profile.twitter.replace('@', '')}`} target="_blank" rel="noopener noreferrer"
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, color: '#121212', textDecoration: 'none', background: '#f0f0f0', padding: '4px 10px', borderRadius: 20 }}>
+                    <span>𝕏</span> {profile.twitter.startsWith('@') ? profile.twitter : `@${profile.twitter}`}
+                  </a>
+                )}
+                {profile?.discord && (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, color: '#5865F2', background: '#eef0ff', padding: '4px 10px', borderRadius: 20 }}>
+                    <span>🎮</span> {profile.discord}
+                  </span>
+                )}
+                {currentUser && currentUser !== userId && (
+                  <a href={`/messages?to=${userId}`} style={{
+                    display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700,
+                    color: 'white', background: accent, padding: '5px 12px', borderRadius: 20, textDecoration: 'none'
+                  }}>
+                    {t('gallery_message')}
+                  </a>
+                )}
+              </div>
             </div>
           </div>
-          {/* Stats rapides */}
+
+          {/* Section Stats & Actions alignée en dessous */}
           {loaded && (
-            <div style={{ display: 'flex', gap: 16, flexShrink: 0, alignItems: 'center' }}>
-              {[
-                { val: filtered.length, label: t('gallery_cards') },
-                { val: filtered.filter(c => c.rc).length, label: 'RC', color: '#e67e22' },
-                { val: filtered.filter(c => c.auto).length, label: 'Auto', color: '#2e7d32' },
-                { val: filtered.filter(c => c.num).length, label: 'Num', color: '#7b1fa2' },
-                { val: filtered.filter(c => c.patch).length, label: 'Patch', color: '#1976d2' },
-              ].map(s => (
-                <div key={s.label} style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 22, fontWeight: 900, color: s.color || accent }}>{s.val}</div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#999', textTransform: 'uppercase' }}>{s.label}</div>
-                </div>
-              ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, borderTop: '1px solid #f0f0f0', paddingTop: 14 }}>
+              {/* Compteurs horizontaux fluides */}
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'space-between', maxWidth: 450 }}>
+                {[
+                  { val: filtered.length, label: t('gallery_cards') },
+                  { val: filtered.filter(c => c.rc).length, label: 'RC', color: '#e67e22' },
+                  { val: filtered.filter(c => c.auto).length, label: 'Auto', color: '#2e7d32' },
+                  { val: filtered.filter(c => c.num).length, label: 'Num', color: '#7b1fa2' },
+                  { val: filtered.filter(c => c.patch).length, label: 'Patch', color: '#1976d2' },
+                ].map(s => (
+                  <div key={s.label} style={{ textAlign: 'center', flex: '1 1 auto', minWidth: 50 }}>
+                    <div style={{ fontSize: 20, fontWeight: 900, color: s.color || accent }}>{s.val}</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#999', textTransform: 'uppercase' }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Boutons d'action : Parfaitement visibles sous les stats sur mobile */}
               {isOwner && (
-                <button onClick={() => setEditMode(!editMode)} style={{
-                  background: editMode ? '#e74c3c' : '#f0f0f0',
-                  color: editMode ? 'white' : '#333',
-                  border: 'none', borderRadius: 8, padding: '8px 14px',
-                  fontWeight: 700, fontSize: 12, cursor: 'pointer',
-                  marginLeft: 8,
-                }}>
-                  {editMode ? t('gallery_done') : t('gallery_privacy')}
-                </button>
-              )}
-              {isOwner && !editMode && (
-                <a href={`/galerie/${userId}/ajouter`} style={{
-                  background: '#003DA6', color: 'white',
-                  border: 'none', borderRadius: 8, padding: '8px 14px',
-                  fontWeight: 700, fontSize: 12, cursor: 'pointer',
-                  marginLeft: 4, textDecoration: 'none', display: 'inline-block',
-                }}>
-                  ➕ {lang === 'fr' ? 'Ajouter' : 'Add'}
-                </a>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 4 }}>
+                  <button onClick={() => setEditMode(!editMode)} style={{
+                    background: editMode ? '#e74c3c' : '#f0f0f0',
+                    color: editMode ? 'white' : '#333',
+                    border: 'none', borderRadius: 8, padding: '10px 16px',
+                    fontWeight: 700, fontSize: 13, cursor: 'pointer', flex: 1, minWidth: 160, textAlign: 'center'
+                  }}>
+                    {editMode ? t('gallery_done') : t('gallery_privacy')}
+                  </button>
+                  
+                  {!editMode && (
+                    <a href={`/galerie/${userId}/ajouter`} style={{
+                      background: '#003DA6', color: 'white',
+                      border: 'none', borderRadius: 8, padding: '10px 16px',
+                      fontWeight: 700, fontSize: 13, cursor: 'pointer',
+                      textDecoration: 'none', display: 'inline-block', flex: 1, minWidth: 120, textAlign: 'center'
+                    }}>
+                      ➕ {lang === 'fr' ? 'Ajouter' : 'Add'}
+                    </a>
+                  )}
+                </div>
               )}
             </div>
           )}
         </div>
 
+        {/* Filtres de recherche */}
         <div style={{ background: '#fff', padding: 10, borderRadius: 8, marginBottom: 15, border: '1px solid #eee' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8, marginBottom: 10 }}>
             <div><label style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 3 }}>{t('gallery_search_label')}</label>
@@ -326,9 +308,10 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
 
         <style>{`
           .card-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
-          .card-item { flex: 0 0 calc(50% - 6px); max-width: calc(50% - 6px); }
+          .card-item { flex: 0 0 calc(50% - 5px); max-width: calc(50% - 5px); }
           @media (min-width: 900px) { .card-item { flex: 0 0 calc(20% - 10px); max-width: calc(20% - 10px); } }
         `}</style>
+        
         <div className="card-grid">
           {displayed.map((d, i) => (
             <div key={i} className="card-item" onClick={() => !editMode && setPopup(d)} style={{
@@ -345,28 +328,15 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
                   {t('gallery_private')}
                 </div>
               )}
-              {/* Boutons d'administration en mode édition */}
               {editMode && isOwner && (
-                <div style={{ position: 'absolute', top: 6, right: 6, zIndex: 2, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
-                  <button onClick={e => { e.stopPropagation(); togglePrivate(d.f) }} style={{
-                    background: privateCards.has(d.f) ? '#e74c3c' : '#003DA6',
-                    color: 'white', border: 'none', borderRadius: 6,
-                    padding: '4px 8px', fontSize: 10, fontWeight: 900, cursor: 'pointer',
-                  }}>
-                    {privateCards.has(d.f) ? t('gallery_make_public') : t('gallery_make_private')}
-                  </button>
-                  
-                  {/* Bouton de suppression : N'apparaît que si la carte est manuelle */}
-                  {d.isManuelle && d.id && (
-                    <button onClick={e => deleteManuelleCard(d.id!, e)} style={{
-                      background: '#d32f2f', color: 'white', border: 'none', borderRadius: 6,
-                      padding: '4px 8px', fontSize: 10, fontWeight: 900, cursor: 'pointer',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                    }}>
-                      🗑️ {lang === 'fr' ? 'Supprimer' : 'Delete'}
-                    </button>
-                  )}
-                </div>
+                <button onClick={e => { e.stopPropagation(); togglePrivate(d.f) }} style={{
+                  position: 'absolute', top: 6, right: 6, zIndex: 2,
+                  background: privateCards.has(d.f) ? '#e74c3c' : '#003DA6',
+                  color: 'white', border: 'none', borderRadius: 6,
+                  padding: '4px 8px', fontSize: 10, fontWeight: 900, cursor: 'pointer',
+                }}>
+                  {privateCards.has(d.f) ? t('gallery_make_public') : t('gallery_make_private')}
+                </button>
               )}
               <div style={{ width: '100%', aspectRatio: '2.5/3.5', marginBottom: 8, overflow: 'hidden', position: 'relative' }}>
                 <img src={d.f} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt={d.n} />
@@ -381,7 +351,7 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
 
         {/* Scroll infini */}
         {loaded && (
-          <div style={{ textTransform: 'none', textAlign: 'center', padding: '20px 0', color: '#999', fontSize: 13 }}>
+          <div style={{ textAlign: 'center', padding: '20px 0', color: '#999', fontSize: 13 }}>
             {displayed.length < filtered.length ? (
               <div ref={loaderRef} style={{ padding: 20 }}>
                 <div style={{ display: 'inline-block', width: 24, height: 24, border: '3px solid #eee', borderTopColor: '#003DA6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
