@@ -36,8 +36,9 @@ const CARD_RATIO = 3.5 / 2.5
 const HEADER_H = 90
 const FOOTER_H = 34
 const PAD = 22
-const GAP = 8
-const NAME_AREA = 44 // hauteur fixe réservée sous chaque carte quand texte activé
+const GAP = 10
+const NAME_AREA = 62  // badges + nom + variation + info
+const SCALE = 2       // résolution 2× pour la qualité
 
 const PLACEHOLDER = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="420"><rect width="300" height="420" fill="%23ddd"/><text x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%23aaa" font-size="40">?</text></svg>'
 
@@ -65,23 +66,46 @@ function bestCols(n: number, availW: number, availH: number, textBelow: boolean)
   return bestC
 }
 
+async function loadFont() {
+  try {
+    const f = new FontFace('Inter', "url(https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2)")
+    await f.load()
+    document.fonts.add(f)
+  } catch {}
+}
+
+function trunc(ctx: CanvasRenderingContext2D, text: string, maxW: number): string {
+  if (ctx.measureText(text).width <= maxW) return text
+  let t = text
+  while (t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1)
+  return t + '…'
+}
+
 async function generate(cards: Card[], profileName: string, avatarUrl: string, accent: string, lang: string, opts: Options): Promise<Blob> {
+  await loadFont()
+
   const { w, h } = FORMATS[opts.format]
   const canvas = document.createElement('canvas')
-  canvas.width = w; canvas.height = h
+  // Résolution 2× pour la qualité
+  canvas.width = w * SCALE; canvas.height = h * SCALE
   const ctx = canvas.getContext('2d')!
+  ctx.scale(SCALE, SCALE)
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
 
   const bg = opts.bgType === 'white' ? '#ffffff' : opts.bgType === 'black' ? '#111111' : opts.bgColor
-  const isDark = opts.bgType === 'black' || (opts.bgType === 'custom' && parseInt(opts.bgColor.replace('#', ''), 16) < 0xaaaaaa * 3)
+  const isDark = opts.bgType === 'black' || (opts.bgType === 'custom' && parseInt(opts.bgColor.replace('#', ''), 16) < 0x999999 * 3)
   const textColor = isDark ? '#ffffff' : '#111111'
-  const subColor = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.4)'
+  const subColor = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.38)'
+  const FONT = 'Inter, Arial, sans-serif'
 
-  const textBelow = opts.showName || opts.showInfo || opts.showVariation
+  const hasText = opts.showName || opts.showInfo || opts.showVariation
+  const hasBelow = hasText || opts.showBadges
   const availW = w - PAD * 2
   const availH = h - HEADER_H - FOOTER_H - PAD * 2
-  const cols = bestCols(cards.length, availW, availH, textBelow)
+  const cols = bestCols(cards.length, availW, availH, hasBelow)
   const rows = Math.ceil(cards.length / cols)
-  const nameH = textBelow ? NAME_AREA : 0
+  const nameH = hasBelow ? NAME_AREA : 0
   const cardWfromW = (availW - GAP * (cols - 1)) / cols
   const cardHfromH = (availH - GAP * (rows - 1) - nameH * rows) / rows
   const cardW = Math.floor(Math.min(cardWfromW, cardHfromH / CARD_RATIO))
@@ -92,95 +116,99 @@ async function generate(cards: Card[], profileName: string, avatarUrl: string, a
   const gridX = PAD + (availW - gridW) / 2
   const gridY = HEADER_H + PAD + (availH - gridH) / 2
 
+  // Fond
   ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h)
 
   // Header
   ctx.fillStyle = accent; ctx.fillRect(0, 0, w, HEADER_H)
-  const avS = Math.round(HEADER_H * 0.64)
+  const avS = Math.round(HEADER_H * 0.62)
   const avX = PAD + avS / 2, avY = HEADER_H / 2
   try {
     const av = await loadImg(avatarUrl)
     ctx.save(); ctx.beginPath(); ctx.arc(avX, avY, avS / 2, 0, Math.PI * 2); ctx.clip()
     ctx.drawImage(av, PAD, avY - avS / 2, avS, avS); ctx.restore()
   } catch {}
-  const tx = PAD + avS + 14
-  ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'
-  ctx.font = `bold ${Math.round(HEADER_H * 0.28)}px Arial, sans-serif`
+  const tx = PAD + avS + 12
+  ctx.textBaseline = 'middle'
+  ctx.fillStyle = '#fff'; ctx.font = `700 ${Math.round(HEADER_H * 0.27)}px ${FONT}`
   ctx.fillText(profileName, tx, avY - HEADER_H * 0.1)
-  ctx.font = `${Math.round(HEADER_H * 0.168)}px Arial, sans-serif`
-  ctx.fillStyle = 'rgba(255,255,255,0.7)'
+  ctx.fillStyle = 'rgba(255,255,255,0.68)'; ctx.font = `400 ${Math.round(HEADER_H * 0.16)}px ${FONT}`
   ctx.fillText(`${cards.length} carte${cards.length > 1 ? 's' : ''} · memorabilius.fr`, tx, avY + HEADER_H * 0.18)
-  ctx.textAlign = 'right'; ctx.font = `${Math.round(HEADER_H * 0.15)}px Arial, sans-serif`
-  ctx.fillStyle = 'rgba(255,255,255,0.5)'
+  ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = `400 ${Math.round(HEADER_H * 0.14)}px ${FONT}`
   ctx.fillText(new Date().toLocaleDateString(lang === 'fr' ? 'fr-FR' : 'en-US'), w - PAD, avY)
   ctx.textAlign = 'left'
 
   const images = await Promise.all(cards.map(c => loadImg(c.f)))
-  const tagH = Math.max(12, Math.round(cardW * 0.08))
-  const nameSize = Math.max(9, Math.round(cardW * 0.095))
-  const varSize = Math.max(8, Math.round(cardW * 0.078))
-  const infoSize = Math.max(7, Math.round(cardW * 0.068))
+
+  // Tailles de texte proportionnelles à la carte, plafonnées
+  const tagH   = Math.min(14, Math.max(9,  Math.round(cardW * 0.075)))
+  const tagFont = Math.round(tagH * 0.7)
+  const nameFs = Math.min(13, Math.max(8,  Math.round(cardW * 0.085)))
+  const varFs  = Math.min(11, Math.max(7,  Math.round(cardW * 0.072)))
+  const infoFs = Math.min(10, Math.max(6,  Math.round(cardW * 0.062)))
 
   cards.forEach((card, i) => {
     const col = i % cols, row = Math.floor(i / cols)
     const x = Math.round(gridX + col * (cardW + GAP))
     const y = Math.round(gridY + row * (cardH + nameH + GAP))
-    ctx.shadowColor = 'rgba(0,0,0,0.18)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 3
+
+    // Image carte
+    ctx.shadowColor = 'rgba(0,0,0,0.15)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 2
     ctx.drawImage(images[i], x, y, cardW, cardH)
     ctx.shadowBlur = 0; ctx.shadowOffsetY = 0
 
+    if (!hasBelow) return
+
+    // Zone sous la carte
+    let lineY = y + cardH + 4
+    ctx.textBaseline = 'top'
+
+    // Badges (sous la carte, comme la galerie)
     if (opts.showBadges) {
       const tags: { label: string; color: string }[] = []
-      if (card.rc) tags.push({ label: 'RC', color: '#e67e22' })
-      if (card.auto) tags.push({ label: 'AUTO', color: '#2e7d32' })
-      if (card.num) tags.push({ label: card.num, color: '#7b1fa2' })
+      if (card.rc)   tags.push({ label: 'RC',    color: '#e67e22' })
+      if (card.auto) tags.push({ label: 'AUTO',  color: '#2e7d32' })
+      if (card.num)  tags.push({ label: card.num, color: '#7b1fa2' })
       if (card.patch) tags.push({ label: 'PATCH', color: '#1976d2' })
       if (card.g && card.g !== 'Raw') tags.push({ label: card.g, color: accent })
       if (tags.length) {
-        ctx.font = `bold ${Math.round(tagH * 0.72)}px Arial, sans-serif`
+        ctx.font = `700 ${tagFont}px ${FONT}`
         ctx.textBaseline = 'middle'
-        let tagX = x + 4
-        const tagY = y + cardH - tagH - 5
-        tags.slice(0, 4).forEach(tag => {
-          const tw = ctx.measureText(tag.label).width + tagH * 0.9
+        let tagX = x + 2
+        tags.slice(0, 5).forEach(tag => {
+          const tw = ctx.measureText(tag.label).width + tagFont + 2
           ctx.fillStyle = tag.color
-          ctx.beginPath(); ctx.roundRect(tagX, tagY, tw, tagH, 3); ctx.fill()
+          ctx.beginPath(); ctx.roundRect(tagX, lineY, tw, tagH, 3); ctx.fill()
           ctx.fillStyle = '#fff'
-          ctx.fillText(tag.label, tagX + tagH * 0.45, tagY + tagH / 2)
+          ctx.fillText(tag.label, tagX + (tagFont + 2) / 2, lineY + tagH / 2)
           tagX += tw + 3
         })
+        ctx.textBaseline = 'top'
+        lineY += tagH + 4
       }
     }
 
-    if (textBelow) {
-      let lineY = y + cardH + 4
-      ctx.textBaseline = 'top'
-      if (opts.showName && card.n) {
-        ctx.fillStyle = textColor; ctx.font = `bold ${nameSize}px Arial, sans-serif`
-        let name = card.n
-        while (name.length > 1 && ctx.measureText(name).width > cardW - 4) name = name.slice(0, -1)
-        ctx.fillText(name !== card.n ? name + '…' : name, x + 2, lineY); lineY += nameSize + 2
-      }
-      if (opts.showVariation && card.v) {
-        ctx.fillStyle = accent; ctx.font = `${varSize}px Arial, sans-serif`
-        let v = card.v
-        while (v.length > 1 && ctx.measureText(v).width > cardW - 4) v = v.slice(0, -1)
-        ctx.fillText(v !== card.v ? v + '…' : v, x + 2, lineY); lineY += varSize + 2
-      }
-      if (opts.showInfo && (card.y || card.br)) {
-        ctx.fillStyle = subColor; ctx.font = `${infoSize}px Arial, sans-serif`
-        const info = [card.y, card.br].filter(Boolean).join(' · ')
-        let inf = info
-        while (inf.length > 1 && ctx.measureText(inf).width > cardW - 4) inf = inf.slice(0, -1)
-        ctx.fillText(inf !== info ? inf + '…' : inf, x + 2, lineY)
-      }
+    if (opts.showName && card.n) {
+      ctx.fillStyle = textColor; ctx.font = `700 ${nameFs}px ${FONT}`
+      ctx.fillText(trunc(ctx, card.n, cardW - 4), x + 2, lineY)
+      lineY += nameFs + 2
+    }
+    if (opts.showVariation && card.v) {
+      ctx.fillStyle = accent; ctx.font = `400 ${varFs}px ${FONT}`
+      ctx.fillText(trunc(ctx, card.v, cardW - 4), x + 2, lineY)
+      lineY += varFs + 2
+    }
+    if (opts.showInfo && (card.y || card.br)) {
+      ctx.fillStyle = subColor; ctx.font = `400 ${infoFs}px ${FONT}`
+      ctx.fillText(trunc(ctx, [card.y, card.br].filter(Boolean).join(' · '), cardW - 4), x + 2, lineY)
     }
   })
 
-  ctx.fillStyle = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'
+  // Footer
+  ctx.fillStyle = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'
   ctx.fillRect(0, h - FOOTER_H, w, FOOTER_H)
-  ctx.fillStyle = isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.25)'
-  ctx.font = `${Math.round(FOOTER_H * 0.4)}px Arial, sans-serif`
+  ctx.fillStyle = isDark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.22)'
+  ctx.font = `400 ${Math.round(FOOTER_H * 0.38)}px ${FONT}`
   ctx.textBaseline = 'middle'; ctx.textAlign = 'center'
   ctx.fillText('memorabilius.fr', w / 2, h - FOOTER_H / 2); ctx.textAlign = 'left'
 
