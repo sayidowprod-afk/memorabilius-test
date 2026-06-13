@@ -74,7 +74,7 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
     if (cropModal && imgRef.current?.complete) {
       resetTransform()
     }
-  }, [rotation, cropModal, resetTransform])
+  }, [cropModal, resetTransform])
 
   // Wheel zoom sans scroll de page (passive: false obligatoire)
   useEffect(() => {
