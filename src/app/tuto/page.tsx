@@ -54,7 +54,7 @@ export default function Tuto() {
           👉 Obtenir la feuille Google Sheets
         </a>
         <div>
-          <a href="https://memorabilius.fr/wp-content/uploads/2026/05/Memorabilius-WinMac_.zip" style={{ display: 'inline-block', background: '#f0f0f0', color: '#333', padding: '10px 20px', borderRadius: 8, fontWeight: 700, fontSize: 13 }}>
+          <a href="https://drive.google.com/file/d/1bJklGgu2n-seeWdWixOy-FaGmSPwRx1W/view?usp=sharing" style={{ display: 'inline-block', background: '#f0f0f0', color: '#333', padding: '10px 20px', borderRadius: 8, fontWeight: 700, fontSize: 13 }}>
             💾 Télécharger le programme d'automatisation d'importation des scans
           </a>
         </div>
