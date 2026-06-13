@@ -1,8 +1,10 @@
 'use client'
 import { useEffect, useState, useRef, use } from 'react'
 import { supabase } from '@/lib/supabase'
-import Viewer3D from '@/components/Viewer3D'
+import dynamic from 'next/dynamic'
 import OnlineIndicator from '@/components/OnlineIndicator'
+
+const Viewer3D = dynamic(() => import('@/components/Viewer3D'), { ssr: false })
 import { useLang } from '@/lib/LangContext'
 
 const PAGE_SIZE = 48
