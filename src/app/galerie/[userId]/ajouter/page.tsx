@@ -41,19 +41,26 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
     const container = containerRef.current
     const cw = container.clientWidth
     const ch = container.clientHeight
+
+    // Frame dimensions (mirrors the CSS: min(82% cw, 90vh * CARD_RATIO))
+    const frameW = Math.min(cw * 0.82, ch * 0.9 * CARD_RATIO)
+    const frameH = frameW / CARD_RATIO
+
     const angleRad = (rotation * Math.PI) / 180
     const absCos = Math.abs(Math.cos(angleRad))
     const absSin = Math.abs(Math.sin(angleRad))
     const rotW = img.naturalWidth * absCos + img.naturalHeight * absSin
     const rotH = img.naturalWidth * absSin + img.naturalHeight * absCos
-    const imgAspect = rotW / rotH
-    let scale: number
-    if (imgAspect > CARD_RATIO) {
-      scale = ch / rotH
-    } else {
-      scale = cw / rotW
-    }
-    scale = Math.max(scale, 0.3)
+
+    // Display size of the image before transform scale
+    const displayW = img.width
+    const displayH = img.height
+
+    // Scale so the rotated image fits INSIDE the frame (contain)
+    const scaleW = frameW / (displayW * absCos + displayH * absSin)
+    const scaleH = frameH / (displayW * absSin + displayH * absCos)
+    const scale = Math.min(scaleW, scaleH)
+
     setImgTransform({ x: 0, y: 0, scale })
   }, [rotation])
 
