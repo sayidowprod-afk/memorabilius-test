@@ -1,9 +1,11 @@
 'use client'
-import { useState, use, useRef, useEffect } from 'react'
+import { useState, use, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { useLang } from '@/lib/LangContext'
+
+const CARD_RATIO = 2.5 / 3.5
 
 export default function AjouterCarte({ params }: { params: Promise<{ userId: string }> }) {
   const { userId } = use(params)
@@ -22,13 +24,50 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
 
   const [cropModal, setCropModal] = useState<{ side: 'recto' | 'verso'; src: string } | null>(null)
   const [rotation, setRotation] = useState(0)
-  
+
+  // Image pan/zoom state (image moves under fixed frame)
+  const [imgTransform, setImgTransform] = useState({ x: 0, y: 0, scale: 1 })
   const containerRef = useRef<HTMLDivElement | null>(null)
-  const [cropBox, setCropBox] = useState({ x: 50, y: 50, width: 150, height: 210 })
+  const imgRef = useRef<HTMLImageElement | null>(null)
+
+  // Touch/drag refs
+  const lastPointer = useRef({ x: 0, y: 0 })
+  const lastDist = useRef(0)
   const isDragging = useRef(false)
-  const isResizing = useRef(false)
-  const dragStart = useRef({ x: 0, y: 0 })
-  const boxStart = useRef({ x: 0, y: 0, width: 0, height: 0 })
+
+  const resetTransform = useCallback(() => {
+    if (!imgRef.current || !containerRef.current) return
+    const img = imgRef.current
+    const container = containerRef.current
+    const cw = container.clientWidth
+    const ch = container.clientHeight
+    const angleRad = (rotation * Math.PI) / 180
+    const absCos = Math.abs(Math.cos(angleRad))
+    const absSin = Math.abs(Math.sin(angleRad))
+    const rotW = img.naturalWidth * absCos + img.naturalHeight * absSin
+    const rotH = img.naturalWidth * absSin + img.naturalHeight * absCos
+    const imgAspect = rotW / rotH
+    let scale: number
+    if (imgAspect > CARD_RATIO) {
+      scale = ch / rotH
+    } else {
+      scale = cw / rotW
+    }
+    scale = Math.max(scale, 0.3)
+    setImgTransform({ x: 0, y: 0, scale })
+  }, [rotation])
+
+  useEffect(() => {
+    if (cropModal) {
+      setImgTransform({ x: 0, y: 0, scale: 1 })
+    }
+  }, [cropModal])
+
+  useEffect(() => {
+    if (cropModal && imgRef.current?.complete) {
+      resetTransform()
+    }
+  }, [rotation, cropModal, resetTransform])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, side: 'recto' | 'verso') => {
     const file = e.target.files?.[0]
@@ -38,132 +77,129 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
       if (reader.result) {
         setCropModal({ side, src: reader.result as string })
         setRotation(0)
-        setCropBox({ x: 50, y: 50, width: 160, height: 224 })
+        setImgTransform({ x: 0, y: 0, scale: 1 })
       }
     }
     reader.readAsDataURL(file)
     e.target.value = ''
   }
 
-  const getEventCoords = (e: any) => {
-    if (e.touches && e.touches.length > 0) {
-      return { x: e.touches[0].clientX, y: e.touches[0].clientY }
-    }
-    return { x: e.clientX, y: e.clientY }
+  const getDist = (touches: React.TouchList) =>
+    Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY)
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    isDragging.current = true
+    lastPointer.current = { x: e.clientX, y: e.clientY }
   }
 
-  const handlePointerDown = (e: React.MouseEvent | React.TouchEvent, type: 'drag' | 'resize') => {
-    // Bloque le déclenchement des gestes par défaut du navigateur
-    if (e.cancelable) e.preventDefault()
-    
-    const coords = getEventCoords(e)
-    if (type === 'drag') isDragging.current = true
-    if (type === 'resize') isResizing.current = true
-
-    dragStart.current = { x: coords.x, y: coords.y }
-    boxStart.current = { ...cropBox }
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging.current) return
+    const dx = e.clientX - lastPointer.current.x
+    const dy = e.clientY - lastPointer.current.y
+    lastPointer.current = { x: e.clientX, y: e.clientY }
+    setImgTransform(t => ({ ...t, x: t.x + dx, y: t.y + dy }))
   }
 
-  useEffect(() => {
-    const handlePointerMove = (e: MouseEvent | TouchEvent) => {
-      if (!isDragging.current && !isResizing.current) return
-      
-      // CRUCIAL POUR MOBILE : Annule le défilement et le rebond de la page entière
-      if (e.cancelable) e.preventDefault()
+  const handleMouseUp = () => { isDragging.current = false }
 
-      if (!containerRef.current) return
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault()
+    const delta = e.deltaY > 0 ? 0.9 : 1.1
+    setImgTransform(t => ({ ...t, scale: Math.max(0.1, Math.min(10, t.scale * delta)) }))
+  }
 
-      const coords = getEventCoords(e)
-      const dx = coords.x - dragStart.current.x
-      const dy = coords.y - dragStart.current.y
-      const container = containerRef.current.getBoundingClientRect()
-
-      const targetRatio = 2.5 / 3.5
-
-      if (isDragging.current) {
-        let newX = boxStart.current.x + dx
-        let newY = boxStart.current.y + dy
-        newX = Math.max(0, Math.min(container.width - cropBox.width, newX))
-        newY = Math.max(0, Math.min(container.height - cropBox.height, newY))
-        setCropBox(prev => ({ ...prev, x: newX, y: newY }))
-      }
-
-      if (isResizing.current) {
-        let newWidth = boxStart.current.width + dx
-        let newHeight = newWidth / targetRatio
-        if (newWidth > 40 && (boxStart.current.x + newWidth) <= container.width && (boxStart.current.y + newHeight) <= container.height) {
-          setCropBox(prev => ({ ...prev, width: newWidth, height: newHeight }))
-        }
-      }
-    }
-
-    const handlePointerUp = () => {
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      isDragging.current = true
+      lastPointer.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+    } else if (e.touches.length === 2) {
       isDragging.current = false
-      isResizing.current = false
+      lastDist.current = getDist(e.touches)
     }
+  }
 
-    // Ajout des écouteurs globaux avec passive: false pour forcer la priorité sur le scroll natif
-    window.addEventListener('mousemove', handlePointerMove, { passive: false })
-    window.addEventListener('mouseup', handlePointerUp)
-    window.addEventListener('touchmove', handlePointerMove, { passive: false })
-    window.addEventListener('touchend', handlePointerUp)
-
-    return () => {
-      window.removeEventListener('mousemove', handlePointerMove)
-      window.removeEventListener('mouseup', handlePointerUp)
-      window.removeEventListener('touchmove', handlePointerMove)
-      window.removeEventListener('touchend', handlePointerUp)
+  const handleTouchMove = (e: React.TouchEvent) => {
+    e.preventDefault()
+    if (e.touches.length === 1 && isDragging.current) {
+      const dx = e.touches[0].clientX - lastPointer.current.x
+      const dy = e.touches[0].clientY - lastPointer.current.y
+      lastPointer.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+      setImgTransform(t => ({ ...t, x: t.x + dx, y: t.y + dy }))
+    } else if (e.touches.length === 2) {
+      const dist = getDist(e.touches)
+      const delta = dist / lastDist.current
+      lastDist.current = dist
+      setImgTransform(t => ({ ...t, scale: Math.max(0.1, Math.min(10, t.scale * delta)) }))
     }
-  }, [cropBox])
+  }
+
+  const handleTouchEnd = () => { isDragging.current = false }
 
   const applyCropAndUpload = async () => {
-    if (!cropModal || !containerRef.current) return
+    if (!cropModal || !containerRef.current || !imgRef.current) return
     const side = cropModal.side
-    
+
     if (side === 'recto') setUploadingRecto(true)
     else setUploadingVerso(true)
-    
-    const imgElement = containerRef.current.querySelector('img') as HTMLImageElement
-    if (!imgElement) return
 
-    const srcCanvas = document.createElement('canvas')
-    const srcCtx = srcCanvas.getContext('2d')
-    if (!srcCtx) return
+    const container = containerRef.current
+    const cw = container.clientWidth
+    const ch = container.clientHeight
 
+    // Frame dimensions (same as overlay)
+    const frameW = Math.min(cw * 0.82, ch * CARD_RATIO * 0.9)
+    const frameH = frameW / CARD_RATIO
+
+    const img = imgRef.current
+
+    // Build rotated + scaled canvas
     const angleRad = (rotation * Math.PI) / 180
     const absCos = Math.abs(Math.cos(angleRad))
     const absSin = Math.abs(Math.sin(angleRad))
-    
-    const rotWidth = imgElement.naturalWidth * absCos + imgElement.naturalHeight * absSin
-    const rotHeight = imgElement.naturalWidth * absSin + imgElement.naturalHeight * absCos
+    const rotW = img.naturalWidth * absCos + img.naturalHeight * absSin
+    const rotH = img.naturalWidth * absSin + img.naturalHeight * absCos
 
-    srcCanvas.width = rotWidth
-    srcCanvas.height = rotHeight
-
-    srcCtx.translate(rotWidth / 2, rotHeight / 2)
+    const srcCanvas = document.createElement('canvas')
+    srcCanvas.width = rotW
+    srcCanvas.height = rotH
+    const srcCtx = srcCanvas.getContext('2d')!
+    srcCtx.translate(rotW / 2, rotH / 2)
     srcCtx.rotate(angleRad)
-    srcCtx.drawImage(imgElement, -imgElement.naturalWidth / 2, -imgElement.naturalHeight / 2)
+    srcCtx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2)
 
-    const scaleX = rotWidth / imgElement.width
-    const scaleY = rotHeight / imgElement.height
+    // The displayed image size after CSS transform (scale)
+    const displayedImgW = img.width * imgTransform.scale
+    const displayedImgH = img.height * imgTransform.scale
+
+    // Center of container
+    const cx = cw / 2
+    const cy = ch / 2
+
+    // Image center in container space
+    const imgCx = cx + imgTransform.x
+    const imgCy = cy + imgTransform.y
+
+    // Frame top-left in container space
+    const frameX = cx - frameW / 2
+    const frameY = cy - frameH / 2
+
+    // Frame top-left relative to image top-left
+    const relX = frameX - (imgCx - displayedImgW / 2)
+    const relY = frameY - (imgCy - displayedImgH / 2)
+
+    // Scale factor from displayed image coords to natural canvas coords
+    const scaleToCanvas = rotW / displayedImgW
+
+    const cropX = relX * scaleToCanvas
+    const cropY = relY * scaleToCanvas
+    const cropW = frameW * scaleToCanvas
+    const cropH = frameH * scaleToCanvas
 
     const finalCanvas = document.createElement('canvas')
-    const finalCtx = finalCanvas.getContext('2d')
-    if (!finalCtx) return
-
     finalCanvas.width = 600
     finalCanvas.height = 840
-
-    const cropX = cropBox.x * scaleX
-    const cropY = cropBox.y * scaleY
-    const cropW = cropBox.width * scaleX
-    const cropH = cropBox.height * scaleY
-
-    finalCtx.drawImage(
-      srcCanvas,
-      cropX, cropY, cropW, cropH,
-      0, 0, finalCanvas.width, finalCanvas.height
-    )
+    const finalCtx = finalCanvas.getContext('2d')!
+    finalCtx.drawImage(srcCanvas, cropX, cropY, cropW, cropH, 0, 0, 600, 840)
 
     setCropModal(null)
 
@@ -176,10 +212,10 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
       const fileToUpload = new File([blob], `${Date.now()}_${side}.jpg`, { type: 'image/jpeg' })
 
       const { error } = await supabase.storage.from('avatars').upload(path, fileToUpload, { upsert: true })
-      if (error) { 
+      if (error) {
         alert('Erreur upload : ' + error.message)
         setUploadingRecto(false); setUploadingVerso(false)
-        return 
+        return
       }
 
       const { data } = supabase.storage.from('avatars').getPublicUrl(path)
@@ -219,8 +255,10 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
   const ImageUploader = ({ side, label, preview, uploading }: { side: 'recto' | 'verso', label: string, preview: string | null, uploading: boolean }) => (
     <div>
       <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 8 }}>{label}</label>
-      <div style={{ border: '2px dashed #ddd', borderRadius: 12, overflow: 'hidden', aspectRatio: '2.5/3.5', position: 'relative', cursor: 'pointer', background: '#fafafa', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        onClick={() => document.getElementById(`upload-${side}`)?.click()}>
+      <div
+        style={{ border: '2px dashed #ddd', borderRadius: 12, overflow: 'hidden', aspectRatio: '2.5/3.5', position: 'relative', cursor: 'pointer', background: '#fafafa', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        onClick={() => document.getElementById(`upload-${side}`)?.click()}
+      >
         {preview ? (
           <img src={preview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={label} />
         ) : (
@@ -330,83 +368,115 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
         </div>
       </form>
 
-      {/* Modale de recadrage optimisée avec isolation tactile totale */}
       {cropModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 10 }}>
-          <div style={{ background: '#fff', padding: 20, borderRadius: 16, maxWidth: 520, width: '100%', textAlign: 'center', boxSizing: 'border-box' }}>
-            <h3 style={{ margin: '0 0 10px', fontWeight: 800 }}>{lang === 'fr' ? 'Ajuster et faire pivoter la carte' : 'Adjust and rotate card'}</h3>
-            <p style={{ fontSize: 12, color: '#666', margin: '0 0 15px' }}>
-              {lang === 'fr' ? 'Glissez pour déplacer, étirez le coin bleu pour redimensionner.' : 'Drag to move, stretch the blue corner to resize.'}
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          {/* Zone d'interaction : image mobile sous cadre fixe */}
+          <div
+            ref={containerRef}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onWheel={handleWheel}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            style={{
+              position: 'relative',
+              width: '100%',
+              flex: 1,
+              overflow: 'hidden',
+              cursor: isDragging.current ? 'grabbing' : 'grab',
+              touchAction: 'none',
+              userSelect: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {/* Image libre (se déplace/zoom) */}
+            <img
+              ref={imgRef}
+              src={cropModal.src}
+              alt="To crop"
+              onLoad={resetTransform}
+              draggable={false}
+              style={{
+                position: 'absolute',
+                maxWidth: 'none',
+                transform: `translate(${imgTransform.x}px, ${imgTransform.y}px) scale(${imgTransform.scale}) rotate(${rotation}deg)`,
+                transformOrigin: 'center center',
+                pointerEvents: 'none',
+                transition: 'none',
+              }}
+            />
+
+            {/* Overlay sombre autour du cadre */}
+            {(() => {
+              // Calculate frame dimensions relative to container for overlay cutout
+              // We use CSS clip-path on 4 separate divs for the shadow
+              return null
+            })()}
+
+            {/* Cadre fixe centré — juste les coins, pas de bordure pleine */}
+            <div style={{
+              position: 'absolute',
+              pointerEvents: 'none',
+              width: `min(82%, calc(90vh * ${CARD_RATIO}))`,
+              aspectRatio: '2.5/3.5',
+              boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)',
+              borderRadius: 6,
+            }}>
+              {/* Coins décoratifs blancs */}
+              {[
+                { top: -2, left: -2, borderTop: '3px solid white', borderLeft: '3px solid white', borderRadius: '4px 0 0 0' },
+                { top: -2, right: -2, borderTop: '3px solid white', borderRight: '3px solid white', borderRadius: '0 4px 0 0' },
+                { bottom: -2, left: -2, borderBottom: '3px solid white', borderLeft: '3px solid white', borderRadius: '0 0 0 4px' },
+                { bottom: -2, right: -2, borderBottom: '3px solid white', borderRight: '3px solid white', borderRadius: '0 0 4px 0' },
+              ].map((style, i) => (
+                <div key={i} style={{ position: 'absolute', width: 22, height: 22, ...style }} />
+              ))}
+            </div>
+          </div>
+
+          {/* Panneau bas */}
+          <div style={{ width: '100%', background: '#1a1a1a', padding: '14px 20px 20px', boxSizing: 'border-box' }}>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', textAlign: 'center', margin: '0 0 12px' }}>
+              {lang === 'fr'
+                ? 'Glissez pour repositionner · Pincez ou molette pour zoomer'
+                : 'Drag to reposition · Pinch or scroll to zoom'}
             </p>
-            
-            {/* Conteneur principal de l'image : touchAction: 'none' pour bloquer le scroll natif */}
-            <div ref={containerRef} style={{ position: 'relative', display: 'inline-block', maxWidth: '100%', maxHeight: '50vh', overflow: 'hidden', background: '#222', borderRadius: 8, userSelect: 'none', touchAction: 'none' }}>
-              <img src={cropModal.src} alt="To crop" 
-                style={{ 
-                  maxWidth: '100%', 
-                  maxHeight: '50vh', 
-                  display: 'block', 
-                  pointerEvents: 'none',
-                  transform: `rotate(${rotation}deg)`,
-                  transition: 'transform 0.1s linear'
-                }} 
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap' }}>🔄 {rotation}°</span>
+              <input
+                type="range" min="-180" max="180" value={rotation}
+                onChange={e => setRotation(Number(e.target.value))}
+                style={{ flex: 1, accentColor: '#fff', cursor: 'pointer', height: 4 }}
               />
-              
-              {/* Cadre de rognage interactif */}
-              <div 
-                onMouseDown={e => handlePointerDown(e, 'drag')}
-                onTouchStart={e => handlePointerDown(e, 'drag')}
-                style={{
-                  position: 'absolute',
-                  border: '3px solid #003DA6',
-                  boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.5)',
-                  cursor: 'move',
-                  top: cropBox.y,
-                  left: cropBox.x,
-                  width: cropBox.width,
-                  height: cropBox.height,
-                  pointerEvents: 'auto',
-                  touchAction: 'none' // Empêche tout effet de rebond ou scroll sur le cadre
-                }}
+              <button
+                type="button"
+                onClick={resetTransform}
+                style={{ padding: '6px 12px', background: 'rgba(255,255,255,0.12)', color: 'white', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
               >
-                <div style={{ position: 'absolute', inset: 0, border: '1px dashed rgba(255,255,255,0.6)' }} />
-                
-                {/* Poignée agrandie pour faciliter la saisie sur écran tactile */}
-                <div 
-                  onMouseDown={e => { e.stopPropagation(); handlePointerDown(e, 'resize') }}
-                  onTouchStart={e => { e.stopPropagation(); handlePointerDown(e, 'resize') }}
-                  style={{
-                    position: 'absolute',
-                    bottom: -14,
-                    right: -14,
-                    width: 28,
-                    height: 28,
-                    background: '#003DA6',
-                    border: '3px solid white',
-                    borderRadius: '50%',
-                    cursor: 'se-resize',
-                    pointerEvents: 'auto',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.4)',
-                    touchAction: 'none' // Empêche le conflit avec le comportement système
-                  }} 
-                />
-              </div>
+                {lang === 'fr' ? 'Recadrer' : 'Fit'}
+              </button>
             </div>
 
-            <div style={{ marginTop: 20, textAlign: 'left', background: '#f9f9f9', padding: '12px 16px', borderRadius: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#444' }}>🔄 {lang === 'fr' ? 'Orientation / Rotation' : 'Orientation / Rotation'}</span>
-                <span style={{ fontSize: 12, fontWeight: 800, color: '#003DA6', marginLeft: 'auto' }}>{rotation}°</span>
-              </div>
-              <input type="range" min="-180" max="180" value={rotation} onChange={e => setRotation(Number(e.target.value))} style={{ width: '100%', accentColor: '#003DA6', cursor: 'pointer' }} />
-            </div>
-
-            <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-              <button type="button" onClick={() => setCropModal(null)} style={{ flex: 1, padding: 12, background: '#eee', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer', color: '#555' }}>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setCropModal(null)}
+                style={{ flex: 1, padding: 14, background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 12, fontWeight: 700, cursor: 'pointer', color: 'white', fontSize: 15 }}
+              >
                 {lang === 'fr' ? 'Annuler' : 'Cancel'}
               </button>
-              <button type="button" onClick={applyCropAndUpload} style={{ flex: 1, padding: 12, background: '#003DA6', color: 'white', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>
-                {lang === 'fr' ? 'Découper & Enregistrer' : 'Crop & Save'}
+              <button
+                type="button"
+                onClick={applyCropAndUpload}
+                style={{ flex: 2, padding: 14, background: 'white', color: '#111', border: 'none', borderRadius: 12, fontWeight: 800, cursor: 'pointer', fontSize: 15 }}
+              >
+                {lang === 'fr' ? 'Utiliser cette image' : 'Use this image'}
               </button>
             </div>
           </div>
