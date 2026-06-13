@@ -22,7 +22,7 @@ export default function CardVideoExport({ card, accent, onClose }: Props) {
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const { lang } = useLang()
 
-  const DURATION = 3000 // 3 secondes pour un tour complet
+  const DURATION = 6000 // 6 secondes pour un tour complet
   const FPS = 60
   const CARD_W = 600
   const CARD_H = 840
