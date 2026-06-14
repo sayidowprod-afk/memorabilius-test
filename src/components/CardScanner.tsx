@@ -11,79 +11,169 @@ interface Props {
   onClose: () => void
 }
 
-// ── Détection pure JS (sans dépendance) ───────────────────────────────────
-// Tourne en <50ms sur une image 400px, sans bloquer l'UI
+// ── Détection par transformée de Hough ────────────────────────────────────
+
+// Ordre: TL, TR, BR, BL
+function orderCorners(pts: Pt[]): Pt[] {
+  const bySum  = [...pts].sort((a, b) => (a.x+a.y) - (b.x+b.y))
+  const byDiff = [...pts].sort((a, b) => (a.x-a.y) - (b.x-b.y))
+  return [bySum[0], byDiff[byDiff.length-1], bySum[bySum.length-1], byDiff[0]]
+}
 
 function toGray(d: Uint8ClampedArray, w: number, h: number): Float32Array {
   const g = new Float32Array(w * h)
-  for (let i = 0; i < w * h; i++) g[i] = d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114
+  for (let i = 0; i < w * h; i++) g[i] = d[i*4]*0.299 + d[i*4+1]*0.587 + d[i*4+2]*0.114
   return g
+}
+
+// Étirement de l'histogramme : améliore le contraste avant détection de bords
+function normalize(g: Float32Array): Float32Array {
+  let min = 255, max = 0
+  for (let i = 0; i < g.length; i++) { if (g[i] < min) min = g[i]; if (g[i] > max) max = g[i] }
+  const range = max - min || 1
+  const out = new Float32Array(g.length)
+  for (let i = 0; i < g.length; i++) out[i] = (g[i] - min) / range * 255
+  return out
 }
 
 function gaussBlur(g: Float32Array, w: number, h: number): Float32Array {
   const k = [1, 4, 6, 4, 1]
-  const out = new Float32Array(w * h)
   const tmp = new Float32Array(w * h)
+  const out = new Float32Array(w * h)
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
       let s = 0, n = 0
-      for (let d = -2; d <= 2; d++) { const xx = x + d; if (xx >= 0 && xx < w) { s += g[y * w + xx] * k[d + 2]; n += k[d + 2] } }
-      tmp[y * w + x] = s / n
+      for (let d = -2; d <= 2; d++) { const xx = x+d; if (xx>=0 && xx<w) { s += g[y*w+xx]*k[d+2]; n += k[d+2] } }
+      tmp[y*w+x] = s/n
     }
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
       let s = 0, n = 0
-      for (let d = -2; d <= 2; d++) { const yy = y + d; if (yy >= 0 && yy < h) { s += tmp[yy * w + x] * k[d + 2]; n += k[d + 2] } }
-      out[y * w + x] = s / n
+      for (let d = -2; d <= 2; d++) { const yy = y+d; if (yy>=0 && yy<h) { s += tmp[yy*w+x]*k[d+2]; n += k[d+2] } }
+      out[y*w+x] = s/n
     }
   return out
 }
 
-function canny(g: Float32Array, w: number, h: number): Uint8Array {
+function sobel(g: Float32Array, w: number, h: number): Uint8Array {
   const out = new Uint8Array(w * h)
-  for (let y = 1; y < h - 1; y++)
-    for (let x = 1; x < w - 1; x++) {
+  for (let y = 1; y < h-1; y++)
+    for (let x = 1; x < w-1; x++) {
       const gx = -g[(y-1)*w+x-1] + g[(y-1)*w+x+1] - 2*g[y*w+x-1] + 2*g[y*w+x+1] - g[(y+1)*w+x-1] + g[(y+1)*w+x+1]
       const gy = -g[(y-1)*w+x-1] - 2*g[(y-1)*w+x] - g[(y-1)*w+x+1] + g[(y+1)*w+x-1] + 2*g[(y+1)*w+x] + g[(y+1)*w+x+1]
-      out[y * w + x] = Math.sqrt(gx * gx + gy * gy) > 30 ? 255 : 0
+      out[y*w+x] = Math.sqrt(gx*gx + gy*gy) > 25 ? 255 : 0
     }
   return out
 }
 
-function detectCorners(edges: Uint8Array, w: number, h: number): Pt[] | null {
-  // Pour chaque quadrant, cherche le point le plus proche du coin de l'image
-  // parmi les pixels de bord — heuristique robuste pour les cartes isolées
-  const quads = [
-    { cx: 0,   cy: 0   },  // TL
-    { cx: w-1, cy: 0   },  // TR
-    { cx: w-1, cy: h-1 },  // BR
-    { cx: 0,   cy: h-1 },  // BL
-  ]
+type HLine = { r: number; t: number; v: number }
 
-  const result: Pt[] = []
-  for (const { cx, cy } of quads) {
-    let bestD = Infinity, bestPt: Pt | null = null
-    for (let y = 0; y < h; y++)
-      for (let x = 0; x < w; x++) {
-        if (!edges[y * w + x]) continue
-        const d = Math.hypot(x - cx, y - cy)
-        if (d < bestD) { bestD = d; bestPt = { x, y } }
+function houghLines(edges: Uint8Array, w: number, h: number): HLine[] {
+  const diag   = Math.ceil(Math.sqrt(w*w + h*h))
+  const NRHO   = diag * 2 + 1
+  const NTHETA = 180
+  const acc    = new Int32Array(NRHO * NTHETA)
+  const cosA   = new Float32Array(NTHETA)
+  const sinA   = new Float32Array(NTHETA)
+  for (let t = 0; t < NTHETA; t++) {
+    const a = t * Math.PI / NTHETA; cosA[t] = Math.cos(a); sinA[t] = Math.sin(a)
+  }
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      if (!edges[y*w+x]) continue
+      for (let t = 0; t < NTHETA; t++) {
+        const r = Math.round(x*cosA[t] + y*sinA[t]) + diag
+        if (r >= 0 && r < NRHO) acc[r*NTHETA+t]++
       }
-    if (!bestPt) return null
-    result.push(bestPt)
+    }
+
+  // Greedy peak picking : top N avec distance minimale
+  const minVotes = Math.max(w, h) * 0.08
+  const candidates: HLine[] = []
+  for (let r = 0; r < NRHO; r++)
+    for (let t = 0; t < NTHETA; t++) {
+      const v = acc[r*NTHETA+t]
+      if (v >= minVotes) candidates.push({ r: r-diag, t, v })
+    }
+  candidates.sort((a, b) => b.v - a.v)
+
+  const peaks: HLine[] = []
+  for (const c of candidates) {
+    const tooClose = peaks.some(p =>
+      Math.abs(p.r - c.r) < 20 &&
+      Math.min(Math.abs(p.t - c.t), NTHETA - Math.abs(p.t - c.t)) < 15
+    )
+    if (!tooClose) { peaks.push(c); if (peaks.length >= 30) break }
+  }
+  return peaks
+}
+
+function lineIntersect(l1: HLine, l2: HLine, NTHETA: number): Pt | null {
+  const t1 = l1.t * Math.PI / NTHETA, t2 = l2.t * Math.PI / NTHETA
+  const det = Math.cos(t1)*Math.sin(t2) - Math.sin(t1)*Math.cos(t2)
+  if (Math.abs(det) < 0.02) return null
+  return {
+    x: (l1.r*Math.sin(t2) - l2.r*Math.sin(t1)) / det,
+    y: (l2.r*Math.cos(t1) - l1.r*Math.cos(t2)) / det,
+  }
+}
+
+function detectCornersHough(edges: Uint8Array, w: number, h: number): Pt[] | null {
+  const NTHETA = 180
+  const peaks  = houghLines(edges, w, h)
+  if (peaks.length < 4) return null
+
+  // Groupe 1 : angle dominant (ligne la plus votée)
+  // Groupe 2 : angle perpendiculaire (±90°)
+  const dominant = peaks[0]
+  const perpT    = (dominant.t + NTHETA / 2) % NTHETA
+  const TOL      = 25
+
+  const angDiff = (a: number, b: number) => Math.min(Math.abs(a-b), NTHETA - Math.abs(a-b))
+
+  const g1 = peaks.filter(l => angDiff(l.t, dominant.t) < TOL)
+  const g2 = peaks.filter(l => angDiff(l.t, perpT)      < TOL)
+  if (g1.length < 2 || g2.length < 2) return null
+
+  // Dans chaque groupe, trouve la paire la plus écartée (bords opposés de la carte)
+  const bestPair = (lines: HLine[]): [HLine, HLine] | null => {
+    let best: [HLine, HLine] | null = null, bestD = 0
+    for (let i = 0; i < lines.length; i++)
+      for (let j = i+1; j < lines.length; j++) {
+        const d = Math.abs(lines[i].r - lines[j].r)
+        if (d > bestD && d > Math.min(w, h) * 0.15) { bestD = d; best = [lines[i], lines[j]] }
+      }
+    return best
   }
 
-  // Validation : les 4 coins doivent former un quad raisonnable
-  const [tl, tr, br, bl] = result
-  const areaApprox = Math.abs((tr.x-tl.x)*(bl.y-tl.y) - (bl.x-tl.x)*(tr.y-tl.y)) / 2
-  if (areaApprox < w * h * 0.05) return null
-  return result
+  const pair1 = bestPair(g1)
+  const pair2 = bestPair(g2)
+  if (!pair1 || !pair2) return null
+
+  // Calcule les 4 intersections
+  const corners: Pt[] = []
+  for (const l1 of pair1)
+    for (const l2 of pair2) {
+      const pt = lineIntersect(l1, l2, NTHETA)
+      // Accepte les coins légèrement hors image (carte coupée par le cadre)
+      if (pt && pt.x >= -w*0.25 && pt.x <= w*1.25 && pt.y >= -h*0.25 && pt.y <= h*1.25)
+        corners.push(pt)
+    }
+
+  if (corners.length !== 4) return null
+
+  // Validation : surface minimale (la carte doit occuper >10% de l'image)
+  const [tl, tr, br, bl] = orderCorners(corners)
+  const area = Math.abs((tr.x-tl.x)*(bl.y-tl.y) - (bl.x-tl.x)*(tr.y-tl.y)) / 2
+  if (area < w * h * 0.10) return null
+
+  return orderCorners(corners)
 }
 
 async function detectCard(img: HTMLImageElement): Promise<Pt[] | null> {
   const MAX = 400
   const scale = Math.min(MAX / img.naturalWidth, MAX / img.naturalHeight, 1)
-  const W = Math.round(img.naturalWidth * scale)
+  const W = Math.round(img.naturalWidth  * scale)
   const H = Math.round(img.naturalHeight * scale)
 
   const c = document.createElement('canvas')
@@ -91,12 +181,12 @@ async function detectCard(img: HTMLImageElement): Promise<Pt[] | null> {
   c.getContext('2d')!.drawImage(img, 0, 0, W, H)
   const data = c.getContext('2d')!.getImageData(0, 0, W, H).data
 
-  await new Promise(r => setTimeout(r, 0)) // yield
-  const gray  = toGray(data, W, H)
+  await new Promise(r => setTimeout(r, 0))
+  const gray  = normalize(toGray(data, W, H))
   const blur  = gaussBlur(gray, W, H)
-  const edges = canny(blur, W, H)
+  const edges = sobel(blur, W, H)
 
-  const corners = detectCorners(edges, W, H)
+  const corners = detectCornersHough(edges, W, H)
   if (!corners) return null
   return corners.map(p => ({ x: p.x / scale, y: p.y / scale }))
 }
