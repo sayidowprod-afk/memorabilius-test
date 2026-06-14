@@ -122,11 +122,11 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
     if (side === 'recto') { setForm(f => ({ ...f, image_recto: url })); setPreviewRecto(url); setUploadingRecto(false) }
     else { setForm(f => ({ ...f, image_verso: url })); setPreviewVerso(url); setUploadingVerso(false) }
 
-    // Analyse IA uniquement sur le recto
-    if (side === 'recto') analyzeCard(blob)
+    // Analyse IA recto ET verso — le verso complète les champs manquants
+    analyzeCard(blob, side === 'verso')
   }
 
-  const analyzeCard = async (blob: Blob) => {
+  const analyzeCard = async (blob: Blob, fillMissingOnly = false) => {
     setScanning(true)
     setScanError(null)
     try {
@@ -147,16 +147,16 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
       }
       setForm(f => ({
         ...f,
-        nom:        card.nom        || f.nom,
-        equipe:     card.equipe     || f.equipe,
-        annee:      card.annee      || f.annee,
-        collection: card.collection || f.collection,
-        variation:  card.variation  || f.variation,
-        num:        card.num        || f.num,
-        grade:      card.grade      || f.grade,
-        rc:         card.rc   ?? f.rc,
-        auto:       card.auto ?? f.auto,
-        patch:      card.patch ?? f.patch,
+        nom:        (fillMissingOnly && f.nom)        ? f.nom        : card.nom        || f.nom,
+        equipe:     (fillMissingOnly && f.equipe)     ? f.equipe     : card.equipe     || f.equipe,
+        annee:      (fillMissingOnly && f.annee)      ? f.annee      : card.annee      || f.annee,
+        collection: (fillMissingOnly && f.collection) ? f.collection : card.collection || f.collection,
+        variation:  (fillMissingOnly && f.variation)  ? f.variation  : card.variation  || f.variation,
+        num:        (fillMissingOnly && f.num)        ? f.num        : card.num        || f.num,
+        grade:      (fillMissingOnly && f.grade !== 'Raw') ? f.grade : card.grade      || f.grade,
+        rc:         f.rc   || (card.rc   ?? false),
+        auto:       f.auto || (card.auto ?? false),
+        patch:      f.patch || (card.patch ?? false),
       }))
     } catch (e: any) {
       setScanError(e.message)
