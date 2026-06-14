@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent'
 
 const PROMPT = `Tu es un expert en cartes de collection sportives (basketball, football, baseball, hockey, soccer, etc.) et TCG.
 Analyse cette image de carte et extrais les informations suivantes en JSON strict.
