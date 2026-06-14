@@ -125,9 +125,9 @@ async function generate(cards: Card[], profileName: string, avatarUrl: string, a
   const cardW = Math.floor((availW - GAP * (cols - 1)) / cols)
   const nameH = hasBelow ? Math.min(NAME_AREA, Math.round(cardW * 0.55)) : 0
   const cardH = Math.floor(cardW * CARD_RATIO)
-  // vGap plafonné à GAP pour éviter les espaces indécents entre lignes
+  // vGap réduit : max 6px pour serrer la grille
   const totalCardH = rows * (cardH + nameH)
-  const vGap = rows > 1 ? Math.min(GAP, Math.max(0, (availH - totalCardH) / (rows - 1))) : 0
+  const vGap = rows > 1 ? Math.min(6, Math.max(0, (availH - totalCardH) / (rows - 1))) : 0
   const gridH = totalCardH + vGap * (rows - 1)
 
   const gridX = PAD
@@ -136,8 +136,25 @@ async function generate(cards: Card[], profileName: string, avatarUrl: string, a
   // Fond
   ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h)
 
-  // Header
-  ctx.fillStyle = accent; ctx.fillRect(0, 0, w, HEADER_H)
+  // Fond texturé : grille de points subtils
+  if (true) {
+    const dotColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'
+    const spacing = 18
+    ctx.fillStyle = dotColor
+    for (let dy = spacing; dy < h; dy += spacing)
+      for (let dx = spacing; dx < w; dx += spacing)
+        ctx.fillRect(dx, dy, 1.5, 1.5)
+  }
+
+  // Header gradient
+  const grad = ctx.createLinearGradient(0, 0, w, HEADER_H)
+  const accentDark = accent + 'cc' // version plus sombre via opacité
+  grad.addColorStop(0, accent)
+  grad.addColorStop(1, accentDark)
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, w, HEADER_H)
+  // Légère ligne de séparation en bas du header
+  ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(0, HEADER_H - 2, w, 2)
+
   const avS = Math.round(HEADER_H * 0.62)
   const avX = PAD + avS / 2, avY = HEADER_H / 2
   try {
@@ -148,9 +165,23 @@ async function generate(cards: Card[], profileName: string, avatarUrl: string, a
   const tx = PAD + avS + 12
   ctx.textBaseline = 'middle'
   ctx.fillStyle = '#fff'; ctx.font = `700 ${Math.round(HEADER_H * 0.27)}px ${FONT}`
-  ctx.fillText(profileName, tx, avY - HEADER_H * 0.1)
-  ctx.fillStyle = 'rgba(255,255,255,0.68)'; ctx.font = `400 ${Math.round(HEADER_H * 0.16)}px ${FONT}`
-  ctx.fillText(`${cards.length} carte${cards.length > 1 ? 's' : ''} · memorabilius.fr`, tx, avY + HEADER_H * 0.18)
+  ctx.fillText(profileName, tx, avY - HEADER_H * 0.12)
+
+  // Stats RC / AUTO / PATCH
+  const rcCount = cards.filter(c => c.rc).length
+  const autoCount = cards.filter(c => c.auto).length
+  const patchCount = cards.filter(c => c.patch).length
+  const numCount = cards.filter(c => c.num).length
+  const statParts = [
+    `${cards.length} carte${cards.length > 1 ? 's' : ''}`,
+    rcCount ? `${rcCount} RC` : '',
+    autoCount ? `${autoCount} AUTO` : '',
+    patchCount ? `${patchCount} PATCH` : '',
+    numCount ? `${numCount} #NUM` : '',
+  ].filter(Boolean).join(' · ')
+  ctx.fillStyle = 'rgba(255,255,255,0.72)'; ctx.font = `400 ${Math.round(HEADER_H * 0.155)}px ${FONT}`
+  ctx.fillText(statParts, tx, avY + HEADER_H * 0.16)
+
   ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = `400 ${Math.round(HEADER_H * 0.14)}px ${FONT}`
   ctx.fillText(new Date().toLocaleDateString(lang === 'fr' ? 'fr-FR' : 'en-US'), w - PAD, avY)
   ctx.textAlign = 'left'
