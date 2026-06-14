@@ -359,9 +359,9 @@ export default function GalerieExport({ cards, profileName, avatarUrl, accent, l
     try {
       const { default: jsPDF } = await import('jspdf')
 
-      // A4 portrait : 210 × 297 mm
-      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-      const PW = 210, PH = 297
+      // A4 paysage : 297 × 210 mm (plus large = plus de place par colonne)
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+      const PW = 297, PH = 210
       const ML = 10, MR = 10
 
       const hasPdfValues = filtered.some(c => cardValues.has(c.f))
@@ -369,24 +369,24 @@ export default function GalerieExport({ cards, profileName, avatarUrl, accent, l
         ? filtered.reduce((s, c) => s + (cardValues.get(c.f) ?? 0), 0)
         : 0
 
-      // Colonnes (mm) — avec ou sans photo
-      type Col = { header: string; key: keyof Card | '_badges' | '_photo' | '_valeur'; w: number; align?: 'center' | 'right' }
+      // Colonnes (mm)
+      type Col = { header: string; key: keyof Card | '_photo' | '_valeur'; w: number; align?: 'center' | 'right' }
       const cols: Col[] = [
-        ...(withPhotos ? [{ header: '', key: '_photo' as const, w: 11 }] : []),
-        { header: 'Joueur',      key: 'n',      w: 32 },
-        { header: 'Équipe',      key: 't',      w: 22 },
-        { header: 'Année',       key: 'y',      w: 13 },
-        { header: 'Collection',  key: 's',      w: 30 },
-        { header: 'Variation',   key: 'v',      w: 26 },
-        { header: 'Num.',        key: 'num',    w: 14 },
-        { header: 'Grade',       key: 'g',      w: 13 },
-        { header: 'RC',          key: 'rc',     w: 8,  align: 'center' },
-        { header: 'Auto',        key: 'auto',   w: 8,  align: 'center' },
-        { header: 'Patch',       key: 'patch',  w: 8,  align: 'center' },
-        ...(hasPdfValues ? [{ header: 'Valeur €', key: '_valeur' as const, w: 16, align: 'right' as const }] : []),
+        ...(withPhotos ? [{ header: '', key: '_photo' as const, w: 12 }] : []),
+        { header: 'Joueur',     key: 'n',     w: 42 },
+        { header: 'Équipe',    key: 't',     w: 28 },
+        { header: 'Année',     key: 'y',     w: 16 },
+        { header: 'Collection', key: 's',    w: 48 },
+        { header: 'Variation',  key: 'v',    w: 44 },
+        { header: 'Num.',       key: 'num',  w: 18 },
+        { header: 'Grade',      key: 'g',    w: 16 },
+        { header: 'RC',         key: 'rc',   w: 9,  align: 'center' },
+        { header: 'Auto',       key: 'auto', w: 9,  align: 'center' },
+        { header: 'Patch',      key: 'patch',w: 9,  align: 'center' },
+        ...(hasPdfValues ? [{ header: 'Valeur €', key: '_valeur' as const, w: 20, align: 'right' as const }] : []),
       ]
       const usableW = PW - ML - MR
-      // Réduire proportionnellement si débordement, puis étirer la dernière colonne
+      // Étirer la dernière colonne texte pour remplir (ou réduire si débordement)
       let totalW = cols.reduce((s, c) => s + c.w, 0)
       if (totalW > usableW) {
         const scale = usableW / totalW
@@ -397,39 +397,53 @@ export default function GalerieExport({ cards, profileName, avatarUrl, accent, l
 
       // Charger les images si besoin
       let cardImgs: (HTMLImageElement | null)[] = []
-      if (withPhotos) {
-        cardImgs = await loadImgs(filtered.map(c => c.f))
-      }
+      if (withPhotos) cardImgs = await loadImgs(filtered.map(c => c.f))
 
       const toDataUrl = (img: HTMLImageElement, w = 60, h = 84): string => {
-        const c = document.createElement('canvas'); c.width = w; c.height = h
-        c.getContext('2d')!.drawImage(img, 0, 0, w, h)
-        return c.toDataURL('image/jpeg', 0.8)
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h
+        cv.getContext('2d')!.drawImage(img, 0, 0, w, h)
+        return cv.toDataURL('image/jpeg', 0.8)
       }
 
-      const HEADER_H = 14   // hauteur du bloc titre
-      const COL_H    = 7    // hauteur entête colonnes
-      const ROW_H    = withPhotos ? 13 : 7  // hauteur ligne
-      const FONT = 'helvetica'
+      const FONT     = 'helvetica'
+      const FS       = 7       // font-size pt
+      const LINE_H   = 3.8    // mm entre lignes de texte
+      const ROW_PAD  = 1.6    // mm padding haut/bas dans chaque ligne
+      const COL_H    = 7      // hauteur entête colonnes
+      const HEADER_H = 14
 
-      let pageNum = 0
-      let y = 0
+      // Pré-calcul des lignes wrappées et hauteurs de ligne
+      doc.setFont(FONT, 'normal'); doc.setFontSize(FS)
+      type RowMeta = { wrapped: string[][]; h: number }
+      const SKIP = new Set(['_photo', '_valeur', 'rc', 'auto', 'patch'])
+      const rowMeta: RowMeta[] = filtered.map(card => {
+        const wrapped = cols.map(col => {
+          if (SKIP.has(col.key)) return []
+          const raw = card[col.key as keyof Card]
+          const txt = typeof raw === 'boolean' ? '' : (raw || '')
+          return txt ? doc.splitTextToSize(txt, col.w - 3) as string[] : []
+        })
+        const maxLines = Math.max(1, ...wrapped.map(l => l.length))
+        const h = withPhotos
+          ? Math.max(14, maxLines * LINE_H + ROW_PAD * 2)
+          : maxLines * LINE_H + ROW_PAD * 2
+        return { wrapped, h }
+      })
+
+      let pageNum = 0, y = 0
 
       const newPage = () => {
         if (pageNum > 0) doc.addPage()
-        pageNum++
-        y = 8
+        pageNum++; y = 8
 
-        // Titre
         if (pageNum === 1) {
           doc.setFont(FONT, 'bold'); doc.setFontSize(13); doc.setTextColor(20, 20, 20)
           doc.text(`${profileName} — Collection (${filtered.length} carte${filtered.length > 1 ? 's' : ''})`, ML, y + 5)
           doc.setFont(FONT, 'normal'); doc.setFontSize(7); doc.setTextColor(150)
-          const subLine = [
-            `Exporté le ${new Date().toLocaleDateString('fr-FR')} · memorabilius.fr`,
-            hasPdfValues ? `Valeur totale : ${totalValue.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '',
-          ].filter(Boolean).join('   ·   ')
-          doc.text(subLine, ML, y + 10)
+          const sub = [`Exporté le ${new Date().toLocaleDateString('fr-FR')} · memorabilius.fr`,
+            hasPdfValues ? `Valeur totale : ${totalValue.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '']
+            .filter(Boolean).join('   ·   ')
+          doc.text(sub, ML, y + 10)
           y += HEADER_H
         }
 
@@ -449,65 +463,58 @@ export default function GalerieExport({ cards, profileName, avatarUrl, accent, l
       }
 
       newPage()
-
-      doc.setFontSize(7.5)
+      doc.setFont(FONT, 'normal'); doc.setFontSize(FS)
 
       filtered.forEach((card, i) => {
-        // Nouvelle page si nécessaire
-        if (y + ROW_H > PH - 8) newPage()
+        const { wrapped, h: rowH } = rowMeta[i]
+        if (y + rowH > PH - 8) newPage()
 
         // Fond alterné
-        if (i % 2 === 1) { doc.setFillColor(247, 249, 252); doc.rect(ML, y, usableW, ROW_H, 'F') }
+        if (i % 2 === 1) { doc.setFillColor(247, 249, 252); doc.rect(ML, y, usableW, rowH, 'F') }
 
         doc.setFont(FONT, 'normal'); doc.setTextColor(30, 30, 30)
+        const midY = y + rowH / 2 + 2      // centre vertical (cellules courtes)
+        const topY = y + ROW_PAD + FS * 0.35  // baseline 1ère ligne (cellules multi-lignes)
         let cx = ML
 
-        cols.forEach(col => {
-          const cellY = y + ROW_H / 2 + 2.5
-          const maxW = col.w - 3
-
+        cols.forEach((col, ci) => {
           if (col.key === '_photo') {
             const img = cardImgs[i]
             if (img) {
               try {
-                const d = toDataUrl(img)
-                const imgH = ROW_H - 1.5
+                const imgH = rowH - 1.5
                 const imgW = imgH * (2.5 / 3.5)
-                doc.addImage(d, 'JPEG', cx + 1, y + 0.8, imgW, imgH)
+                doc.addImage(toDataUrl(img), 'JPEG', cx + 1, y + 0.8, imgW, imgH)
               } catch {}
             }
           } else if (col.key === 'rc' || col.key === 'auto' || col.key === 'patch') {
-            const val = card[col.key as 'rc' | 'auto' | 'patch']
-            if (val) {
-              doc.setTextColor(col.key === 'rc' ? 180 : col.key === 'auto' ? 40 : 20, col.key === 'rc' ? 100 : col.key === 'auto' ? 120 : 80, col.key === 'patch' ? 180 : 30)
-              doc.setFont(FONT, 'bold')
-              doc.text('✓', cx + col.w / 2, cellY, { align: 'center' })
+            if (card[col.key as 'rc' | 'auto' | 'patch']) {
+              const [r, g, b] = col.key === 'rc' ? [180, 80, 10] : col.key === 'auto' ? [30, 130, 30] : [20, 90, 190]
+              doc.setTextColor(r, g, b); doc.setFont(FONT, 'bold')
+              doc.text('✓', cx + col.w / 2, midY, { align: 'center' })
               doc.setFont(FONT, 'normal'); doc.setTextColor(30, 30, 30)
             }
           } else if (col.key === '_valeur') {
             const v = cardValues.get(card.f)
             if (v !== undefined) {
               doc.setFont(FONT, 'bold')
-              doc.text(v.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €', cx + col.w - 1.5, cellY, { align: 'right' })
+              doc.text(v.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €',
+                cx + col.w - 1.5, midY, { align: 'right' })
               doc.setFont(FONT, 'normal')
             }
           } else {
-            const raw = card[col.key as keyof Card]
-            const text = typeof raw === 'boolean' ? '' : (raw || '')
-            const truncated = doc.getTextWidth(text) > maxW
-              ? doc.splitTextToSize(text, maxW)[0] + '…'
-              : text
-            doc.text(truncated, cx + 1.5, cellY)
+            // Texte avec retour à la ligne — aucune troncature
+            const lines = wrapped[ci]
+            lines.forEach((line, li) => {
+              doc.text(line, cx + 1.5, topY + li * LINE_H)
+            })
           }
-
           cx += col.w
         })
 
-        // Ligne de séparation
         doc.setDrawColor(220, 220, 220); doc.setLineWidth(0.2)
-        doc.line(ML, y + ROW_H, ML + usableW, y + ROW_H)
-
-        y += ROW_H
+        doc.line(ML, y + rowH, ML + usableW, y + rowH)
+        y += rowH
       })
 
       // Numéros de page
