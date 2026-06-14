@@ -220,15 +220,18 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
   const numValue = (num: string) => { const m = num.trim().match(/\/(\d+)$/); return m ? parseInt(m[1]) : null }
   const isOneOfOne = (num: string) => { const v = numValue(num); return v === 1 }
   const isLowNum = (num: string) => { const v = numValue(num); return v !== null && v >= 2 && v <= 10 }
+  const isBronzeNum = (num: string) => { const v = numValue(num); return v !== null && v >= 11 && v <= 25 }
 
   const getTags = (d: Card) => {
     const oon = d.num && isOneOfOne(d.num)
     const low = d.num && !oon && isLowNum(d.num)
+    const bronze = d.num && !oon && !low && isBronzeNum(d.num)
     return (
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', minHeight: 18 }}>
         {d.rc && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, background: '#e67e22', color: 'white' }}>RC</span>}
         {d.auto && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, background: '#2e7d32', color: 'white' }}>AUTO</span>}
-        {d.num && !oon && !low && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, background: '#7b1fa2', color: 'white' }}>{d.num}</span>}
+        {d.num && !oon && !low && !bronze && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, background: '#7b1fa2', color: 'white' }}>{d.num}</span>}
+        {bronze && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, background: 'linear-gradient(90deg,#6d3a00,#cd7f32,#f5cba7,#cd7f32,#6d3a00)', color: '#2d1500', backgroundSize: '200% 100%', animation: 'goldshine 2s linear infinite', boxShadow: '0 0 6px 2px rgba(205,127,50,0.5)' }}>{d.num}</span>}
         {oon && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, background: 'linear-gradient(90deg,#b8860b,#ffd700,#fffacd,#ffd700,#b8860b)', color: '#3d2600', backgroundSize: '200% 100%', animation: 'goldshine 2s linear infinite', boxShadow: '0 0 6px 2px rgba(255,215,0,0.5)' }}>{d.num}</span>}
         {low && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, background: 'linear-gradient(90deg,#888,#e0e0e0,#fff,#e0e0e0,#888)', color: '#222', backgroundSize: '200% 100%', animation: 'goldshine 2s linear infinite', boxShadow: '0 0 6px 2px rgba(200,200,200,0.6)' }}>{d.num}</span>}
         {d.patch && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, background: '#1976d2', color: 'white' }}>PATCH</span>}
