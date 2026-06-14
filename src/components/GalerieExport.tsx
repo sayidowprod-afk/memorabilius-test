@@ -346,73 +346,157 @@ export default function GalerieExport({ cards, profileName, avatarUrl, accent, l
     URL.revokeObjectURL(url)
   }
 
-  // ── Export PDF tableau (via impression navigateur) ─────────────────────────
-  const exportPdfTable = (withPhotos: boolean) => {
-    const win = window.open('', '_blank')
-    if (!win) { alert('Autorisez les popups pour cet export.'); return }
+  // ── Export PDF tableau (jsPDF, téléchargement direct) ─────────────────────
+  const [exportingPdf, setExportingPdf] = useState(false)
 
-    const badge = (label: string, color: string) =>
-      `<span style="display:inline-block;background:${color};color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;margin-right:2px">${label}</span>`
+  const exportPdfTable = async (withPhotos: boolean) => {
+    if (!filtered.length) return
+    setExportingPdf(true)
+    try {
+      const { default: jsPDF } = await import('jspdf')
 
-    const tableRows = filtered.map((c, i) => {
-      const badges = [
-        c.rc    ? badge('RC',    '#e67e22') : '',
-        c.auto  ? badge('AUTO',  '#2e7d32') : '',
-        c.patch ? badge('PATCH', '#1976d2') : '',
-        c.num   ? badge(c.num,   '#7b1fa2') : '',
-        c.g && c.g !== 'Raw' ? badge(c.g, '#555') : '',
-      ].join('')
-      return `<tr style="background:${i % 2 === 0 ? '#fff' : '#f7f9fc'}">
-        ${withPhotos ? `<td style="padding:3px 6px;vertical-align:middle">
-          <img src="${c.f}" crossorigin="anonymous" style="width:32px;height:45px;object-fit:cover;border-radius:3px;display:block" />
-        </td>` : ''}
-        <td style="font-weight:600">${c.n || ''}</td>
-        <td>${c.t || ''}</td>
-        <td>${c.y || ''}</td>
-        <td>${c.s || ''}</td>
-        <td>${c.v || ''}</td>
-        <td style="white-space:nowrap">${c.num || ''}</td>
-        <td>${c.g || ''}</td>
-        <td>${badges}</td>
-      </tr>`
-    }).join('')
+      // A4 paysage : 297 × 210 mm
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+      const PW = 297, PH = 210
+      const ML = 10, MR = 10
 
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
-      <title>${profileName} — Collection</title>
-      <style>
-        *{box-sizing:border-box;margin:0;padding:0}
-        body{font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#1a1a1a;padding:12mm}
-        h1{font-size:16px;font-weight:700;margin-bottom:3px}
-        .sub{font-size:9px;color:#888;margin-bottom:12px}
-        table{border-collapse:collapse;width:100%}
-        thead tr{background:#003DA6}
-        th{color:#fff;padding:7px 8px;text-align:left;font-size:9px;font-weight:700;white-space:nowrap}
-        td{padding:5px 8px;border-bottom:1px solid #eee;vertical-align:middle;font-size:9.5px}
-        @media print{@page{margin:10mm;size:A4 landscape}body{padding:0}}
-      </style>
-    </head><body>
-      <h1>${profileName} — Collection (${filtered.length} carte${filtered.length > 1 ? 's' : ''})</h1>
-      <div class="sub">Exporté le ${new Date().toLocaleDateString('fr-FR')} · memorabilius.fr</div>
-      <table>
-        <thead><tr>
-          ${withPhotos ? '<th>Photo</th>' : ''}
-          <th>Joueur</th><th>Équipe</th><th>Année</th>
-          <th>Collection</th><th>Variation</th><th>Num.</th>
-          <th>Grade</th><th>Badges</th>
-        </tr></thead>
-        <tbody>${tableRows}</tbody>
-      </table>
-      <script>
-        const imgs = document.querySelectorAll('img');
-        if (!imgs.length) { window.print(); }
-        else {
-          let n = 0;
-          const done = () => { if (++n >= imgs.length) window.print(); };
-          imgs.forEach(img => { if (img.complete) done(); else { img.onload = done; img.onerror = done; } });
+      // Colonnes (mm) — avec ou sans photo
+      type Col = { header: string; key: keyof Card | '_badges' | '_photo'; w: number; align?: 'center' }
+      const cols: Col[] = [
+        ...(withPhotos ? [{ header: '', key: '_photo' as const, w: 12 }] : []),
+        { header: 'Joueur',      key: 'n',   w: 42 },
+        { header: 'Équipe',      key: 't',   w: 28 },
+        { header: 'Année',       key: 'y',   w: 16 },
+        { header: 'Collection',  key: 's',   w: 42 },
+        { header: 'Variation',   key: 'v',   w: 36 },
+        { header: 'Num.',        key: 'num', w: 18 },
+        { header: 'Grade',       key: 'g',   w: 16 },
+        { header: 'RC',          key: 'rc',  w: 9,  align: 'center' },
+        { header: 'Auto',        key: 'auto',w: 9,  align: 'center' },
+        { header: 'Patch',       key: 'patch',w: 10, align: 'center' },
+      ]
+      // Ajuster la dernière colonne pour remplir la largeur
+      const totalW = cols.reduce((s, c) => s + c.w, 0)
+      const usableW = PW - ML - MR
+      if (totalW < usableW) cols[cols.length - 1].w += usableW - totalW
+
+      // Charger les images si besoin
+      let cardImgs: (HTMLImageElement | null)[] = []
+      if (withPhotos) {
+        cardImgs = await loadImgs(filtered.map(c => c.f))
+      }
+
+      const toDataUrl = (img: HTMLImageElement, w = 60, h = 84): string => {
+        const c = document.createElement('canvas'); c.width = w; c.height = h
+        c.getContext('2d')!.drawImage(img, 0, 0, w, h)
+        return c.toDataURL('image/jpeg', 0.8)
+      }
+
+      const HEADER_H = 14   // hauteur du bloc titre
+      const COL_H    = 7    // hauteur entête colonnes
+      const ROW_H    = withPhotos ? 13 : 7  // hauteur ligne
+      const FONT = 'helvetica'
+
+      let pageNum = 0
+      let y = 0
+
+      const newPage = () => {
+        if (pageNum > 0) doc.addPage()
+        pageNum++
+        y = 8
+
+        // Titre
+        if (pageNum === 1) {
+          doc.setFont(FONT, 'bold'); doc.setFontSize(13); doc.setTextColor(20, 20, 20)
+          doc.text(`${profileName} — Collection (${filtered.length} carte${filtered.length > 1 ? 's' : ''})`, ML, y + 5)
+          doc.setFont(FONT, 'normal'); doc.setFontSize(7); doc.setTextColor(150)
+          doc.text(`Exporté le ${new Date().toLocaleDateString('fr-FR')} · memorabilius.fr`, ML, y + 10)
+          y += HEADER_H
         }
-      </script>
-    </body></html>`)
-    win.document.close()
+
+        // En-tête colonnes
+        doc.setFillColor(0, 61, 166)
+        doc.rect(ML, y, usableW, COL_H, 'F')
+        doc.setFont(FONT, 'bold'); doc.setFontSize(7); doc.setTextColor(255, 255, 255)
+        let cx = ML
+        cols.forEach(col => {
+          if (col.header) {
+            const tx = col.align === 'center' ? cx + col.w / 2 : cx + 1.5
+            doc.text(col.header, tx, y + COL_H / 2 + 2.2, { align: col.align === 'center' ? 'center' : 'left' })
+          }
+          cx += col.w
+        })
+        y += COL_H
+      }
+
+      newPage()
+
+      doc.setFontSize(7.5)
+
+      filtered.forEach((card, i) => {
+        // Nouvelle page si nécessaire
+        if (y + ROW_H > PH - 8) newPage()
+
+        // Fond alterné
+        if (i % 2 === 1) { doc.setFillColor(247, 249, 252); doc.rect(ML, y, usableW, ROW_H, 'F') }
+
+        doc.setFont(FONT, 'normal'); doc.setTextColor(30, 30, 30)
+        let cx = ML
+
+        cols.forEach(col => {
+          const cellY = y + ROW_H / 2 + 2.5
+          const maxW = col.w - 3
+
+          if (col.key === '_photo') {
+            const img = cardImgs[i]
+            if (img) {
+              try {
+                const d = toDataUrl(img)
+                const imgH = ROW_H - 1.5
+                const imgW = imgH * (2.5 / 3.5)
+                doc.addImage(d, 'JPEG', cx + 1, y + 0.8, imgW, imgH)
+              } catch {}
+            }
+          } else if (col.key === 'rc' || col.key === 'auto' || col.key === 'patch') {
+            const val = card[col.key as 'rc' | 'auto' | 'patch']
+            if (val) {
+              doc.setTextColor(col.key === 'rc' ? 180 : col.key === 'auto' ? 40 : 20, col.key === 'rc' ? 100 : col.key === 'auto' ? 120 : 80, col.key === 'patch' ? 180 : 30)
+              doc.setFont(FONT, 'bold')
+              doc.text('✓', cx + col.w / 2, cellY, { align: 'center' })
+              doc.setFont(FONT, 'normal'); doc.setTextColor(30, 30, 30)
+            }
+          } else {
+            const raw = card[col.key as keyof Card]
+            const text = typeof raw === 'boolean' ? '' : (raw || '')
+            // Tronquer si trop long
+            const truncated = doc.getTextWidth(text) > maxW
+              ? doc.splitTextToSize(text, maxW)[0] + '…'
+              : text
+            doc.text(truncated, cx + 1.5, cellY)
+          }
+
+          cx += col.w
+        })
+
+        // Ligne de séparation
+        doc.setDrawColor(220, 220, 220); doc.setLineWidth(0.2)
+        doc.line(ML, y + ROW_H, ML + usableW, y + ROW_H)
+
+        y += ROW_H
+      })
+
+      // Numéros de page
+      const totalPages = doc.getNumberOfPages()
+      for (let p = 1; p <= totalPages; p++) {
+        doc.setPage(p)
+        doc.setFont(FONT, 'normal'); doc.setFontSize(7); doc.setTextColor(180)
+        doc.text(`${p} / ${totalPages}`, PW - MR, PH - 5, { align: 'right' })
+      }
+
+      doc.save(`${profileName.replace(/\s+/g, '_')}_collection.pdf`)
+    } finally {
+      setExportingPdf(false)
+    }
   }
 
   const handleExport = async () => {
@@ -543,15 +627,15 @@ export default function GalerieExport({ cards, profileName, avatarUrl, accent, l
                 style={{ padding: '12px 8px', border: '2px solid #ddd', borderRadius: 10, background: '#fafafa', color: '#333', fontWeight: 700, fontSize: 13, cursor: filtered.length ? 'pointer' : 'not-allowed', transition: '0.15s', opacity: filtered.length ? 1 : 0.5 }}>
                 📊 CSV / Excel
               </button>
-              <button onClick={() => exportPdfTable(tableWithPhotos)} disabled={!filtered.length}
-                style={{ padding: '12px 8px', border: '2px solid #003DA6', borderRadius: 10, background: '#f0f4ff', color: '#003DA6', fontWeight: 700, fontSize: 13, cursor: filtered.length ? 'pointer' : 'not-allowed', transition: '0.15s', opacity: filtered.length ? 1 : 0.5 }}>
-                🖨️ PDF tableau
+              <button onClick={() => exportPdfTable(tableWithPhotos)} disabled={!filtered.length || exportingPdf}
+                style={{ padding: '12px 8px', border: '2px solid #003DA6', borderRadius: 10, background: exportingPdf ? '#e8eeff' : '#f0f4ff', color: '#003DA6', fontWeight: 700, fontSize: 13, cursor: filtered.length && !exportingPdf ? 'pointer' : 'not-allowed', transition: '0.15s', opacity: filtered.length ? 1 : 0.5 }}>
+                {exportingPdf ? '⏳ PDF…' : '⬇️ PDF tableau'}
               </button>
             </div>
             <p style={{ fontSize: 11, color: '#aaa', marginTop: 8, lineHeight: 1.5 }}>
               {lang === 'fr'
-                ? 'CSV s\'ouvre dans Excel / Google Sheets · PDF : une impression s\'ouvre, choisissez "Enregistrer en PDF"'
-                : 'CSV opens in Excel / Google Sheets · PDF: a print dialog opens, choose "Save as PDF"'}
+                ? 'CSV s\'ouvre dans Excel / Google Sheets · PDF se télécharge directement'
+                : 'CSV opens in Excel / Google Sheets · PDF downloads directly'}
             </p>
           </div>
         </div>
