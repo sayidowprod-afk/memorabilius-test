@@ -37,7 +37,7 @@ export default function CardVideoExport({ card, accent, onClose }: Props) {
   const { lang } = useLang()
 
   const DURATION = 6000
-  const FPS = 60
+  const FPS = 30
   const themeRef = useRef(theme)
   const vfmtRef = useRef(vfmt)
   themeRef.current = theme
@@ -236,8 +236,10 @@ export default function CardVideoExport({ card, accent, onClose }: Props) {
 
     const mimeType = codec === 'mp4' && MediaRecorder.isTypeSupported('video/mp4')
       ? 'video/mp4' : 'video/webm;codecs=vp9'
-    const stream = canvas.captureStream(FPS)
-    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 10_000_000 })
+    // captureStream(0) + requestFrame() : on ne capture que les frames réellement rendus
+    const stream = canvas.captureStream(0)
+    const videoTrack = stream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack
+    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 6_000_000 })
     const chunks: Blob[] = []
     recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
     recorder.onstop = () => {
@@ -253,10 +255,12 @@ export default function CardVideoExport({ card, accent, onClose }: Props) {
       const p = Math.min(frame / totalFrames, 1)
       setProgress(Math.round(p * 100))
       drawFrame(ctx, frontImg, backImg, p)
-      if (frame < totalFrames) { frame++; setTimeout(() => requestAnimationFrame(render), frameDur) }
+      videoTrack.requestFrame() // capture uniquement ce frame rendu
+      frame++
+      if (frame <= totalFrames) setTimeout(render, frameDur)
       else setTimeout(() => recorder.stop(), 200)
     }
-    requestAnimationFrame(render)
+    setTimeout(render, 0)
   }
 
   const download = () => {
