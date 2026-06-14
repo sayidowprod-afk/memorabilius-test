@@ -48,7 +48,6 @@ function loadImg(src: string): Promise<HTMLImageElement> {
     img.crossOrigin = 'anonymous'
     img.onload = () => resolve(img)
     img.onerror = () => {
-      // Retry sans crossOrigin (évite les erreurs CORS pour les images même domaine)
       const img2 = new Image()
       img2.onload = () => resolve(img2)
       img2.onerror = () => { const fb = new Image(); fb.onload = () => resolve(fb); fb.src = PLACEHOLDER }
@@ -56,6 +55,16 @@ function loadImg(src: string): Promise<HTMLImageElement> {
     }
     img.src = src
   })
+}
+
+async function loadImgs(srcs: string[], limit = 20): Promise<HTMLImageElement[]> {
+  const out: HTMLImageElement[] = new Array(srcs.length)
+  let i = 0
+  async function worker() {
+    while (i < srcs.length) { const idx = i++; out[idx] = await loadImg(srcs[idx]) }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, srcs.length) }, worker))
+  return out
 }
 
 // Trouve le minimum de colonnes tel que les cartes (largeur pleine) tiennent en hauteur.
@@ -70,12 +79,15 @@ function bestCols(n: number, availW: number, availH: number, textBelow: boolean)
   return n
 }
 
+let fontPromise: Promise<void> | null = null
 async function loadFont() {
-  try {
-    const f = new FontFace('Inter', "url(https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2)")
-    await f.load()
-    document.fonts.add(f)
-  } catch {}
+  if (!fontPromise) fontPromise = (async () => {
+    try {
+      const f = new FontFace('Inter', "url(https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2)")
+      await f.load(); document.fonts.add(f)
+    } catch {}
+  })()
+  return fontPromise
 }
 
 function trunc(ctx: CanvasRenderingContext2D, text: string, maxW: number): string {
@@ -143,7 +155,7 @@ async function generate(cards: Card[], profileName: string, avatarUrl: string, a
   ctx.fillText(new Date().toLocaleDateString(lang === 'fr' ? 'fr-FR' : 'en-US'), w - PAD, avY)
   ctx.textAlign = 'left'
 
-  const images = await Promise.all(cards.map(c => loadImg(c.f)))
+  const images = await loadImgs(cards.map(c => c.f))
 
   // Tailles de texte proportionnelles à la carte, plafonnées
   const tagH   = Math.min(14, Math.max(9,  Math.round(cardW * 0.075)))
@@ -221,7 +233,7 @@ async function generate(cards: Card[], profileName: string, avatarUrl: string, a
   ctx.textBaseline = 'middle'; ctx.textAlign = 'center'
   ctx.fillText('memorabilius.fr', w / 2, h - FOOTER_H / 2); ctx.textAlign = 'left'
 
-  return new Promise((res, rej) => canvas.toBlob(b => b ? res(b) : rej(), 'image/png'))
+  return new Promise((res, rej) => canvas.toBlob(b => b ? res(b) : rej(), 'image/jpeg', 0.95))
 }
 
 // ─── Toggle ────────────────────────────────────────────────────────────────────
@@ -279,7 +291,7 @@ export default function GalerieExport({ cards, profileName, avatarUrl, accent, l
       const blob = await generate(filtered, profileName, avatarUrl, accent, lang, opts)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = url; a.download = `${profileName.replace(/\s+/g, '_')}_${opts.format}.png`; a.click()
+      a.href = url; a.download = `${profileName.replace(/\s+/g, '_')}_${opts.format}.jpg`; a.click()
       URL.revokeObjectURL(url)
     } finally { setExporting(false) }
   }
