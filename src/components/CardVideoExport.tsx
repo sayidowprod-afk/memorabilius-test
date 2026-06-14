@@ -29,6 +29,15 @@ export default function CardVideoExport({ card, accent, onClose }: Props) {
   const themeRef = useRef(theme)
   themeRef.current = theme
 
+  // Particules stables (positions déterministes, pas de random par frame)
+  const PARTICLES = Array.from({ length: 45 }, (_, i) => ({
+    x: (i * 137.508) % 1,
+    y: (i * 97.3) % 1,
+    r: 1 + (i % 3) * 0.8,
+    speed: 0.06 + (i % 5) * 0.025,
+    phase: i * 0.73,
+  }))
+
   const loadImage = (src: string): Promise<HTMLImageElement> =>
     new Promise((resolve) => {
       const img = new Image()
@@ -52,89 +61,141 @@ export default function CardVideoExport({ card, accent, onClose }: Props) {
     const W = ctx.canvas.width
     const H = ctx.canvas.height
     const isDark = themeRef.current === 'dark'
+    const bg0 = isDark ? '#0a0a1a' : '#f0f4ff'
+    const bg1 = isDark ? '#1a1a3a' : '#e8ecff'
+    const bgSolid = isDark ? '#0d0d1f' : '#f0f4ff'
 
-    // Fond
+    // Fond dégradé
     const grad = ctx.createLinearGradient(0, 0, W, H)
-    if (isDark) { grad.addColorStop(0, '#0a0a1a'); grad.addColorStop(1, '#1a1a3a') }
-    else { grad.addColorStop(0, '#f0f4ff'); grad.addColorStop(1, '#e8ecff') }
-    ctx.fillStyle = grad
-    ctx.fillRect(0, 0, W, H)
+    grad.addColorStop(0, bg0); grad.addColorStop(1, bg1)
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H)
+
+    // Particules flottantes
+    PARTICLES.forEach(({ x, y, r, speed, phase }) => {
+      const py = ((y * H - p * speed * H * 3) % H + H) % H
+      const alpha = (isDark ? 0.04 : 0.07) + 0.02 * Math.sin(p * Math.PI * 6 + phase)
+      ctx.beginPath(); ctx.arc(x * W, py, r, 0, Math.PI * 2)
+      ctx.fillStyle = isDark ? `rgba(160,160,255,${alpha})` : `rgba(80,80,200,${alpha})`
+      ctx.fill()
+    })
+
+    // Spotlight derrière la carte (accent color, pulsant légèrement)
+    const spotPulse = 1 + 0.08 * Math.sin(p * Math.PI * 4)
+    const spot = ctx.createRadialGradient(W / 2, H / 2 - 80, 0, W / 2, H / 2 - 80, 420 * spotPulse)
+    const ar = parseInt(accent.slice(1, 3), 16)
+    const ag = parseInt(accent.slice(3, 5), 16)
+    const ab = parseInt(accent.slice(5, 7), 16)
+    spot.addColorStop(0, `rgba(${ar},${ag},${ab},${isDark ? 0.14 : 0.07})`)
+    spot.addColorStop(1, 'rgba(0,0,0,0)')
+    ctx.fillStyle = spot; ctx.fillRect(0, 0, W, H)
 
     // Carte
     const angle = p * Math.PI * 2
     const scaleX = Math.cos(angle)
     const showBack = scaleX < 0
     const CARD_W = 600, CARD_H = 840
-    const cardW = CARD_W * Math.abs(scaleX)
+    const zoom = 1 + 0.035 * Math.sin(p * Math.PI) // zoom subtil
+    const cardW = CARD_W * Math.abs(scaleX) * zoom
+    const cardH = CARD_H * zoom
+    const cardCY = H / 2 - 80
 
     if (cardW > 2) {
+      // Reflet au sol
+      const floorY = cardCY + cardH / 2
       ctx.save()
-      ctx.translate(W / 2, H / 2 - 80)
-      ctx.drawImage(showBack ? backImg : frontImg, -cardW / 2, -CARD_H / 2, cardW, CARD_H)
-      if (Math.abs(scaleX) > 0.1) {
+      ctx.translate(W / 2, floorY)
+      ctx.transform(Math.abs(scaleX) * zoom, 0, 0, -zoom, 0, 0)
+      ctx.globalAlpha = 0.18 * Math.abs(scaleX)
+      ctx.drawImage(showBack ? backImg : frontImg, -CARD_W / 2, 0, CARD_W, CARD_H)
+      ctx.restore()
+      // Fondu sur le reflet
+      const reflFade = ctx.createLinearGradient(0, floorY, 0, floorY + cardH * 0.45)
+      reflFade.addColorStop(0, 'rgba(0,0,0,0)')
+      reflFade.addColorStop(1, bgSolid)
+      ctx.fillStyle = reflFade; ctx.fillRect(0, floorY, W, cardH * 0.45)
+
+      // Carte principale
+      ctx.save()
+      ctx.translate(W / 2, cardCY)
+      ctx.drawImage(showBack ? backImg : frontImg, -cardW / 2, -cardH / 2, cardW, cardH)
+      // Reflet lumineux (shine)
+      if (Math.abs(scaleX) > 0.08) {
         const glowPos = (Math.sin(angle) + 1) / 2
-        const shine = ctx.createLinearGradient(-cardW / 2 + cardW * glowPos, -CARD_H / 2, -cardW / 2 + cardW * glowPos + 100, CARD_H / 2)
+        const shine = ctx.createLinearGradient(
+          -cardW / 2 + cardW * glowPos, -cardH / 2,
+          -cardW / 2 + cardW * glowPos + 120, cardH / 2
+        )
         shine.addColorStop(0, 'rgba(255,255,255,0)')
-        shine.addColorStop(0.5, `rgba(255,255,255,${isDark ? 0.18 : 0.3})`)
+        shine.addColorStop(0.5, `rgba(255,255,255,${isDark ? 0.20 : 0.28})`)
         shine.addColorStop(1, 'rgba(255,255,255,0)')
-        ctx.fillStyle = shine; ctx.fillRect(-cardW / 2, -CARD_H / 2, cardW, CARD_H)
+        ctx.fillStyle = shine; ctx.fillRect(-cardW / 2, -cardH / 2, cardW, cardH)
       }
       ctx.restore()
     }
 
-    // Zone infos
-    const infoY = H / 2 + 840 / 2 - 40
+    // Zone infos — fondu progressif au lieu d'une ligne dure
+    const infoY = cardCY + cardH / 2 - 30
     const infoH = H - infoY
-    ctx.save(); ctx.globalAlpha = isDark ? 0.9 : 0.92
-    ctx.fillStyle = isDark ? '#0d0d1f' : '#ffffff'
-    ctx.fillRect(0, infoY, W, infoH); ctx.restore()
+    const fadeGrad = ctx.createLinearGradient(0, infoY - 80, 0, infoY + 20)
+    fadeGrad.addColorStop(0, 'rgba(0,0,0,0)')
+    fadeGrad.addColorStop(1, bgSolid)
+    ctx.fillStyle = fadeGrad; ctx.fillRect(0, infoY - 80, W, 100)
+    ctx.fillStyle = bgSolid; ctx.fillRect(0, infoY + 20, W, infoH)
+    // Ligne accent
     ctx.fillStyle = accent; ctx.fillRect(0, infoY, W, 3)
+
+    const textBase = infoY + 50
+    ctx.textAlign = 'center'
 
     // Nom
     ctx.fillStyle = isDark ? 'white' : '#121212'
-    ctx.font = `bold ${Math.round(W * 0.042)}px Inter, sans-serif`
-    ctx.textAlign = 'center'
-    ctx.fillText(card.n, W / 2, infoY + 44)
+    ctx.font = `bold ${Math.round(W * 0.044)}px Inter, sans-serif`
+    ctx.fillText(card.n, W / 2, textBase)
 
     // Variation
     if (card.v) {
       ctx.fillStyle = accent
-      ctx.font = `600 ${Math.round(W * 0.028)}px Inter, sans-serif`
-      ctx.fillText(card.v, W / 2, infoY + 76)
+      ctx.font = `600 ${Math.round(W * 0.029)}px Inter, sans-serif`
+      ctx.fillText(card.v, W / 2, textBase + 38)
     }
 
     // Infos secondaires
-    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)'
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.48)' : 'rgba(0,0,0,0.48)'
     ctx.font = `${Math.round(W * 0.024)}px Inter, sans-serif`
     const info2 = [card.t, card.y, `${card.br} ${card.s}`].filter(Boolean).join(' · ')
-    ctx.fillText(info2, W / 2, infoY + (card.v ? 104 : 76))
+    ctx.fillText(info2, W / 2, textBase + (card.v ? 72 : 38))
 
-    // Tags
+    // Tags / badges
     const tags: { label: string; color: string }[] = []
-    if (card.rc) tags.push({ label: 'RC', color: '#e67e22' })
+    if (card.rc)   tags.push({ label: 'RC', color: '#e67e22' })
     if (card.auto) tags.push({ label: 'AUTO', color: '#2e7d32' })
-    if (card.num) tags.push({ label: `/${card.num}`, color: '#7b1fa2' })
+    if (card.num)  tags.push({ label: `/${card.num}`, color: '#7b1fa2' })
     if (card.patch) tags.push({ label: 'PATCH', color: '#1976d2' })
     if (tags.length > 0) {
-      const tagW = 72, totalW = tags.length * (tagW + 8) - 8
+      const tagH = 28, tagPad = 20, gap = 10
+      const tagWidths = tags.map(t => {
+        ctx.font = `bold ${Math.round(W * 0.024)}px Inter, sans-serif`
+        return ctx.measureText(t.label).width + tagPad * 2
+      })
+      const totalW = tagWidths.reduce((a, b) => a + b, 0) + gap * (tags.length - 1)
       let tagX = W / 2 - totalW / 2
-      const tagY = infoY + (card.v ? 118 : 90)
-      tags.forEach(tag => {
-        ctx.fillStyle = tag.color; ctx.beginPath()
-        ctx.roundRect(tagX, tagY, tagW, 24, 4); ctx.fill()
+      const tagY = textBase + (card.v ? 90 : 56)
+      tags.forEach((tag, i) => {
+        const tw = tagWidths[i]
+        ctx.fillStyle = tag.color
+        ctx.beginPath(); ctx.roundRect(tagX, tagY, tw, tagH, 6); ctx.fill()
         ctx.fillStyle = 'white'
-        ctx.font = `bold ${Math.round(W * 0.022)}px Inter, sans-serif`
-        ctx.textAlign = 'center'
-        ctx.fillText(tag.label, tagX + tagW / 2, tagY + 16)
-        tagX += tagW + 8
+        ctx.font = `bold ${Math.round(W * 0.024)}px Inter, sans-serif`
+        ctx.fillText(tag.label, tagX + tw / 2, tagY + tagH * 0.68)
+        tagX += tw + gap
       })
     }
 
     // Logo
-    ctx.fillStyle = accent
-    ctx.font = `bold ${Math.round(W * 0.03)}px Inter, sans-serif`
+    ctx.fillStyle = isDark ? `rgba(${ar},${ag},${ab},0.7)` : accent
+    ctx.font = `600 ${Math.round(W * 0.028)}px Inter, sans-serif`
     ctx.textAlign = 'right'
-    ctx.fillText('Memorabilius', W - 20, H - 14)
+    ctx.fillText('memorabilius.fr', W - 22, H - 16)
   }
 
   const startRecording = async () => {
