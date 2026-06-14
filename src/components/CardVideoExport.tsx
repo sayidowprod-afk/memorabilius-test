@@ -233,25 +233,26 @@ export default function CardVideoExport({ card, accent, onClose }: Props) {
     const totalFrames = Math.ceil((DURATION / 1000) * FPS)
     const frameDur = DURATION / totalFrames
 
-    // ── Phase 1 : pré-rendu → ImageBitmaps décodés en mémoire ─────────────
-    // Rend chaque frame + encode en JPEG + décode en ImageBitmap prêt à copier
-    // → phase 2 ne fait que ctx.drawImage, zéro travail async, timing parfait
+    // ── Phase 1 : pré-rendu → ImageBitmaps en mémoire ─────────────────────
+    // p va de 0 à (totalFrames-1)/totalFrames : rotation de 0 à ~360° sans
+    // dupliquer le frame de départ (évite la "pause" visible en fin de vidéo)
     const bitmaps: ImageBitmap[] = []
-    for (let i = 0; i <= totalFrames; i++) {
+    for (let i = 0; i < totalFrames; i++) {
       drawFrame(ctx, frontImg, backImg, i / totalFrames)
       const blob = await new Promise<Blob>(res =>
         canvas.toBlob(b => res(b!), 'image/jpeg', 0.88)
       )
       bitmaps.push(await createImageBitmap(blob))
       setProgress(Math.round(i / totalFrames * 60))
-      await new Promise(r => setTimeout(r, 0)) // yield au navigateur
+      await new Promise(r => setTimeout(r, 0))
     }
 
-    // ── Phase 2 : copies synchrones + rAF pour timing parfait ──────────────
+    // ── Phase 2 : captureStream(FPS) auto + setInterval ────────────────────
+    // captureStream(FPS) : le browser capture à FPS régulier sans requestFrame
+    // setInterval : met à jour le canvas au même rythme → timing natif du browser
     const mimeType = codec === 'mp4' && MediaRecorder.isTypeSupported('video/mp4')
       ? 'video/mp4' : 'video/webm;codecs=vp9'
-    const stream = canvas.captureStream(0)
-    const videoTrack = stream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack
+    const stream = canvas.captureStream(FPS)
     const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 6_000_000 })
     const chunks: Blob[] = []
     recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
@@ -262,23 +263,18 @@ export default function CardVideoExport({ card, accent, onClose }: Props) {
     }
     recorder.start()
 
+    let fi = 0
     await new Promise<void>(resolve => {
-      let i = 0
-      const startAt = performance.now()
-      const tick = () => {
-        if (i >= bitmaps.length) { resolve(); return }
-        ctx.drawImage(bitmaps[i], 0, 0, canvas.width, canvas.height)
-        videoTrack.requestFrame()
-        setProgress(60 + Math.round(i / bitmaps.length * 40))
-        i++
-        const next = startAt + i * frameDur
-        const delay = next - performance.now()
-        if (delay > 4) setTimeout(() => requestAnimationFrame(tick), delay - 4)
-        else requestAnimationFrame(tick)
-      }
-      requestAnimationFrame(tick)
+      const id = setInterval(() => {
+        ctx.drawImage(bitmaps[fi], 0, 0, canvas.width, canvas.height)
+        setProgress(60 + Math.round(fi / bitmaps.length * 40))
+        fi++
+        if (fi >= bitmaps.length) { clearInterval(id); resolve() }
+      }, frameDur)
     })
-    setTimeout(() => recorder.stop(), 200)
+    // Attendre que le dernier frame soit bien capturé avant d'arrêter
+    await new Promise(r => setTimeout(r, frameDur * 3))
+    recorder.stop()
   }
 
   const download = () => {
