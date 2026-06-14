@@ -70,7 +70,7 @@ function AnnuaireContent() {
     // Recalculer les stats si pas à jour depuis 24h
     profiles.forEach(async p => {
       const lastUpdate = p.stats_updated_at ? new Date(p.stats_updated_at) : null
-      const isStale = !lastUpdate || (Date.now() - lastUpdate.getTime() > 24 * 60 * 60 * 1000)
+      const isStale = !lastUpdate || (Date.now() - lastUpdate.getTime() > 60 * 60 * 1000)
       if (isStale) {
         try {
           const r = await fetch('/api/update-stats', {
