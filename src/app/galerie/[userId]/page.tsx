@@ -217,13 +217,18 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
 
   const toggleFilter = (k: keyof typeof activeFilters) => setActiveFilters(p => ({ ...p, [k]: !p[k] }))
 
+  const isOneOfOne = (num: string) => /^(1\/1|\/1)$/i.test(num.trim())
+
   const getTags = (d: Card) => {
+    const oon = d.num && isOneOfOne(d.num)
     return (
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', minHeight: 18 }}>
         {d.rc && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, background: '#e67e22', color: 'white' }}>RC</span>}
         {d.auto && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, background: '#2e7d32', color: 'white' }}>AUTO</span>}
-        {d.num && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, background: '#7b1fa2', color: 'white' }}>{d.num}</span>}
+        {d.num && !oon && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, background: '#7b1fa2', color: 'white' }}>{d.num}</span>}
+        {oon && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, background: 'linear-gradient(90deg,#b8860b,#ffd700,#fffacd,#ffd700,#b8860b)', color: '#3d2600', backgroundSize: '200% 100%', animation: 'goldshine 2s linear infinite', boxShadow: '0 0 6px 2px rgba(255,215,0,0.5)' }}>✨ 1/1</span>}
         {d.patch && <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 6px', borderRadius: 4, background: '#1976d2', color: 'white' }}>PATCH</span>}
+        <style>{`@keyframes goldshine { 0%{background-position:200% 0} 100%{background-position:-200% 0} }`}</style>
       </div>
     )
   }
