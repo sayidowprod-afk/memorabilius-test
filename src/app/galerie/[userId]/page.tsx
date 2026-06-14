@@ -348,39 +348,41 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
               <select value={fYear} onChange={e => setFYear(e.target.value)}>
                 <option value="">{t('gallery_all')}</option>{years.map(year => <option key={year}>{year}</option>)}
               </select></div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 3 }}>
-                {lang === 'fr' ? 'Trier par' : 'Sort by'}
-              </label>
-              <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}
-                style={{ background: sortBy !== 'default' ? '#f0f4ff' : undefined, borderColor: sortBy !== 'default' ? '#003DA6' : undefined, color: sortBy !== 'default' ? '#003DA6' : undefined, fontWeight: sortBy !== 'default' ? 700 : undefined }}>
-                <option value="default">{lang === 'fr' ? '— Ordre par défaut —' : '— Default order —'}</option>
-                <optgroup label={lang === 'fr' ? 'Joueur' : 'Player'}>
-                  <option value="n">{lang === 'fr' ? 'Joueur A → Z' : 'Player A → Z'}</option>
-                  <option value="n_desc">{lang === 'fr' ? 'Joueur Z → A' : 'Player Z → A'}</option>
-                </optgroup>
-                <optgroup label={lang === 'fr' ? 'Année' : 'Year'}>
-                  <option value="y">{lang === 'fr' ? 'Année croissante' : 'Year asc'}</option>
-                  <option value="y_desc">{lang === 'fr' ? 'Année décroissante' : 'Year desc'}</option>
-                </optgroup>
-                <option value="t">{lang === 'fr' ? 'Équipe A → Z' : 'Team A → Z'}</option>
-                <option value="s">{lang === 'fr' ? 'Collection A → Z' : 'Brand A → Z'}</option>
-                <option value="v">{lang === 'fr' ? 'Variation A → Z' : 'Variation A → Z'}</option>
-                <option value="g">{lang === 'fr' ? 'Grade' : 'Grade'}</option>
-                {cardValues.size > 0 && <>
-                  <option value="valeur">{lang === 'fr' ? 'Valeur ↓ (plus cher en 1er)' : 'Value ↓ (highest first)'}</option>
-                  <option value="valeur_desc">{lang === 'fr' ? 'Valeur ↑ (moins cher en 1er)' : 'Value ↑ (lowest first)'}</option>
-                </>}
-              </select>
-            </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 5 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 5, marginBottom: 8 }}>
             {(['rc', 'auto', 'num', 'patch'] as const).map(k => (
               <button key={k} onClick={() => toggleFilter(k)} style={{
                 padding: '8px 2px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 9, fontWeight: 800, textTransform: 'uppercase',
                 background: activeFilters[k] ? accent : '#f0f0f0', color: activeFilters[k] ? 'white' : '#333'
               }}>{k === 'num' ? '# NUM' : k.toUpperCase()}</button>
             ))}
+          </div>
+          <div>
+            <label style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 3 }}>
+              {lang === 'fr' ? 'Trier par' : 'Sort by'}
+            </label>
+            <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}
+              style={{ background: sortBy !== 'default' ? '#f0f4ff' : undefined, borderColor: sortBy !== 'default' ? '#003DA6' : undefined, color: sortBy !== 'default' ? '#003DA6' : undefined, fontWeight: sortBy !== 'default' ? 700 : undefined }}>
+              <option value="default">{lang === 'fr' ? '— Ordre par défaut —' : '— Default order —'}</option>
+              <optgroup label={lang === 'fr' ? 'Joueur' : 'Player'}>
+                <option value="n">{lang === 'fr' ? 'Joueur A → Z' : 'Player A → Z'}</option>
+                <option value="n_desc">{lang === 'fr' ? 'Joueur Z → A' : 'Player Z → A'}</option>
+              </optgroup>
+              <optgroup label={lang === 'fr' ? 'Année' : 'Year'}>
+                <option value="y">{lang === 'fr' ? 'Année croissante' : 'Year asc'}</option>
+                <option value="y_desc">{lang === 'fr' ? 'Année décroissante' : 'Year desc'}</option>
+              </optgroup>
+              <optgroup label={lang === 'fr' ? 'Équipe' : 'Team'}>
+                <option value="t">{lang === 'fr' ? 'Équipe A → Z' : 'Team A → Z'}</option>
+              </optgroup>
+              <optgroup label={lang === 'fr' ? 'Collection' : 'Brand'}>
+                <option value="s">{lang === 'fr' ? 'Collection A → Z' : 'Brand A → Z'}</option>
+              </optgroup>
+              {cardValues.size > 0 && <>
+                <option value="valeur">{lang === 'fr' ? 'Valeur ↓ (plus cher en 1er)' : 'Value ↓ (highest first)'}</option>
+                <option value="valeur_desc">{lang === 'fr' ? 'Valeur ↑ (moins cher en 1er)' : 'Value ↑ (lowest first)'}</option>
+              </>}
+            </select>
           </div>
         </div>
 
