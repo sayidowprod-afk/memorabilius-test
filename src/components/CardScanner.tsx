@@ -201,27 +201,41 @@ export default function CardScanner({ src, onResult, onFallback, onClose }: Prop
   const canvasRef   = useRef<HTMLCanvasElement>(null)
   const imgRef      = useRef<HTMLImageElement | null>(null)
   const scaleRef    = useRef(1)
+
   const [status, setStatus]     = useState<Status>('detecting')
   const [corners, setCorners]   = useState<Pt[]>([])
   const [dragging, setDragging] = useState<number | null>(null)
   const [applying, setApplying] = useState(false)
 
+  // Zoom / pan — pan en coordonnées canvas (non-zoomées)
+  const [zoom, setZoom] = useState(1)
+  const [pan,  setPan]  = useState<Pt>({ x: 0, y: 0 })
+  const zoomRef  = useRef(zoom)
+  const panRef   = useRef(pan)
+  zoomRef.current = zoom
+  panRef.current  = pan
+
+  // Refs pour le pinch
+  const lastPinchDist = useRef(0)
+  const lastPanPt     = useRef<Pt | null>(null)
+  const isPanning     = useRef(false)
+
+  // ── Chargement & détection ─────────────────────────────────────────────
   useEffect(() => {
     const img = new Image()
     img.onload = async () => {
       imgRef.current = img
       const canvas = canvasRef.current
       if (!canvas) return
-
       const maxW = Math.min(window.innerWidth - 32, 500)
-      const maxH = Math.round(window.innerHeight * 0.56)
+      const maxH = Math.round(window.innerHeight * 0.50)
       const scale = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight, 1)
       scaleRef.current = scale
       canvas.width  = Math.round(img.naturalWidth  * scale)
       canvas.height = Math.round(img.naturalHeight * scale)
+      setPan({ x: canvas.width / 2, y: canvas.height / 2 })
       canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
 
-      // Détection en pur JS — non bloquante
       const naturalCorners = await detectCard(img)
       const display = naturalCorners
         ? naturalCorners.map(p => ({ x: p.x * scale, y: p.y * scale }))
@@ -235,75 +249,173 @@ export default function CardScanner({ src, onResult, onFallback, onClose }: Prop
   const defaultCorners = (canvas: HTMLCanvasElement): Pt[] => {
     const p = Math.round(Math.min(canvas.width, canvas.height) * 0.07)
     return [
-      { x: p, y: p },
-      { x: canvas.width - p, y: p },
-      { x: canvas.width - p, y: canvas.height - p },
-      { x: p, y: canvas.height - p },
+      { x: p, y: p }, { x: canvas.width - p, y: p },
+      { x: canvas.width - p, y: canvas.height - p }, { x: p, y: canvas.height - p },
     ]
   }
 
-  // Dessin overlay
+  // ── Dessin ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current
     const img    = imgRef.current
     if (!canvas || !img || corners.length < 4) return
     const ctx = canvas.getContext('2d')!
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+    const cw = canvas.width, ch = canvas.height
+    const z = zoom, px = pan.x, py = pan.y
 
+    ctx.clearRect(0, 0, cw, ch)
+    ctx.save()
+    ctx.translate(cw / 2, ch / 2)
+    ctx.scale(z, z)
+    ctx.translate(-px, -py)
+    ctx.drawImage(img, 0, 0, cw, ch)
+
+    // Quadrilatère
     ctx.beginPath()
     ctx.moveTo(corners[0].x, corners[0].y)
     corners.forEach(c => ctx.lineTo(c.x, c.y))
     ctx.closePath()
-    ctx.fillStyle   = 'rgba(0,229,255,0.10)'
-    ctx.fill()
-    ctx.strokeStyle = '#00e5ff'
-    ctx.lineWidth   = 2.5
-    ctx.stroke()
+    ctx.fillStyle   = 'rgba(0,229,255,0.10)'; ctx.fill()
+    ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 2.5 / z; ctx.stroke()
 
+    // Handles (taille constante quel que soit le zoom)
     corners.forEach((c, i) => {
       ctx.beginPath()
-      ctx.arc(c.x, c.y, HANDLE_R, 0, Math.PI * 2)
-      ctx.fillStyle   = HANDLE_COLORS[i]
-      ctx.fill()
-      ctx.strokeStyle = 'rgba(0,0,0,0.4)'
-      ctx.lineWidth   = 2
-      ctx.stroke()
+      ctx.arc(c.x, c.y, HANDLE_R / z, 0, Math.PI * 2)
+      ctx.fillStyle   = HANDLE_COLORS[i]; ctx.fill()
+      ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 2 / z; ctx.stroke()
     })
-  }, [corners])
+    ctx.restore()
+  }, [corners, zoom, pan])
 
-  const canvasPt = (e: React.MouseEvent | React.TouchEvent): Pt => {
+  // ── Conversion écran → coordonnées canvas (inverse de la transform draw) ──
+  // draw: screenPt = (canvasPt - pan) * zoom + center
+  // inverse: canvasPt = (screenPt - center) / zoom + pan
+  const screenToCanvasCoord = (clientX: number, clientY: number): Pt => {
     const canvas = canvasRef.current!
     const rect   = canvas.getBoundingClientRect()
-    const sx = canvas.width  / rect.width
-    const sy = canvas.height / rect.height
-    const t  = 'touches' in e ? (e.touches[0] ?? (e as React.TouchEvent).changedTouches[0]) : (e as React.MouseEvent)
-    return { x: (t.clientX - rect.left) * sx, y: (t.clientY - rect.top) * sy }
+    const scaleX = canvas.width  / rect.width
+    const scaleY = canvas.height / rect.height
+    const screenX = (clientX - rect.left) * scaleX
+    const screenY = (clientY - rect.top)  * scaleY
+    const cx = canvas.width  / 2
+    const cy = canvas.height / 2
+    const z = zoomRef.current, p = panRef.current
+    return {
+      x: (screenX - cx) / z + p.x,
+      y: (screenY - cy) / z + p.y,
+    }
   }
 
-  const nearestCorner = (pos: Pt) => {
+  const nearestCorner = (pos: Pt): number => {
+    const z = zoomRef.current
     let best = -1, bd = Infinity
-    corners.forEach((c, i) => { const d = Math.hypot(c.x - pos.x, c.y - pos.y); if (d < bd) { bd = d; best = i } })
+    corners.forEach((c, i) => {
+      const d = Math.hypot(c.x - pos.x, c.y - pos.y) * z
+      if (d < bd) { bd = d; best = i }
+    })
     return bd < HANDLE_R * 2.5 ? best : -1
   }
 
-  const onDown = (e: React.MouseEvent | React.TouchEvent) => {
-    const idx = nearestCorner(canvasPt(e))
-    if (idx >= 0) { e.preventDefault(); setDragging(idx) }
+  // ── Événements souris ──────────────────────────────────────────────────
+  const onMouseDown = (e: React.MouseEvent) => {
+    const pos = screenToCanvasCoord(e.clientX, e.clientY)
+    const idx = nearestCorner(pos)
+    if (idx >= 0) { setDragging(idx) }
+    else { isPanning.current = true; lastPanPt.current = { x: e.clientX, y: e.clientY } }
   }
-  const onMove = (e: React.MouseEvent | React.TouchEvent) => {
-    if (dragging === null) return
-    e.preventDefault()
-    const pos = canvasPt(e)
-    const canvas = canvasRef.current!
-    setCorners(prev => {
-      const next = [...prev]
-      next[dragging] = { x: Math.max(0, Math.min(canvas.width, pos.x)), y: Math.max(0, Math.min(canvas.height, pos.y)) }
-      return next
-    })
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (dragging !== null) {
+      const pos = screenToCanvasCoord(e.clientX, e.clientY)
+      const canvas = canvasRef.current!
+      setCorners(prev => { const n = [...prev]; n[dragging] = { x: Math.max(0, Math.min(canvas.width, pos.x)), y: Math.max(0, Math.min(canvas.height, pos.y)) }; return n })
+    } else if (isPanning.current && lastPanPt.current) {
+      const canvas = canvasRef.current!
+      const rect   = canvas.getBoundingClientRect()
+      const sx = canvas.width / rect.width, sy = canvas.height / rect.height
+      const dx = (e.clientX - lastPanPt.current.x) * sx / zoomRef.current
+      const dy = (e.clientY - lastPanPt.current.y) * sy / zoomRef.current
+      lastPanPt.current = { x: e.clientX, y: e.clientY }
+      setPan(p => ({ x: p.x - dx, y: p.y - dy }))
+    }
   }
-  const onUp = () => setDragging(null)
+  const onMouseUp = () => { setDragging(null); isPanning.current = false; lastPanPt.current = null }
 
+  const onWheel = (e: React.WheelEvent) => {
+    e.preventDefault()
+    const delta = e.deltaY > 0 ? 0.85 : 1 / 0.85
+    setZoom(z => Math.max(1, Math.min(8, z * delta)))
+  }
+
+  // ── Événements tactiles ────────────────────────────────────────────────
+  const onTouchStart = (e: React.TouchEvent) => {
+    e.preventDefault()
+    if (e.touches.length === 1) {
+      const t = e.touches[0]
+      const pos = screenToCanvasCoord(t.clientX, t.clientY)
+      const idx = nearestCorner(pos)
+      if (idx >= 0) { setDragging(idx) }
+      else { isPanning.current = true; lastPanPt.current = { x: t.clientX, y: t.clientY } }
+    } else if (e.touches.length === 2) {
+      setDragging(null); isPanning.current = false
+      lastPinchDist.current = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      )
+      lastPanPt.current = {
+        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+      }
+    }
+  }
+  const onTouchMove = (e: React.TouchEvent) => {
+    e.preventDefault()
+    if (e.touches.length === 1) {
+      const t = e.touches[0]
+      if (dragging !== null) {
+        const pos = screenToCanvasCoord(t.clientX, t.clientY)
+        const canvas = canvasRef.current!
+        setCorners(prev => { const n = [...prev]; n[dragging] = { x: Math.max(0, Math.min(canvas.width, pos.x)), y: Math.max(0, Math.min(canvas.height, pos.y)) }; return n })
+      } else if (isPanning.current && lastPanPt.current) {
+        const canvas = canvasRef.current!
+        const rect   = canvas.getBoundingClientRect()
+        const sx = canvas.width / rect.width, sy = canvas.height / rect.height
+        const dx = (t.clientX - lastPanPt.current.x) * sx / zoomRef.current
+        const dy = (t.clientY - lastPanPt.current.y) * sy / zoomRef.current
+        lastPanPt.current = { x: t.clientX, y: t.clientY }
+        setPan(p => ({ x: p.x - dx, y: p.y - dy }))
+      }
+    } else if (e.touches.length === 2) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      )
+      if (lastPinchDist.current > 0) {
+        const ratio = dist / lastPinchDist.current
+        setZoom(z => Math.max(1, Math.min(8, z * ratio)))
+      }
+      lastPinchDist.current = dist
+
+      // Pan au centre du pinch
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2
+      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2
+      if (lastPanPt.current) {
+        const canvas = canvasRef.current!
+        const rect   = canvas.getBoundingClientRect()
+        const sx = canvas.width / rect.width, sy = canvas.height / rect.height
+        const dx = (midX - lastPanPt.current.x) * sx / zoomRef.current
+        const dy = (midY - lastPanPt.current.y) * sy / zoomRef.current
+        setPan(p => ({ x: p.x - dx, y: p.y - dy }))
+      }
+      lastPanPt.current = { x: midX, y: midY }
+    }
+  }
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (e.touches.length === 0) { setDragging(null); isPanning.current = false; lastPanPt.current = null }
+    if (e.touches.length === 1) { lastPinchDist.current = 0 }
+  }
+
+  // ── Warp ───────────────────────────────────────────────────────────────
   const applyWarp = async () => {
     const img = imgRef.current
     if (!img || corners.length < 4 || applying) return
@@ -319,26 +431,49 @@ export default function CardScanner({ src, onResult, onFallback, onClose }: Prop
     }
   }
 
+  const resetZoom = () => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    setZoom(1)
+    setPan({ x: canvas.width / 2, y: canvas.height / 2 })
+  }
+
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.96)', zIndex: 999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px 16px 24px' }}>
-      <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, marginBottom: 10, textAlign: 'center', minHeight: 20 }}>
-        {status === 'detecting' && 'Détection en cours…'}
-        {status === 'found'     && 'Carte détectée — ajustez les coins si besoin'}
-        {status === 'notfound'  && 'Non détectée — placez les coins sur la carte'}
-        {applying               && 'Recadrage…'}
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.96)', zIndex: 999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '12px 16px 20px' }}>
+      <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, marginBottom: 8, textAlign: 'center', minHeight: 18 }}>
+        {!applying && status === 'detecting' && 'Détection en cours…'}
+        {!applying && status === 'found'     && 'Carte détectée — ajustez les coins si besoin'}
+        {!applying && status === 'notfound'  && 'Non détectée — placez les coins sur la carte'}
+        {applying  && 'Recadrage en cours…'}
       </p>
 
       <canvas
         ref={canvasRef}
-        style={{ maxWidth: '100%', maxHeight: '56vh', borderRadius: 8, touchAction: 'none', cursor: dragging !== null ? 'grabbing' : 'crosshair', display: 'block' }}
-        onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
-        onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp}
+        style={{ maxWidth: '100%', maxHeight: '50vh', borderRadius: 8, touchAction: 'none', display: 'block', cursor: dragging !== null ? 'grabbing' : isPanning.current ? 'grab' : 'crosshair' }}
+        onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}
+        onWheel={onWheel}
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
       />
 
-      {corners.length === 4 && (
-        <div style={{ display: 'flex', gap: 12, marginTop: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+      {/* Zoom slider */}
+      {corners.length === 4 && !applying && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, width: '100%', maxWidth: 420 }}>
+          <span style={{ fontSize: 16 }}>🔍</span>
+          <input type="range" min="100" max="800" value={Math.round(zoom * 100)}
+            onChange={e => setZoom(Number(e.target.value) / 100)}
+            style={{ flex: 1, accentColor: '#00e5ff', height: 4, cursor: 'pointer' }}
+          />
+          <button onClick={resetZoom}
+            style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', whiteSpace: 'nowrap' }}>
+            {Math.round(zoom * 100)}% ↺
+          </button>
+        </div>
+      )}
+
+      {corners.length === 4 && !applying && (
+        <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
           {['Haut-gauche','Haut-droit','Bas-droit','Bas-gauche'].map((label, i) => (
-            <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+            <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'rgba(255,255,255,0.38)' }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: HANDLE_COLORS[i], display: 'inline-block' }} />
               {label}
             </span>
@@ -346,7 +481,7 @@ export default function CardScanner({ src, onResult, onFallback, onClose }: Prop
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 10, marginTop: 16, width: '100%', maxWidth: 420, boxSizing: 'border-box' }}>
+      <div style={{ display: 'flex', gap: 10, marginTop: 12, width: '100%', maxWidth: 420, boxSizing: 'border-box' }}>
         <button onClick={onClose} disabled={applying}
           style={{ flex: 1, padding: '13px 0', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 12, color: 'white', fontWeight: 700, cursor: 'pointer', fontSize: 14 }}>
           Annuler
