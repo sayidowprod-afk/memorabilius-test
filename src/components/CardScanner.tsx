@@ -524,38 +524,34 @@ async function imageToBase64(img: HTMLImageElement, maxSize = 800): Promise<{ b6
   return { b64: dataUrl.split(',')[1], scale }
 }
 
-async function detectCardRoboflow(img: HTMLImageElement): Promise<Pt[] | null> {
+async function detectCardGemini(img: HTMLImageElement): Promise<Pt[] | null> {
   try {
     const { b64, scale } = await imageToBase64(img, 800)
     const ctrl = new AbortController()
-    const tid  = setTimeout(() => ctrl.abort(), 8000)
+    const tid  = setTimeout(() => ctrl.abort(), 15000)
     let res: Response
     try {
       res = await fetch('/api/detect-card', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: b64 }),
+        body: JSON.stringify({ imageBase64: b64, mimeType: 'image/jpeg' }),
         signal: ctrl.signal,
       })
     } finally {
       clearTimeout(tid)
     }
     if (!res!.ok) return null
-    const bbox = await res!.json()
-    const { x, y, width, height } = bbox
-    if (!width || !height) return null
+    const data = await res!.json()
+    const { corners } = data
+    if (!corners?.topLeft) return null
 
-    // Coins du bbox en coordonnées image originale
-    const nx = Math.max(0, x / scale)
-    const ny = Math.max(0, y / scale)
-    const nw = Math.min(img.naturalWidth  - nx, width  / scale)
-    const nh = Math.min(img.naturalHeight - ny, height / scale)
-
+    // Gemini voit l'image redimensionnée → divise par scale pour revenir aux coords naturelles
+    const { topLeft: tl, topRight: tr, bottomRight: br, bottomLeft: bl } = corners
     return orderCorners([
-      { x: nx,      y: ny      },
-      { x: nx + nw, y: ny      },
-      { x: nx + nw, y: ny + nh },
-      { x: nx,      y: ny + nh },
+      { x: tl.x / scale, y: tl.y / scale },
+      { x: tr.x / scale, y: tr.y / scale },
+      { x: br.x / scale, y: br.y / scale },
+      { x: bl.x / scale, y: bl.y / scale },
     ])
   } catch {
     return null
@@ -563,7 +559,7 @@ async function detectCardRoboflow(img: HTMLImageElement): Promise<Pt[] | null> {
 }
 
 async function detectCard(img: HTMLImageElement): Promise<Pt[] | null> {
-  return await detectCardRoboflow(img)
+  return await detectCardGemini(img)
 }
 
 // ── Perspective warp pure JS (homographie) ────────────────────────────────
