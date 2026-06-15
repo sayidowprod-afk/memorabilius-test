@@ -431,6 +431,86 @@ function peripheralMask(edges: Uint8Array, w: number, h: number): Uint8Array {
   return out
 }
 
+// ── Détection dans un crop Roboflow (carte déjà localisée) ───────────────
+// Utilise minAreaRect pour trouver le rectangle orienté de la carte (même inclinée)
+
+async function detectCardInCrop(cropImg: HTMLImageElement, cv: any): Promise<Pt[] | null> {
+  const W = cropImg.naturalWidth
+  const H = cropImg.naturalHeight
+
+  const canvas = document.createElement('canvas')
+  canvas.width = W; canvas.height = H
+  canvas.getContext('2d')!.drawImage(cropImg, 0, 0, W, H)
+
+  const src  = cv.imread(canvas)
+  const gray = new cv.Mat()
+  const blur = new cv.Mat()
+  cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY)
+  cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0)
+
+  // Couleur du fond depuis les bordures du crop
+  const BORDER = Math.max(5, Math.round(Math.min(W, H) * 0.08))
+  const gData  = blur.data as Uint8Array
+  let bgSum = 0, bgCount = 0
+  for (let x = 0; x < W; x++) {
+    for (let b = 0; b < BORDER; b++) {
+      bgSum += gData[b * W + x]
+      bgSum += gData[(H - 1 - b) * W + x]
+      bgCount += 2
+    }
+  }
+  const bgVal = Math.round(bgSum / bgCount)
+
+  let best: Pt[] | null = null
+
+  for (const tol of [25, 40, 60]) {
+    const diff   = new cv.Mat()
+    const thresh = new cv.Mat()
+    const closed = new cv.Mat()
+    const bgMat  = new cv.Mat(H, W, cv.CV_8UC1, new cv.Scalar(bgVal))
+    cv.absdiff(blur, bgMat, diff)
+    bgMat.delete()
+    cv.threshold(diff, thresh, tol, 255, cv.THRESH_BINARY)
+    const kSz    = Math.max(3, Math.round(Math.min(W, H) * 0.05) * 2 + 1)
+    const kernel = cv.Mat.ones(kSz, kSz, cv.CV_8U)
+    cv.morphologyEx(thresh, closed, cv.MORPH_CLOSE, kernel)
+    kernel.delete()
+
+    const contours  = new cv.MatVector()
+    const hierarchy = new cv.Mat()
+    cv.findContours(closed, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+
+    let largestCnt: any = null, largestArea = 0
+    for (let i = 0; i < contours.size(); i++) {
+      const cnt  = contours.get(i)
+      const area = cv.contourArea(cnt)
+      if (area > largestArea) {
+        if (largestCnt) largestCnt.delete()
+        largestArea = area; largestCnt = cnt
+      } else cnt.delete()
+    }
+
+    if (largestCnt && largestArea > W * H * 0.08) {
+      // minAreaRect : rectangle orienté → suit l'inclinaison de la carte
+      const rect   = cv.minAreaRect(largestCnt)
+      const boxMat = new cv.Mat()
+      cv.boxPoints(rect, boxMat)
+      const pts: Pt[] = []
+      for (let j = 0; j < 4; j++)
+        pts.push({ x: boxMat.data32F[j * 2], y: boxMat.data32F[j * 2 + 1] })
+      boxMat.delete()
+      best = orderCorners(pts)
+    }
+
+    if (largestCnt) largestCnt.delete()
+    diff.delete(); thresh.delete(); closed.delete(); contours.delete(); hierarchy.delete()
+    if (best) break
+  }
+
+  src.delete(); gray.delete(); blur.delete()
+  return best
+}
+
 // ── Détection Roboflow → bbox → OpenCV corners ───────────────────────────
 
 async function imageToBase64(img: HTMLImageElement, maxSize = 800): Promise<{ b64: string; scale: number }> {
@@ -472,14 +552,14 @@ async function detectCardRoboflow(img: HTMLImageElement): Promise<Pt[] | null> {
     cropImg.src = cropC.toDataURL()
     await new Promise(r => { cropImg.onload = r })
 
-    // OpenCV sur le crop — beaucoup plus facile à détecter maintenant
+    // OpenCV sur le crop avec minAreaRect (rectangle orienté pour cartes inclinées)
     try {
       const cv      = await loadOpenCV()
-      const corners = await detectCardOpenCV(cropImg, cv)
+      const corners = await detectCardInCrop(cropImg, cv)
       if (corners) {
         const mapped = corners.map(p => ({ x: p.x + nx, y: p.y + ny }))
-        // Valide que les coins restent proches du bbox (sinon OpenCV a trouvé le mauvais objet)
-        const tol = 0.30
+        // Valide que les coins restent proches du bbox
+        const tol = 0.35
         const valid = mapped.every(p =>
           p.x >= nx - nw * tol && p.x <= nx + nw * (1 + tol) &&
           p.y >= ny - nh * tol && p.y <= ny + nh * (1 + tol)
