@@ -2,17 +2,23 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
 
-const PROMPT = `This image shows a cropped region containing a sports/trading card. The card fills most of the frame.
+const PROMPT = `You are analyzing an image that contains a physical sports/trading card placed on a surface.
 
-Find the exact 4 corners of the card and return their positions as fractions of this image's width and height (0.0 = left/top edge, 1.0 = right/bottom edge).
+Your task: find the exact pixel positions of the 4 corners of the card's outer border, then express them as fractions (0.0 to 1.0) of the image width/height.
 
-Respond ONLY with valid JSON, no markdown:
-{"topLeft":{"x":0.05,"y":0.04},"topRight":{"x":0.95,"y":0.04},"bottomRight":{"x":0.95,"y":0.96},"bottomLeft":{"x":0.05,"y":0.96}}
+The card is a rectangular object with:
+- A distinct colored border (often blue, white, gold, silver, or black)
+- Sharp straight edges
+- It may be slightly tilted or angled — the corners will NOT necessarily be at the image corners
+- The background is different from the card (dark surface, table, hand, etc.)
 
-Rules:
-- Find the physical corners of the card, even if slightly tilted
-- x = horizontal (0=left, 1=right), y = vertical (0=top, 1=bottom)
-- Values should be between 0.0 and 1.0`
+Find where the card's 4 outer corners are. Each corner is where two edges of the card meet at a sharp angle (~90°).
+
+Return ONLY this JSON (no markdown, no explanation):
+{"topLeft":{"x":0.12,"y":0.08},"topRight":{"x":0.88,"y":0.06},"bottomRight":{"x":0.90,"y":0.94},"bottomLeft":{"x":0.10,"y":0.96}}
+
+Coordinates: x = fraction of image width (0=left, 1=right), y = fraction of image height (0=top, 1=bottom).
+The 4 corners must form a convex quadrilateral matching the card shape.`
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.GEMINI_API_KEY
