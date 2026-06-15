@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 interface FrameRect { x: number; y: number; w: number; h: number }
 
@@ -88,7 +89,7 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
 
   const CARD_RATIO = 2.5 / 3.5
 
-  return (
+  const content = (
     <div style={{ position: 'fixed', inset: 0, background: 'black', zIndex: 9999, display: 'flex', flexDirection: 'column' }}>
       {error ? (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white', gap: 16 }}>
@@ -132,6 +133,8 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
       )}
     </div>
   )
+
+  return typeof document !== 'undefined' ? createPortal(content, document.body) : null
 }
 
 function OverlayMask({ cardRatio }: { cardRatio: number }) {

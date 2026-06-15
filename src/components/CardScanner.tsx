@@ -529,45 +529,38 @@ async function imageToBase64(img: HTMLImageElement, maxSize = 800): Promise<{ b6
 
 async function detectCardFromFrame(img: HTMLImageElement, frame: FrameRect): Promise<Pt[] | null> {
   try {
-    // Agrandit la zone de crop de 20% de chaque côté pour ne pas couper les coins
-    // si l'utilisateur n'était pas parfaitement aligné avec le cadre
+    // Crop de la zone cadre avec 20% de marge pour absorber l'imprécision d'alignement
     const PAD = 0.20
     const cx = Math.max(0, frame.x - frame.w * PAD)
     const cy = Math.max(0, frame.y - frame.h * PAD)
     const cw = Math.min(img.naturalWidth  - cx, frame.w * (1 + PAD * 2))
     const ch = Math.min(img.naturalHeight - cy, frame.h * (1 + PAD * 2))
 
-    const cropCanvas = document.createElement('canvas')
-    const MAX = 700
+    // Crée un canvas du crop à taille raisonnable pour OpenCV
+    const MAX = 600
     const cropScale = Math.min(MAX / cw, MAX / ch, 1)
+    const cropCanvas = document.createElement('canvas')
     cropCanvas.width  = Math.round(cw * cropScale)
     cropCanvas.height = Math.round(ch * cropScale)
     cropCanvas.getContext('2d')!.drawImage(img, cx, cy, cw, ch, 0, 0, cropCanvas.width, cropCanvas.height)
-    const cropB64 = cropCanvas.toDataURL('image/jpeg', 0.92).split(',')[1]
 
-    const ctrl = new AbortController()
-    const tid = setTimeout(() => ctrl.abort(), 12000)
-    let res: Response
-    try {
-      res = await fetch('/api/detect-corners', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: cropB64, mimeType: 'image/jpeg' }),
-        signal: ctrl.signal,
-      })
-    } finally { clearTimeout(tid) }
+    // Transforme le canvas en HTMLImageElement pour detectCardInCrop
+    const cropImg = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image()
+      i.onload = () => resolve(i)
+      i.onerror = reject
+      i.src = cropCanvas.toDataURL('image/jpeg', 0.92)
+    })
 
-    if (!res!.ok) return null
-    const { topLeft: tl, topRight: tr, bottomRight: br, bottomLeft: bl } = await res!.json()
-    if (!tl || !tr || !br || !bl) return null
+    const cv = await loadOpenCV()
+    const corners = await detectCardInCrop(cropImg, cv)
+    if (!corners) return null
 
-    // Fractions du crop élargi → coordonnées naturelles de l'image originale
-    return [
-      { x: cx + tl.x * cw, y: cy + tl.y * ch },
-      { x: cx + tr.x * cw, y: cy + tr.y * ch },
-      { x: cx + br.x * cw, y: cy + br.y * ch },
-      { x: cx + bl.x * cw, y: cy + bl.y * ch },
-    ]
+    // Coins dans l'espace du canvas cropé → espace image naturelle originale
+    return corners.map(p => ({
+      x: cx + (p.x / cropScale),
+      y: cy + (p.y / cropScale),
+    }))
   } catch {
     return null
   }
