@@ -546,13 +546,14 @@ async function detectCardGemini(img: HTMLImageElement): Promise<Pt[] | null> {
     if (!corners?.topLeft) return null
 
     // Roboflow retourne des coords en pixels dans l'image redimensionnée → divise par scale
+    // Ordre fixe TL, TR, BR, BL — ne pas réordonner, les noms sont fiables
     const { topLeft: tl, topRight: tr, bottomRight: br, bottomLeft: bl } = corners
-    return orderCorners([
+    return [
       { x: tl.x / scale, y: tl.y / scale },
       { x: tr.x / scale, y: tr.y / scale },
       { x: br.x / scale, y: br.y / scale },
       { x: bl.x / scale, y: bl.y / scale },
-    ])
+    ]
   } catch {
     return null
   }
