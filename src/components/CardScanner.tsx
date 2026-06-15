@@ -527,13 +527,12 @@ async function imageToBase64(img: HTMLImageElement, maxSize = 800): Promise<{ b6
   return { b64: dataUrl.split(',')[1], scale }
 }
 
-// Scan depuis les 4 bords de l'image vers l'intérieur pour trouver les bords de la carte.
-// Approche CamScanner : chaque côté donne un ensemble de points d'arête,
-// on fitte une droite sur ces points, on intersecte les 4 droites → 4 coins précis.
-// Ignore les patterns internes holographiques car on ne cherche que le PREMIER bord rencontré.
+// Approche CamScanner : scan depuis les bords du crop vers l'intérieur.
+// Le fond est estimé depuis les zones de PADDING (extérieures au cadre overlay),
+// garanties background. Retourne null si détection trop incertaine → fallback sur cadre.
 function detectCardFromFrame(img: HTMLImageElement, frame: FrameRect): Pt[] | null {
   try {
-    const PAD = 0.14
+    const PAD = 0.16
     const cx = Math.max(0, frame.x - frame.w * PAD)
     const cy = Math.max(0, frame.y - frame.h * PAD)
     const cw = Math.min(img.naturalWidth  - cx, frame.w * (1 + PAD * 2))
@@ -549,142 +548,93 @@ function detectCardFromFrame(img: HTMLImageElement, frame: FrameRect): Pt[] | nu
     const { data } = canvas.getContext('2d')!.getImageData(0, 0, W, H)
 
     // Grayscale
-    const gray = new Float32Array(W * H)
+    const raw = new Float32Array(W * H)
     for (let i = 0; i < W * H; i++)
-      gray[i] = 0.299 * data[i*4] + 0.587 * data[i*4+1] + 0.114 * data[i*4+2]
+      raw[i] = 0.299 * data[i*4] + 0.587 * data[i*4+1] + 0.114 * data[i*4+2]
 
-    // Blur 3×3 pour lisser le bruit de surface
+    // Blur 3×3
     const g = new Float32Array(W * H)
     for (let y = 1; y < H - 1; y++)
       for (let x = 1; x < W - 1; x++) {
         let sum = 0
         for (let dy = -1; dy <= 1; dy++)
           for (let dx = -1; dx <= 1; dx++)
-            sum += gray[(y + dy) * W + (x + dx)]
-        g[y * W + x] = sum / 9
+            sum += raw[(y+dy)*W+(x+dx)]
+        g[y*W+x] = sum / 9
       }
 
-    // Luminance de fond : moyenne des pixels en bordure extrême du crop (5px)
+    // Position du cadre dans l'espace canvas cropé
+    const fxL = Math.round((frame.x - cx) * s)
+    const fxR = Math.round((frame.x + frame.w - cx) * s)
+    const fyT = Math.round((frame.y - cy) * s)
+    const fyB = Math.round((frame.y + frame.h - cy) * s)
+
+    // Fond estimé depuis les 4 coins du crop (zones PAD — garanties background)
+    const CORNER = Math.round(Math.min(W, H) * 0.08)
     let bgSum = 0, bgN = 0
-    for (let x = 0; x < W; x++) {
-      bgSum += g[x] + g[(H - 1) * W + x]; bgN += 2
-    }
-    for (let y = 1; y < H - 1; y++) {
-      bgSum += g[y * W] + g[y * W + W - 1]; bgN += 2
-    }
+    for (let y = 0; y < CORNER; y++) for (let x = 0; x < CORNER; x++) { bgSum += g[y*W+x]; bgN++ }
+    for (let y = 0; y < CORNER; y++) for (let x = W-CORNER; x < W; x++) { bgSum += g[y*W+x]; bgN++ }
+    for (let y = H-CORNER; y < H; y++) for (let x = 0; x < CORNER; x++) { bgSum += g[y*W+x]; bgN++ }
+    for (let y = H-CORNER; y < H; y++) for (let x = W-CORNER; x < W; x++) { bgSum += g[y*W+x]; bgN++ }
     const bgLum = bgSum / bgN
 
-    // Seuil adaptatif : distance à la luminance de fond
-    const THRESH = 22
+    // Essai sur plusieurs seuils, garde le meilleur ratio carte
+    const CARD_RATIO = 2.5 / 3.5
+    let bestResult: Pt[] | null = null
+    let bestScore = Infinity
 
-    // Scan top → bas : trouver premier pixel significativement différent du fond
-    const topPts: Pt[] = []
-    for (let x = Math.round(W * 0.08); x < W * 0.92; x++) {
-      for (let y = 2; y < Math.round(H * 0.55); y++) {
-        if (Math.abs(g[y * W + x] - bgLum) > THRESH) { topPts.push({ x, y }); break }
+    for (const THRESH of [18, 28, 40, 55]) {
+      const topPts: Pt[] = [], botPts: Pt[] = [], leftPts: Pt[] = [], rightPts: Pt[] = []
+
+      for (let x = Math.round(W * 0.05); x < W * 0.95; x++) {
+        for (let y = 1; y < fyT + Math.round((fyB - fyT) * 0.5); y++) {
+          if (Math.abs(g[y*W+x] - bgLum) > THRESH) { topPts.push({ x, y }); break }
+        }
+        for (let y = H - 2; y >= fyB - Math.round((fyB - fyT) * 0.5); y--) {
+          if (Math.abs(g[y*W+x] - bgLum) > THRESH) { botPts.push({ x, y }); break }
+        }
+      }
+      for (let y = Math.round(H * 0.05); y < H * 0.95; y++) {
+        for (let x = 1; x < fxL + Math.round((fxR - fxL) * 0.5); x++) {
+          if (Math.abs(g[y*W+x] - bgLum) > THRESH) { leftPts.push({ x, y }); break }
+        }
+        for (let x = W - 2; x >= fxR - Math.round((fxR - fxL) * 0.5); x--) {
+          if (Math.abs(g[y*W+x] - bgLum) > THRESH) { rightPts.push({ x, y }); break }
+        }
+      }
+
+      if (topPts.length < 8 || botPts.length < 8 || leftPts.length < 8 || rightPts.length < 8) continue
+
+      function med(arr: number[]) { const s = [...arr].sort((a,b)=>a-b); return s[s.length>>1] }
+      function filterY(pts: Pt[]) { const m = med(pts.map(p=>p.y)); const d = med(pts.map(p=>Math.abs(p.y-m)))*2+6; return pts.filter(p=>Math.abs(p.y-m)<=d) }
+      function filterX(pts: Pt[]) { const m = med(pts.map(p=>p.x)); const d = med(pts.map(p=>Math.abs(p.x-m)))*2+6; return pts.filter(p=>Math.abs(p.x-m)<=d) }
+
+      const tP = filterY(topPts), bP = filterY(botPts), lP = filterX(leftPts), rP = filterX(rightPts)
+      if (tP.length < 5 || bP.length < 5 || lP.length < 5 || rP.length < 5) continue
+
+      function fitH(pts: Pt[]) { const n=pts.length; let sx=0,sy=0,sxx=0,sxy=0; for(const p of pts){sx+=p.x;sy+=p.y;sxx+=p.x*p.x;sxy+=p.x*p.y}; const d=n*sxx-sx*sx; if(Math.abs(d)<1e-6)return null; const a=(n*sxy-sx*sy)/d; return {a,b:(sy-a*sx)/n} }
+      function fitV(pts: Pt[]) { const n=pts.length; let sx=0,sy=0,syy=0,sxy=0; for(const p of pts){sx+=p.x;sy+=p.y;syy+=p.y*p.y;sxy+=p.x*p.y}; const d=n*syy-sy*sy; if(Math.abs(d)<1e-6)return null; const a=(n*sxy-sy*sx)/d; return {a,b:(sx-a*sy)/n} }
+      function intersect(h:{a:number;b:number}, v:{a:number;b:number}): Pt|null { const d=1-h.a*v.a; if(Math.abs(d)<1e-6)return null; const y=(h.a*v.b+h.b)/d; return {x:v.a*y+v.b,y} }
+
+      const top=fitH(tP), bot=fitH(bP), left=fitV(lP), right=fitV(rP)
+      if (!top||!bot||!left||!right) continue
+
+      const TL=intersect(top,left), TR=intersect(top,right), BR=intersect(bot,right), BL=intersect(bot,left)
+      if (!TL||!TR||!BR||!BL) continue
+
+      const w = Math.hypot(TR.x-TL.x, TR.y-TL.y)
+      const h2 = Math.hypot(BL.x-TL.x, BL.y-TL.y)
+      if (w < 10 || h2 < 10) continue
+      const ratio = Math.min(w,h2) / Math.max(w,h2)
+      const score = Math.min(Math.abs(ratio - CARD_RATIO), Math.abs(ratio - 1/CARD_RATIO))
+      if (score < bestScore) {
+        bestScore = score
+        bestResult = [TL, TR, BR, BL].map(p => ({ x: cx + p.x/s, y: cy + p.y/s }))
       }
     }
 
-    // Scan bas → haut
-    const botPts: Pt[] = []
-    for (let x = Math.round(W * 0.08); x < W * 0.92; x++) {
-      for (let y = H - 3; y >= Math.round(H * 0.45); y--) {
-        if (Math.abs(g[y * W + x] - bgLum) > THRESH) { botPts.push({ x, y }); break }
-      }
-    }
-
-    // Scan gauche → droite
-    const leftPts: Pt[] = []
-    for (let y = Math.round(H * 0.08); y < H * 0.92; y++) {
-      for (let x = 2; x < Math.round(W * 0.55); x++) {
-        if (Math.abs(g[y * W + x] - bgLum) > THRESH) { leftPts.push({ x, y }); break }
-      }
-    }
-
-    // Scan droite → gauche
-    const rightPts: Pt[] = []
-    for (let y = Math.round(H * 0.08); y < H * 0.92; y++) {
-      for (let x = W - 3; x >= Math.round(W * 0.45); x--) {
-        if (Math.abs(g[y * W + x] - bgLum) > THRESH) { rightPts.push({ x, y }); break }
-      }
-    }
-
-    if (topPts.length < 10 || botPts.length < 10 || leftPts.length < 10 || rightPts.length < 10)
-      return null
-
-    // Retire les outliers (médiane ± 1.5 * IQR) pour robustesse
-    function median(arr: number[]) { const s = [...arr].sort((a, b) => a - b); return s[Math.floor(s.length / 2)] }
-    function filterY(pts: Pt[]): Pt[] {
-      const ys = pts.map(p => p.y)
-      const med = median(ys)
-      const devs = ys.map(y => Math.abs(y - med))
-      const mad = median(devs) * 1.5 + 8
-      return pts.filter(p => Math.abs(p.y - med) <= mad)
-    }
-    function filterX(pts: Pt[]): Pt[] {
-      const xs = pts.map(p => p.x)
-      const med = median(xs)
-      const devs = xs.map(x => Math.abs(x - med))
-      const mad = median(devs) * 1.5 + 8
-      return pts.filter(p => Math.abs(p.x - med) <= mad)
-    }
-
-    const tPts = filterY(topPts)
-    const bPts = filterY(botPts)
-    const lPts = filterX(leftPts)
-    const rPts = filterX(rightPts)
-
-    if (tPts.length < 5 || bPts.length < 5 || lPts.length < 5 || rPts.length < 5)
-      return null
-
-    // Fit y = a*x + b (lignes horizontales: haut/bas)
-    function fitH(pts: Pt[]): { a: number; b: number } | null {
-      const n = pts.length
-      let sx = 0, sy = 0, sxx = 0, sxy = 0
-      for (const p of pts) { sx += p.x; sy += p.y; sxx += p.x * p.x; sxy += p.x * p.y }
-      const d = n * sxx - sx * sx
-      if (Math.abs(d) < 1e-6) return null
-      const a = (n * sxy - sx * sy) / d
-      const b = (sy - a * sx) / n
-      return { a, b }
-    }
-
-    // Fit x = a*y + b (lignes verticales: gauche/droite)
-    function fitV(pts: Pt[]): { a: number; b: number } | null {
-      const n = pts.length
-      let sx = 0, sy = 0, syy = 0, sxy = 0
-      for (const p of pts) { sx += p.x; sy += p.y; syy += p.y * p.y; sxy += p.x * p.y }
-      const d = n * syy - sy * sy
-      if (Math.abs(d) < 1e-6) return null
-      const a = (n * sxy - sy * sx) / d
-      const b = (sx - a * sy) / n
-      return { a, b }
-    }
-
-    // Intersection y=hA*x+hB avec x=vA*y+vB
-    // y = hA*(vA*y+vB)+hB → y*(1-hA*vA) = hA*vB+hB → y = ...
-    function intersect(h: { a: number; b: number }, v: { a: number; b: number }): Pt | null {
-      const d = 1 - h.a * v.a
-      if (Math.abs(d) < 1e-6) return null
-      const y = (h.a * v.b + h.b) / d
-      const x = v.a * y + v.b
-      return { x, y }
-    }
-
-    const top   = fitH(tPts)
-    const bot   = fitH(bPts)
-    const left  = fitV(lPts)
-    const right = fitV(rPts)
-    if (!top || !bot || !left || !right) return null
-
-    const TL = intersect(top,  left)
-    const TR = intersect(top,  right)
-    const BR = intersect(bot,  right)
-    const BL = intersect(bot,  left)
-    if (!TL || !TR || !BR || !BL) return null
-
-    // Reconvertit vers l'espace image naturelle originale
-    return [TL, TR, BR, BL].map(p => ({ x: cx + p.x / s, y: cy + p.y / s }))
+    // Rejette si le ratio est trop loin d'une carte (détection ratée)
+    return bestScore < 0.25 ? bestResult : null
   } catch {
     return null
   }
