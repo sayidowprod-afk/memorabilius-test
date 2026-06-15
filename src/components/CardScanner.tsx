@@ -589,37 +589,7 @@ async function detectCardRoboflow(img: HTMLImageElement): Promise<Pt[] | null> {
 }
 
 async function detectCard(img: HTMLImageElement): Promise<Pt[] | null> {
-  // Méthode principale : Roboflow (modèle custom entraîné) + OpenCV pour les coins
-  const rfResult = await detectCardRoboflow(img)
-  if (rfResult) return rfResult
-
-  // Fallback : algo custom Hough/Otsu (pas besoin d'OpenCV)
-  const MAX = 400
-  const scale = Math.min(MAX / img.naturalWidth, MAX / img.naturalHeight, 1)
-  const W = Math.round(img.naturalWidth  * scale)
-  const H = Math.round(img.naturalHeight * scale)
-
-  const c = document.createElement('canvas')
-  c.width = W; c.height = H
-  c.getContext('2d')!.drawImage(img, 0, 0, W, H)
-  const data = c.getContext('2d')!.getImageData(0, 0, W, H).data
-  await new Promise(r => setTimeout(r, 0))
-
-  const corners1 = detectByThreshold(data, W, H)
-  if (corners1) return corners1.map(p => ({ x: p.x / scale, y: p.y / scale }))
-
-  const gray  = normalize(toGray(data, W, H))
-  const blur  = gaussBlur(gray, W, H)
-  const edges = sobel(blur, W, H)
-
-  const periEdges = peripheralMask(edges, W, H)
-  const corners2 = detectCornersHough(periEdges, W, H)
-  if (corners2) return corners2.map(p => ({ x: p.x / scale, y: p.y / scale }))
-
-  const corners3 = detectCornersHough(edges, W, H)
-  if (corners3) return corners3.map(p => ({ x: p.x / scale, y: p.y / scale }))
-
-  return null
+  return await detectCardRoboflow(img)
 }
 
 // ── Perspective warp pure JS (homographie) ────────────────────────────────
