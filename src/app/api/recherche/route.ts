@@ -10,18 +10,51 @@ export async function GET(req: NextRequest) {
   const query = req.nextUrl.searchParams.get('q')?.toLowerCase().trim()
   if (!query || query.length < 2) return NextResponse.json([])
 
-  // Récupérer tous les profils avec CSV
+  // Récupérer tous les profils
   const { data: profiles } = await supabase
     .from('profiles')
     .select('id, display_name, avatar_url, lien_csv, couleur_bordure')
-    .not('lien_csv', 'is', null)
-    .neq('lien_csv', '')
 
   if (!profiles) return NextResponse.json([])
 
   const results: any[] = []
 
-  await Promise.all(profiles.map(async (p) => {
+  // Cartes manuelles (toutes les cartes publiques)
+  const { data: manuelles } = await supabase
+    .from('cartes_manuelles')
+    .select('*')
+
+  const profileMap = new Map(profiles.map(p => [p.id, p]))
+
+  ;(manuelles || []).forEach(m => {
+    const name = (m.nom || '').toLowerCase()
+    const team = (m.equipe || '').toLowerCase()
+    const variant = (m.variation || '').toLowerCase()
+    const brand = (m.marque || '').toLowerCase()
+    if (!query || !(name.includes(query) || team.includes(query) || variant.includes(query) || brand.includes(query))) return
+    const p = profileMap.get(m.user_id)
+    if (!p) return
+    results.push({
+      img: m.image_recto || 'https://placehold.co/300x420?text=No+Image',
+      name: m.nom || '',
+      team: m.equipe || '',
+      year: m.annee || '',
+      brand: m.marque || '',
+      serie: m.collection || '',
+      variant: m.variation || '',
+      num: m.num || '',
+      auto: m.auto || false,
+      rc: m.rc || false,
+      patch: m.patch || false,
+      collector: p.display_name,
+      collectorId: p.id,
+      collectorAvatar: p.avatar_url,
+      accent: p.couleur_bordure || '#003DA6',
+    })
+  })
+
+  // Cartes CSV
+  await Promise.all(profiles.filter(p => p.lien_csv).map(async (p) => {
     try {
       const r = await fetch(p.lien_csv, { next: { revalidate: 3600 } })
       if (!r.ok) return
