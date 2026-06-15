@@ -35,6 +35,23 @@ function loadOpenCV(): Promise<any> {
   return _cvPromise
 }
 
+// Ratio largeur/hauteur d'un quadrilatère
+function quadRatio(pts: Pt[]): number {
+  const [tl, tr, br, bl] = pts
+  const w = (Math.hypot(tr.x - tl.x, tr.y - tl.y) + Math.hypot(br.x - bl.x, br.y - bl.y)) / 2
+  const h = (Math.hypot(bl.x - tl.x, bl.y - tl.y) + Math.hypot(br.x - tr.x, br.y - tr.y)) / 2
+  return w / (h || 1)
+}
+
+// Vérifie que les coins ne sont pas collés aux bords de l'image (= image entière détectée)
+function cornersInsideImage(pts: Pt[], W: number, H: number): boolean {
+  const MARGIN = 0.05 // 5% de marge min depuis chaque bord
+  return pts.every(p =>
+    p.x > W * MARGIN && p.x < W * (1 - MARGIN) &&
+    p.y > H * MARGIN && p.y < H * (1 - MARGIN)
+  )
+}
+
 async function detectCardOpenCV(img: HTMLImageElement, cv: any): Promise<Pt[] | null> {
   const MAX = 800
   const scale = Math.min(MAX / img.naturalWidth, MAX / img.naturalHeight, 1)
@@ -45,48 +62,77 @@ async function detectCardOpenCV(img: HTMLImageElement, cv: any): Promise<Pt[] | 
   canvas.width = W; canvas.height = H
   canvas.getContext('2d')!.drawImage(img, 0, 0, W, H)
 
-  const src      = cv.imread(canvas)
-  const gray     = new cv.Mat()
-  const blur     = new cv.Mat()
-  const edges    = new cv.Mat()
-  const dilated  = new cv.Mat()
-  const contours = new cv.MatVector()
+  const src       = cv.imread(canvas)
+  const gray      = new cv.Mat()
+  const blur      = new cv.Mat()
+  const contours  = new cv.MatVector()
   const hierarchy = new cv.Mat()
+
+  // Ratios acceptables : portrait (2.5/3.5 ≈ 0.714) ou paysage (3.5/2.5 ≈ 1.4)
+  const CARD_RATIO_P = 2.5 / 3.5
+  const CARD_RATIO_L = 3.5 / 2.5
+  const RATIO_TOL    = 0.28  // tolérance ±28%
+
+  const isCardRatio = (r: number) =>
+    Math.abs(r - CARD_RATIO_P) < RATIO_TOL || Math.abs(r - CARD_RATIO_L) < RATIO_TOL
+
+  const ratioScore = (r: number) =>
+    Math.min(Math.abs(r - CARD_RATIO_P), Math.abs(r - CARD_RATIO_L))
 
   try {
     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY)
     cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0)
-    cv.Canny(blur, edges, 50, 150)
-    const kernel = cv.Mat.ones(3, 3, cv.CV_8U)
-    cv.dilate(edges, dilated, kernel)
-    kernel.delete()
-    cv.findContours(dilated, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE)
 
     let best: Pt[] | null = null
-    let bestArea = 0
+    let bestScore = Infinity
 
-    for (let i = 0; i < contours.size(); i++) {
-      const cnt  = contours.get(i)
-      const area = cv.contourArea(cnt)
-      if (area < W * H * 0.06) { cnt.delete(); continue }
+    // Essai avec plusieurs seuils Canny pour maximiser les chances de détection
+    for (const [lo, hi] of [[30, 90], [50, 150], [80, 200]]) {
+      const edges   = new cv.Mat()
+      const dilated = new cv.Mat()
+      cv.Canny(blur, edges, lo, hi)
+      const kernel = cv.Mat.ones(3, 3, cv.CV_8U)
+      cv.dilate(edges, dilated, kernel)
+      kernel.delete()
+      cv.findContours(dilated, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE)
 
-      const peri   = cv.arcLength(cnt, true)
-      const approx = new cv.Mat()
-      cv.approxPolyDP(cnt, approx, 0.02 * peri, true)
+      for (let i = 0; i < contours.size(); i++) {
+        const cnt  = contours.get(i)
+        const area = cv.contourArea(cnt)
 
-      if (approx.rows === 4 && area > bestArea) {
-        bestArea = area
-        const pts: Pt[] = []
-        for (let j = 0; j < 4; j++)
-          pts.push({ x: approx.data32S[j * 2] / scale, y: approx.data32S[j * 2 + 1] / scale })
-        best = orderCorners(pts)
+        // Trop petit (<6%) ou trop grand (>92% = toute la photo)
+        if (area < W * H * 0.06 || area > W * H * 0.92) { cnt.delete(); continue }
+
+        const peri   = cv.arcLength(cnt, true)
+        const approx = new cv.Mat()
+        cv.approxPolyDP(cnt, approx, 0.02 * peri, true)
+
+        if (approx.rows === 4) {
+          const pts: Pt[] = []
+          for (let j = 0; j < 4; j++)
+            pts.push({ x: approx.data32S[j * 2] / scale, y: approx.data32S[j * 2 + 1] / scale })
+          const ordered = orderCorners(pts)
+          const ratio   = quadRatio(ordered)
+
+          // Rejette si tous les coins sont dans la zone de bord (image entière)
+          const scaledPts = ordered.map(p => ({ x: p.x * scale, y: p.y * scale }))
+          if (!cornersInsideImage(scaledPts, W, H)) { approx.delete(); cnt.delete(); continue }
+
+          // Garde le candidat avec le meilleur ratio carte
+          if (isCardRatio(ratio)) {
+            const score = ratioScore(ratio)
+            if (score < bestScore) { bestScore = score; best = ordered }
+          }
+        }
+        approx.delete(); cnt.delete()
       }
-      approx.delete(); cnt.delete()
+      edges.delete(); dilated.delete()
+      if (best) break // trouvé avec ce seuil, pas besoin d'essayer les autres
     }
+
     return best
   } finally {
-    src.delete(); gray.delete(); blur.delete(); edges.delete()
-    dilated.delete(); contours.delete(); hierarchy.delete()
+    src.delete(); gray.delete(); blur.delete(); contours.delete(); hierarchy.delete()
   }
 }
 
