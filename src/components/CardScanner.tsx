@@ -656,13 +656,29 @@ export default function CardScanner({ src, onResult, onFallback, onClose }: Prop
 
   // ── Chargement & détection ─────────────────────────────────────────────
   useEffect(() => {
-    const img = new Image()
-    img.onload = async () => {
-      origImgRef.current = img
-      imgRef.current = img
-      await initCanvas(img)
+    const load = async () => {
+      // createImageBitmap avec imageOrientation applique la rotation EXIF
+      // (drawImage() ignore EXIF, d'où les photos en paysage qui restent de côté)
+      let imgSrc = src
+      try {
+        const blob   = await fetch(src).then(r => r.blob())
+        const bitmap = await createImageBitmap(blob, { imageOrientation: 'from-image' } as any)
+        const c = document.createElement('canvas')
+        c.width = bitmap.width; c.height = bitmap.height
+        c.getContext('2d')!.drawImage(bitmap, 0, 0)
+        imgSrc = c.toDataURL('image/jpeg', 0.95)
+        bitmap.close()
+      } catch {}
+
+      const img = new Image()
+      img.onload = async () => {
+        origImgRef.current = img
+        imgRef.current = img
+        await initCanvas(img)
+      }
+      img.src = imgSrc
     }
-    img.src = src
+    load()
   }, [src])
 
   const initCanvas = async (img: HTMLImageElement) => {
