@@ -34,7 +34,8 @@ export async function POST(req: NextRequest) {
           { text: PROMPT },
           { inline_data: { mime_type: mimeType, data: imageBase64 } }
         ]}],
-        generationConfig: { temperature: 0, maxOutputTokens: 512 }
+        generationConfig: { temperature: 0, maxOutputTokens: 512 },
+        thinkingConfig: { thinkingBudget: 0 }
       })
     })
 
