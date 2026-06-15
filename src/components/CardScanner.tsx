@@ -476,10 +476,19 @@ async function detectCardRoboflow(img: HTMLImageElement): Promise<Pt[] | null> {
     try {
       const cv      = await loadOpenCV()
       const corners = await detectCardOpenCV(cropImg, cv)
-      if (corners) return corners.map(p => ({ x: p.x + nx, y: p.y + ny }))
+      if (corners) {
+        const mapped = corners.map(p => ({ x: p.x + nx, y: p.y + ny }))
+        // Valide que les coins restent proches du bbox (sinon OpenCV a trouvé le mauvais objet)
+        const tol = 0.30
+        const valid = mapped.every(p =>
+          p.x >= nx - nw * tol && p.x <= nx + nw * (1 + tol) &&
+          p.y >= ny - nh * tol && p.y <= ny + nh * (1 + tol)
+        )
+        if (valid) return mapped
+      }
     } catch {}
 
-    // Si OpenCV échoue sur le crop, retourne les coins du bbox directement
+    // Fallback : coins du bbox Roboflow directement
     return orderCorners([
       { x: nx,      y: ny },
       { x: nx + nw, y: ny },
