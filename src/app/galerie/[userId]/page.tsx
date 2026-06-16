@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState, useRef, use } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import dynamic from 'next/dynamic'
 import OnlineIndicator from '@/components/OnlineIndicator'
@@ -46,6 +47,8 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
 
   const isOwner = currentUser === userId
   const { t, lang } = useLang()
+  const searchParams = useSearchParams()
+  const cardParam = searchParams.get('card')
 
   useEffect(() => {
     const init = async () => {
@@ -161,6 +164,11 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
       setBrands([...new Set(allCards.map(d => d.s).filter(Boolean))].sort())
       setYears([...new Set(allCards.map(d => d.y).filter(Boolean))].sort())
       setLoaded(true)
+      // Auto-ouvre la carte si ?card= est dans l'URL
+      if (cardParam) {
+        const match = allCards.find(c => c.f === decodeURIComponent(cardParam))
+        if (match) setPopup(match)
+      }
     } catch (e) { console.error('CSV error', e); setLoaded(true) }
   }
 
@@ -536,7 +544,7 @@ export default function Galerie({ params }: { params: Promise<{ userId: string }
       </div>
 
       {popup && (
-        <Viewer3D popup={popup} accent={accent} onClose={() => setPopup(null)} getTags={getTags} />
+        <Viewer3D popup={popup} accent={accent} onClose={() => setPopup(null)} getTags={getTags} userId={userId} />
       )}
     </>
   )

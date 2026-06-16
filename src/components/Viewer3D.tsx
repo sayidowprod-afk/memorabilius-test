@@ -9,11 +9,12 @@ interface Card {
   auto: boolean; rc: boolean; patch: boolean; g: string
 }
 
-export default function Viewer3D({ popup, accent, onClose, getTags }: {
+export default function Viewer3D({ popup, accent, onClose, getTags, userId }: {
   popup: Card
   accent: string
   onClose: () => void
   getTags: (d: Card) => React.ReactNode
+  userId?: string
 }) {
   const rotX = useRef(0)
   const rotY = useRef(0)
@@ -26,7 +27,17 @@ export default function Viewer3D({ popup, accent, onClose, getTags }: {
   const wrapRef = useRef<HTMLDivElement>(null)
   const rafRef = useRef<number>(0)
   const [showVideo, setShowVideo] = useState(false)
+  const [copied, setCopied] = useState(false)
   const { lang } = useLang()
+
+  const handleShare = () => {
+    if (!userId) return
+    const url = `${window.location.origin}/galerie/${userId}?card=${encodeURIComponent(popup.f)}`
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
 
   const applyTransform = useCallback(() => {
     if (cardRef.current) {
@@ -198,14 +209,25 @@ export default function Viewer3D({ popup, accent, onClose, getTags }: {
             ))}
           </div>
 
-          {/* Bouton export vidéo */}
-          <button onClick={() => setShowVideo(true)} style={{
-            marginTop: 16, width: '100%', background: '#0d0d1f',
-            color: 'white', border: 'none', borderRadius: 10,
-            padding: '12px', fontWeight: 800, cursor: 'pointer', fontSize: 14,
-          }}>
-            🎬 {lang === 'fr' ? 'Exporter en vidéo' : 'Export as video'}
-          </button>
+          {/* Boutons actions */}
+          <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+            <button onClick={() => setShowVideo(true)} style={{
+              flex: 1, background: '#0d0d1f', color: 'white', border: 'none',
+              borderRadius: 10, padding: '12px', fontWeight: 800, cursor: 'pointer', fontSize: 14,
+            }}>
+              🎬 {lang === 'fr' ? 'Exporter en vidéo' : 'Export as video'}
+            </button>
+            {userId && (
+              <button onClick={handleShare} style={{
+                background: copied ? '#2e7d32' : '#f0f0f0', color: copied ? 'white' : '#333',
+                border: 'none', borderRadius: 10, padding: '12px 14px',
+                fontWeight: 800, cursor: 'pointer', fontSize: 14, whiteSpace: 'nowrap',
+                transition: '0.2s',
+              }}>
+                {copied ? '✓ Copié' : '🔗 Partager'}
+              </button>
+            )}
+          </div>
 
           {showVideo && <CardVideoExport card={popup} accent={accent} onClose={() => setShowVideo(false)} />}
         </div>
