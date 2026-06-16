@@ -264,6 +264,7 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
   const handleDragOver = (e: React.DragEvent, idx: number) => {
     e.preventDefault()
     if (dragIdx === null || dragIdx === idx) return
+    if (!displayed[idx]?.isManuelle) return
     reorder(dragIdx, idx)
   }
   const handleDragEnd = async () => {
@@ -288,7 +289,7 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
       const rect = children[i].getBoundingClientRect()
       if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
           touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
-        if (i !== touchDragIdx.current) {
+        if (i !== touchDragIdx.current && displayed[i]?.isManuelle) {
           reorder(touchDragIdx.current, i)
           touchDragIdx.current = i
         }
