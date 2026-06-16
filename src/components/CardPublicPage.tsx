@@ -104,7 +104,7 @@ export default function CardPublicPage({ userId, cardSlug, src }: Props) {
       <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#999' }}>
         <Link href="/annuaire" style={{ color: '#999', textDecoration: 'none' }}>Annuaire</Link>
         <span>›</span>
-        {profile && <Link href={`/galerie/${profile.slug || userId}`} style={{ color: accent, textDecoration: 'none', fontWeight: 700 }}>{profile.display_name}</Link>}
+        {profile && <Link href={`/galerie/${userId}`} style={{ color: accent, textDecoration: 'none', fontWeight: 700 }}>{profile.display_name}</Link>}
         <span>›</span>
         <span style={{ color: '#333', fontWeight: 600 }}>{card.n}</span>
       </div>
@@ -130,7 +130,7 @@ export default function CardPublicPage({ userId, cardSlug, src }: Props) {
 
           {/* Collectionneur */}
           {profile && (
-            <Link href={`/galerie/${profile.slug || userId}`} style={{ textDecoration: 'none', display: 'block', marginTop: 20 }}>
+            <Link href={`/galerie/${userId}`} style={{ textDecoration: 'none', display: 'block', marginTop: 20 }}>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 12,
                 background: '#f8f8f8', borderRadius: 12, padding: '12px 16px',

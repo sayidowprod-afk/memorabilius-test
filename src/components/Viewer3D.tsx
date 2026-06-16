@@ -35,15 +35,7 @@ export default function Viewer3D({ popup, accent, onClose, getTags, userId, user
 
   const handleShare = () => {
     if (!userId) return
-    const base = userSlug || userId
-    const cardSlug = [popup.n, popup.y, popup.br, popup.s]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .trim()
-      .replace(/\s+/g, '-')
-    const url = `${window.location.origin}/galerie/${base}/${cardSlug}?src=${encodeURIComponent(popup.f)}`
+    const url = `${window.location.origin}/galerie/${userId}?card=${encodeURIComponent(popup.f)}`
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)

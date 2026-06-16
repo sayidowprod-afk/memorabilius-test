@@ -34,7 +34,7 @@ export default function SameCardCollectors({ cardName, excludeUserId, accent }: 
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {collectors.map(c => (
-          <Link key={c.id} href={`/galerie/${c.slug}`} style={{ textDecoration: 'none' }}>
+          <Link key={c.id} href={`/galerie/${c.id}`} style={{ textDecoration: 'none' }}>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 7,
               background: '#f8f8f8', border: `1.5px solid ${c.accent}20`,
