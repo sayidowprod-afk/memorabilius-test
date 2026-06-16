@@ -11,9 +11,9 @@ interface Props { card: Card; accent: string; onClose: () => void }
 
 const IS_MOBILE = typeof window !== 'undefined' && window.innerWidth < 768
 const VIDEO_FORMATS = {
-  default: { w: IS_MOBILE ? 540 : 900,  h: IS_MOBILE ? 780 : 1300, label: 'Défaut',  ratio: '9:13' },
-  reel:    { w: IS_MOBILE ? 540 : 1080, h: IS_MOBILE ? 960 : 1920, label: 'Reel',    ratio: '9:16' },
-  square:  { w: IS_MOBILE ? 640 : 1080, h: IS_MOBILE ? 640 : 1080, label: 'Carré',   ratio: '1:1'  },
+  default: { w: 900,  h: 1300, label: 'Défaut',  ratio: '9:13' },
+  reel:    { w: 1080, h: 1920, label: 'Reel',    ratio: '9:16' },
+  square:  { w: 1080, h: 1080, label: 'Carré',   ratio: '1:1'  },
 } as const
 type VideoFormat = keyof typeof VIDEO_FORMATS
 
@@ -243,7 +243,7 @@ export default function CardVideoExport({ card, accent, onClose }: Props) {
     for (let i = 0; i < totalFrames; i++) {
       drawFrame(ctx, frontImg, backImg, i / totalFrames)
       const blob = await new Promise<Blob>(res =>
-        canvas.toBlob(b => res(b!), 'image/jpeg', IS_MOBILE ? 0.75 : 0.88)
+        canvas.toBlob(b => res(b!), 'image/jpeg', 0.88)
       )
       bitmaps.push(await createImageBitmap(blob))
       setProgress(Math.round(i / totalFrames * 60))

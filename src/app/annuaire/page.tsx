@@ -159,8 +159,8 @@ function AnnuaireContent() {
       </div>
 
       {loading ? <p style={{ textAlign: 'center', padding: 60, color: '#bbb' }}>Chargement des collections...</p> : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', borderRadius: 12, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', minWidth: 500 }}>
             <thead><tr>
               {th('display_name', t('directory_collector'))}
               {th('total', t('directory_total'))}
