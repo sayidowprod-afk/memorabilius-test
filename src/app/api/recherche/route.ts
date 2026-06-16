@@ -99,12 +99,22 @@ export async function GET(req: NextRequest) {
     } catch { }
   }))
 
-  // Trier par pertinence (nom exact en premier)
+  // Collectionneurs dont le nom correspond
+  const users = profiles
+    .filter(p => p.display_name && p.display_name.toLowerCase().includes(query))
+    .map(p => ({
+      id: p.id,
+      display_name: p.display_name,
+      avatar_url: p.avatar_url,
+      accent: p.couleur_bordure || '#003DA6',
+    }))
+
+  // Trier cartes par pertinence (nom exact en premier)
   results.sort((a, b) => {
     const aExact = a.name.toLowerCase().startsWith(query) ? 0 : 1
     const bExact = b.name.toLowerCase().startsWith(query) ? 0 : 1
     return aExact - bExact
   })
 
-  return NextResponse.json(results.slice(0, 60))
+  return NextResponse.json({ cards: results.slice(0, 60), users })
 }

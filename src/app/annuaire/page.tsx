@@ -28,6 +28,7 @@ function AnnuaireContent() {
   const [teamFilter, setTeamFilter] = useState<string>(teamIdFromUrl)
   const [teams, setTeams] = useState<any[]>([])
   const [teamName, setTeamName] = useState<string>('')
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     supabase.from('teams').select('id, name').then(({ data }) => {
@@ -116,7 +117,9 @@ function AnnuaireContent() {
     window.history.pushState({}, '', url.toString())
   }
 
-  const sorted = [...collectors].sort((a, b) => {
+  const sorted = [...collectors].filter(c =>
+    !search || (c.display_name || '').toLowerCase().includes(search.toLowerCase())
+  ).sort((a, b) => {
     if (sortKey === 'display_name') return sortAsc ? (a.display_name || '').localeCompare(b.display_name || '') : (b.display_name || '').localeCompare(a.display_name || '')
     const av = (a.stats?.[sortKey] || 0) as number
     const bv = (b.stats?.[sortKey] || 0) as number
@@ -153,8 +156,14 @@ function AnnuaireContent() {
         )}
       </div>
 
-      <div style={{ marginBottom: 16 }}>
-        <select value={teamFilter} onChange={e => handleTeamChange(e.target.value)} style={{ width: 'auto', minWidth: 200 }}>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder={lang === 'fr' ? 'Rechercher un collectionneur…' : 'Search collector…'}
+          style={{ flex: '1 1 200px', minWidth: 180 }}
+        />
+        <select value={teamFilter} onChange={e => handleTeamChange(e.target.value)} style={{ flex: '1 1 180px', minWidth: 160 }}>
           <option value="">{t('all_teams')}</option>
           {teams.map(t => <option key={t.id} value={String(t.id)}>{t.name}</option>)}
         </select>

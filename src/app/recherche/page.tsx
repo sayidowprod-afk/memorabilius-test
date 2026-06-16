@@ -5,14 +5,15 @@ import { useLang } from '@/lib/LangContext'
 
 export default function Recherche() {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<any[]>([])
+  const [cards, setCards] = useState<any[]>([])
+  const [users, setUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
   const { t } = useLang()
 
   useEffect(() => {
-    if (query.length < 2) { setResults([]); setSearched(false); return }
+    if (query.length < 2) { setCards([]); setUsers([]); setSearched(false); return }
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => search(query), 600)
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
@@ -24,8 +25,9 @@ export default function Recherche() {
     try {
       const r = await fetch(`/api/recherche?q=${encodeURIComponent(q)}`)
       const data = await r.json()
-      setResults(data)
-    } catch { setResults([]) }
+      setCards(data.cards || [])
+      setUsers(data.users || [])
+    } catch { setCards([]); setUsers([]) }
     setLoading(false)
   }
 
@@ -76,23 +78,54 @@ export default function Recherche() {
       </div>
 
       {/* Résultats */}
-      {searched && !loading && results.length === 0 && (
+      {searched && !loading && cards.length === 0 && users.length === 0 && (
         <div style={{ textAlign: 'center', padding: '60px 20px', color: '#bbb' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>🃏</div>
-          <p style={{ fontSize: 18, fontWeight: 700 }}>Aucune carte trouvée pour "{query}"</p>
+          <p style={{ fontSize: 18, fontWeight: 700 }}>Aucun résultat pour "{query}"</p>
           <p style={{ fontSize: 14, marginTop: 8 }}>{t('search_none_sub')}</p>
         </div>
       )}
 
-      {results.length > 0 && (
+      {/* Section collectionneurs */}
+      {users.length > 0 && (
+        <div style={{ marginBottom: 36 }}>
+          <h2 style={{ fontWeight: 800, fontSize: 16, marginBottom: 14, color: '#555' }}>
+            Collectionneurs ({users.length})
+          </h2>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            {users.map((u, i) => (
+              <Link key={i} href={`/galerie/${u.id}`} style={{ textDecoration: 'none' }}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  background: 'white', border: `2px solid ${u.accent}`,
+                  borderRadius: 50, padding: '6px 16px 6px 6px',
+                  transition: '0.2s', cursor: 'pointer',
+                }}
+                  onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-2px)')}
+                  onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
+                >
+                  <img
+                    src={u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.display_name || 'U')}&background=003DA6&color=fff&size=64`}
+                    style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover' }}
+                    alt={u.display_name}
+                  />
+                  <span style={{ fontWeight: 800, fontSize: 14, color: '#121212' }}>{u.display_name}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {cards.length > 0 && (
         <>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, padding: '0 4px' }}>
             <p style={{ fontWeight: 700, color: '#666', fontSize: 14 }}>
-              {results.length} carte{results.length > 1 ? 's' : ''} trouvée{results.length > 1 ? 's' : ''} pour "<strong>{query}</strong>"
+              {cards.length} carte{cards.length > 1 ? 's' : ''} trouvée{cards.length > 1 ? 's' : ''} pour "<strong>{query}</strong>"
             </p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 16 }}>
-            {results.map((card, i) => (
+            {cards.map((card, i) => (
               <Link key={i} href={`/galerie/${card.collectorId}`} style={{ textDecoration: 'none', display: 'block' }}>
                 <div style={{
                   background: 'white', borderRadius: 12, overflow: 'hidden',
