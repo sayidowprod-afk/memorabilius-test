@@ -7,8 +7,11 @@ interface Collector {
   avatar_url: string; accent: string; cardImg?: string
 }
 
-export default function SameCardCollectors({ cardName, excludeUserId, accent }: {
+export default function SameCardCollectors({ cardName, year, brand, set, excludeUserId, accent }: {
   cardName: string
+  year?: string
+  brand?: string
+  set?: string
   excludeUserId?: string
   accent: string
 }) {
@@ -18,12 +21,15 @@ export default function SameCardCollectors({ cardName, excludeUserId, accent }: 
   useEffect(() => {
     if (!cardName) return
     const params = new URLSearchParams({ name: cardName })
+    if (year) params.set('year', year)
+    if (brand) params.set('brand', brand)
+    if (set) params.set('set', set)
     if (excludeUserId) params.set('exclude', excludeUserId)
     fetch(`/api/same-card?${params}`)
       .then(r => r.json())
       .then(d => { setCollectors(d); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [cardName, excludeUserId])
+  }, [cardName, year, brand, set, excludeUserId])
 
   if (loading || collectors.length === 0) return null
 

@@ -8,11 +8,13 @@ const supabase = createClient(
 
 export async function GET(req: NextRequest) {
   const name = req.nextUrl.searchParams.get('name')?.trim()
+  const year = req.nextUrl.searchParams.get('year')?.trim() || ''
+  const brand = req.nextUrl.searchParams.get('brand')?.trim() || ''
+  const set = req.nextUrl.searchParams.get('set')?.trim() || ''
   const excludeUserId = req.nextUrl.searchParams.get('exclude') || ''
   if (!name || name.length < 2) return NextResponse.json([])
 
   const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
-  const needle = normalize(name)
 
   // Cartes manuelles
   const { data: manuelles } = await supabase
@@ -24,7 +26,11 @@ export async function GET(req: NextRequest) {
   const cardsByUser = new Map<string, any>()
 
   ;(manuelles || []).forEach(m => {
-    if (normalize(m.nom || '') === needle) {
+    const sameName = normalize(m.nom || '') === normalize(name)
+    const sameYear = !year || normalize(m.annee || '') === normalize(year)
+    const sameBrand = !brand || normalize(m.marque || '') === normalize(brand)
+    const sameSet = !set || normalize(m.collection || '') === normalize(set)
+    if (sameName && sameYear && sameBrand && sameSet) {
       matchIds.add(m.user_id)
       if (!cardsByUser.has(m.user_id)) cardsByUser.set(m.user_id, m)
     }

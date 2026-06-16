@@ -195,7 +195,14 @@ export default function CardPublicPage({ userId, cardSlug, src }: Props) {
 
           {/* Autres collectionneurs */}
           {card.n && (
-            <SameCardCollectors cardName={card.n} excludeUserId={userId} accent={accent} />
+            <SameCardCollectors
+              cardName={card.n}
+              year={card.y}
+              brand={card.br}
+              set={card.s}
+              excludeUserId={userId}
+              accent={accent}
+            />
           )}
         </div>
       </div>

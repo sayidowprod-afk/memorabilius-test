@@ -241,7 +241,14 @@ export default function Viewer3D({ popup, accent, onClose, getTags, userId, user
           />
 
           {popup.n && (
-            <SameCardCollectors cardName={popup.n} excludeUserId={userId} accent={accent} />
+            <SameCardCollectors
+              cardName={popup.n}
+              year={popup.y}
+              brand={popup.br}
+              set={popup.s}
+              excludeUserId={userId}
+              accent={accent}
+            />
           )}
 
           {showVideo && <CardVideoExport card={popup} accent={accent} onClose={() => setShowVideo(false)} />}
