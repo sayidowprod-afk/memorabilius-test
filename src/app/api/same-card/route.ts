@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   const cardsByUser = new Map<string, any>()
 
   ;(manuelles || []).forEach(m => {
-    if (normalize(m.nom || '').includes(needle)) {
+    if (normalize(m.nom || '') === needle) {
       matchIds.add(m.user_id)
       if (!cardsByUser.has(m.user_id)) cardsByUser.set(m.user_id, m)
     }
