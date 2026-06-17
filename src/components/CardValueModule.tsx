@@ -17,6 +17,7 @@ interface Props {
 export default function CardValueModule({ cardName, set, year, num, variant, rc, auto, patch, accent }: Props) {
   const [data, setData] = useState<CardValueResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [hovered, setHovered] = useState<number | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
 
@@ -36,8 +37,10 @@ export default function CardValueModule({ cardName, set, year, num, variant, rc,
 
     fetch(`/api/ebay-sold?${params}`, { signal: controller.signal })
       .then(r => r.json())
-      .then(({ items }) => {
+      .then((json) => {
         clearTimeout(timeout)
+        if (json.error) { setErrorMsg(json.error); setLoading(false); return }
+        const { items } = json
         if (!items || items.length < 2) { setLoading(false); return }
         const sorted = [...items].sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
         const prices = sorted.map((i: any) => i.price)
@@ -61,6 +64,12 @@ export default function CardValueModule({ cardName, set, year, num, variant, rc,
   const ab = parseInt(accent.slice(5, 7), 16)
 
   if (loading) return null
+
+  if (errorMsg) return (
+    <div style={{ borderTop: '1px solid #eee', paddingTop: 10, marginTop: 10, fontSize: 11, color: '#bbb' }}>
+      Valeur estimée — eBay : {errorMsg === 'no app id' ? 'clé API non configurée' : errorMsg}
+    </div>
+  )
 
   if (!data || data.sales.length === 0) return null
 

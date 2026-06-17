@@ -40,7 +40,6 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
     const { data: t } = await supabase.from('teams').select('*').eq('id', parseInt(teamId)).single()
     if (!t) { router.push('/teams'); return }
     setTeam(t)
-    setIsChef(user?.id === t.created_by)
 
     // Charger les membres
     const { data: m } = await supabase.from('team_members')
@@ -48,6 +47,10 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
       .eq('team_id', parseInt(teamId))
     setMembers(m || [])
     setIsMember(m?.some((x: any) => x.user_id === user?.id) || false)
+
+    const isFounder = user?.id === t.created_by
+    const isAdmin = m?.some((x: any) => x.user_id === user?.id && (x.role === 'admin' || x.role === 'chef')) || false
+    setIsChef(isFounder || isAdmin)
 
     // Charger le profil utilisateur
     if (user) {
@@ -62,8 +65,8 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
       .order('created_at', { ascending: true })
     setMessages(msgs || [])
 
-    // Candidatures (chef seulement)
-    if (user?.id === t.created_by) {
+    // Candidatures (chef ou admin seulement)
+    if (isFounder || isAdmin) {
       const { data: cands } = await supabase.from('team_candidatures')
         .select('*, profiles(id, display_name, avatar_url, lien_csv)')
         .eq('team_id', parseInt(teamId))
