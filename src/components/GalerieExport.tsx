@@ -372,7 +372,7 @@ export default function GalerieExport({ cards, profileName, avatarUrl, accent, l
       // Colonnes (mm)
       type Col = { header: string; key: keyof Card | '_photo' | '_valeur'; w: number; align?: 'center' | 'right' }
       const cols: Col[] = [
-        ...(withPhotos ? [{ header: '', key: '_photo' as const, w: 12 }] : []),
+        ...(withPhotos ? [{ header: '', key: '_photo' as const, w: 22 }] : []),
         { header: 'Joueur',     key: 'n',     w: 42 },
         { header: 'Équipe',    key: 't',     w: 28 },
         { header: 'Année',     key: 'y',     w: 16 },
@@ -395,9 +395,15 @@ export default function GalerieExport({ cards, profileName, avatarUrl, accent, l
       }
       cols[cols.length - 1].w += usableW - totalW
 
-      // Charger les images si besoin
+      // Charger les images si besoin (recto + verso)
       let cardImgs: (HTMLImageElement | null)[] = []
-      if (withPhotos) cardImgs = await loadImgs(filtered.map(c => c.f))
+      let cardImgsVerso: (HTMLImageElement | null)[] = []
+      if (withPhotos) {
+        ;[cardImgs, cardImgsVerso] = await Promise.all([
+          loadImgs(filtered.map(c => c.f)),
+          loadImgs(filtered.map(c => c.b).filter(Boolean)),
+        ])
+      }
 
       const toDataUrl = (img: HTMLImageElement, w = 60, h = 84): string => {
         const cv = document.createElement('canvas'); cv.width = w; cv.height = h
@@ -425,7 +431,7 @@ export default function GalerieExport({ cards, profileName, avatarUrl, accent, l
         })
         const maxLines = Math.max(1, ...wrapped.map(l => l.length))
         const h = withPhotos
-          ? Math.max(14, maxLines * LINE_H + ROW_PAD * 2)
+          ? Math.max(18, maxLines * LINE_H + ROW_PAD * 2)
           : maxLines * LINE_H + ROW_PAD * 2
         return { wrapped, h }
       })
@@ -479,13 +485,15 @@ export default function GalerieExport({ cards, profileName, avatarUrl, accent, l
 
         cols.forEach((col, ci) => {
           if (col.key === '_photo') {
-            const img = cardImgs[i]
-            if (img) {
-              try {
-                const imgH = rowH - 1.5
-                const imgW = imgH * (2.5 / 3.5)
-                doc.addImage(toDataUrl(img), 'JPEG', cx + 1, y + 0.8, imgW, imgH)
-              } catch {}
+            const imgH = rowH - 1.5
+            const imgW = imgH * (2.5 / 3.5)
+            const recto = cardImgs[i]
+            if (recto) {
+              try { doc.addImage(toDataUrl(recto), 'JPEG', cx + 0.5, y + 0.8, imgW, imgH) } catch {}
+            }
+            const verso = cardImgsVerso[i]
+            if (verso) {
+              try { doc.addImage(toDataUrl(verso), 'JPEG', cx + imgW + 1.5, y + 0.8, imgW, imgH) } catch {}
             }
           } else if (col.key === 'rc' || col.key === 'auto' || col.key === 'patch') {
             if (card[col.key as 'rc' | 'auto' | 'patch']) {

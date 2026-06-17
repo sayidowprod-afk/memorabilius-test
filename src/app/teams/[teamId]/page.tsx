@@ -110,15 +110,21 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
   }
 
   const accepterCandidature = async (cand: any) => {
-    // Accepter et ajouter comme membre
-    await supabase.from('team_candidatures').update({ statut: 'accepte' }).eq('id', cand.id)
-    await supabase.from('team_members').insert({ team_id: parseInt(teamId), user_id: cand.user_id })
+    await fetch('/api/team-accept', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidatureId: cand.id, teamId: parseInt(teamId), userId: cand.user_id, action: 'accept' }),
+    })
     setCandidatures(prev => prev.filter(c => c.id !== cand.id))
     init()
   }
 
   const refuserCandidature = async (cand: any) => {
-    await supabase.from('team_candidatures').update({ statut: 'refuse' }).eq('id', cand.id)
+    await fetch('/api/team-accept', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidatureId: cand.id, teamId: parseInt(teamId), userId: cand.user_id, action: 'refuse' }),
+    })
     setCandidatures(prev => prev.filter(c => c.id !== cand.id))
   }
 

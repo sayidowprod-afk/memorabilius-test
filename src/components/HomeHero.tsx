@@ -1,9 +1,11 @@
 'use client'
 import Link from 'next/link'
 import { useLang } from '@/lib/LangContext'
+import { useTheme } from '@/lib/ThemeContext'
 
 export default function HomeHero({ total, totalCartes }: { total: number; totalCartes: number }) {
   const { t, lang } = useLang()
+  const { dark } = useTheme()
 
   const steps = lang === 'fr' ? [
     { n: 1, title: 'Préparez votre Google Sheet', desc: "Utilisez notre modèle pré-rempli pour lister vos cartes (photos, noms, variations). C'est votre base de données personnelle.", link: 'https://docs.google.com/spreadsheets/d/1_3HVVrWiKq8IVO0x2_AIrhkiJBY3p-wAuAxXO7Eb8N8/copy', linkText: '📄 Créer ma copie du modèle →' },
@@ -22,7 +24,7 @@ export default function HomeHero({ total, totalCartes }: { total: number; totalC
         background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
         borderRadius: 20, marginBottom: 40,
       }}>
-        <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3.5rem)', fontWeight: 900, color: '#121212', marginBottom: 20, lineHeight: 1 }}>
+        <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3.5rem)', fontWeight: 900, color: dark ? 'white' : '#003DA6', marginBottom: 20, lineHeight: 1 }}>
           {t('home_hero')}
         </h1>
         <p style={{ fontSize: '1.2rem', color: '#666', maxWidth: 600, margin: '0 auto 30px' }}>
