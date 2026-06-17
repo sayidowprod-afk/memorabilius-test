@@ -6,12 +6,14 @@ import CardVideoExport from '@/components/CardVideoExport'
 import CardValueModule from '@/components/CardValueModule'
 import SameCardCollectors from '@/components/SameCardCollectors'
 import CollectionTagSelect from '@/components/CollectionTagSelect'
+import BookletViewer from '@/components/BookletViewer'
 
 interface Card {
   f: string; b: string; n: string; t: string; y: string
   br: string; s: string; v: string; num: string
   auto: boolean; rc: boolean; patch: boolean; g: string
   isManuelle?: boolean; id_manuelle?: string; collection_tag?: string
+  booklet?: boolean; il?: string; ir?: string
 }
 
 export default function Viewer3D({ popup, accent, onClose, getTags, userId, userSlug, isOwner, onCollectionTagChange }: {
@@ -198,6 +200,17 @@ export default function Viewer3D({ popup, accent, onClose, getTags, userId, user
       }}>×</button>
 
       <div className="viewer-layout">
+        {popup.booklet ? (
+          <div className="viewer-zone" style={{ cursor: 'default' }}>
+            <BookletViewer
+              frontCover={popup.f}
+              backCover={popup.b}
+              interiorLeft={popup.il}
+              interiorRight={popup.ir}
+              accent={accent}
+            />
+          </div>
+        ) : (
         <div className="viewer-zone"
           onMouseDown={onMouseDown} onMouseMove={onMouseMove}
           onMouseUp={onMouseUp} onMouseLeave={onMouseUp}
@@ -221,6 +234,7 @@ export default function Viewer3D({ popup, accent, onClose, getTags, userId, user
             Glisser · Scroll pour zoomer · Double-clic pour reset
           </p>
         </div>
+        )}
 
         <div className="viewer-info">
           <div style={{ color: accent, fontWeight: 900, fontSize: 10, textTransform: 'uppercase', marginBottom: 2 }}>{popup.t}</div>

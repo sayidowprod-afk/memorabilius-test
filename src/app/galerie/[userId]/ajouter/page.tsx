@@ -19,10 +19,14 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
   const [uploadingVerso, setUploadingVerso] = useState(false)
   const [previewRecto, setPreviewRecto] = useState<string | null>(null)
   const [previewVerso, setPreviewVerso] = useState<string | null>(null)
+  const [previewIL, setPreviewIL] = useState<string | null>(null)
+  const [previewIR, setPreviewIR] = useState<string | null>(null)
+  const [uploadingIL, setUploadingIL] = useState(false)
+  const [uploadingIR, setUploadingIR] = useState(false)
   const [form, setForm] = useState({
     nom: '', equipe: '', annee: '', marque: '', collection: '', variation: '',
-    grade: 'Raw', num: '', rc: false, auto: false, patch: false, collection_tag: '',
-    image_recto: '', image_verso: '',
+    grade: 'Raw', num: '', rc: false, auto: false, patch: false, booklet: false, collection_tag: '',
+    image_recto: '', image_verso: '', image_interieur_gauche: '', image_interieur_droite: '',
   })
 
   const [scannerModal, setScannerModal] = useState<{ side: 'recto' | 'verso'; src: string; frameRect?: { x: number; y: number; w: number; h: number } } | null>(null)
@@ -91,13 +95,25 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
     return () => el.removeEventListener('wheel', onWheel)
   }, [cropModal])
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, side: 'recto' | 'verso') => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, side: 'recto' | 'verso' | 'il' | 'ir') => {
     const file = e.target.files?.[0]
     if (!file) return
+    if (side === 'il' || side === 'ir') {
+      const reader = new FileReader()
+      reader.onload = async () => {
+        const dataUrl = reader.result as string
+        const res = await fetch(dataUrl)
+        const blob = await res.blob()
+        await uploadBlob(blob, side)
+      }
+      reader.readAsDataURL(file)
+      e.target.value = ''
+      return
+    }
     const reader = new FileReader()
     reader.onload = () => {
       if (reader.result) {
-        setScannerModal({ side, src: reader.result as string })
+        setScannerModal({ side: side as 'recto' | 'verso', src: reader.result as string })
       }
     }
     reader.readAsDataURL(file)
@@ -107,9 +123,11 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
   const [scanning, setScanning] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
 
-  const uploadBlob = async (blob: Blob, side: 'recto' | 'verso') => {
+  const uploadBlob = async (blob: Blob, side: 'recto' | 'verso' | 'il' | 'ir') => {
     if (side === 'recto') setUploadingRecto(true)
-    else setUploadingVerso(true)
+    else if (side === 'verso') setUploadingVerso(true)
+    else if (side === 'il') setUploadingIL(true)
+    else setUploadingIR(true)
     setScannerModal(null)
 
     const { data: { user } } = await supabase.auth.getUser()
@@ -118,15 +136,14 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
     const path = `cartes/${user.id}/${Date.now()}_${side}.jpg`
     const file = new File([blob], `${Date.now()}_${side}.jpg`, { type: 'image/jpeg' })
     const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true })
-    if (error) { alert('Erreur upload : ' + error.message); setUploadingRecto(false); setUploadingVerso(false); return }
+    if (error) { alert('Erreur upload : ' + error.message); setUploadingRecto(false); setUploadingVerso(false); setUploadingIL(false); setUploadingIR(false); return }
 
     const { data } = supabase.storage.from('avatars').getPublicUrl(path)
     const url = data.publicUrl
-    if (side === 'recto') { setForm(f => ({ ...f, image_recto: url })); setPreviewRecto(url); setUploadingRecto(false) }
-    else { setForm(f => ({ ...f, image_verso: url })); setPreviewVerso(url); setUploadingVerso(false) }
-
-    // Analyse IA recto ET verso — le verso complète les champs manquants
-    analyzeCard(blob, side === 'verso')
+    if (side === 'recto') { setForm(f => ({ ...f, image_recto: url })); setPreviewRecto(url); setUploadingRecto(false); analyzeCard(blob, false) }
+    else if (side === 'verso') { setForm(f => ({ ...f, image_verso: url })); setPreviewVerso(url); setUploadingVerso(false); analyzeCard(blob, true) }
+    else if (side === 'il') { setForm(f => ({ ...f, image_interieur_gauche: url })); setPreviewIL(url); setUploadingIL(false) }
+    else { setForm(f => ({ ...f, image_interieur_droite: url })); setPreviewIR(url); setUploadingIR(false) }
   }
 
   const analyzeCard = async (blob: Blob, fillMissingOnly = false) => {
@@ -295,8 +312,10 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
     const { error } = await supabase.from('cartes_manuelles').insert({
       user_id: user.id, nom: form.nom, equipe: form.equipe || null, annee: form.annee || null,
       marque: form.marque || null, collection: form.collection || null, variation: form.variation || null, grade: form.grade,
-      num: form.num || null, rc: form.rc, auto: form.auto, patch: form.patch,
+      num: form.num || null, rc: form.rc, auto: form.auto, patch: form.patch, booklet: form.booklet,
       image_recto: form.image_recto || null, image_verso: form.image_verso || null,
+      image_interieur_gauche: form.image_interieur_gauche || null,
+      image_interieur_droite: form.image_interieur_droite || null,
       collection_tag: form.collection_tag || null,
     })
 
@@ -315,43 +334,50 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
     router.push(`/galerie/${userId}`)
   }
 
-  const ImageUploader = ({ side, label, preview, uploading }: { side: 'recto' | 'verso', label: string, preview: string | null, uploading: boolean }) => (
-    <div>
-      <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 8 }}>{label}</label>
-      <div
-        style={{ border: '2px dashed #ddd', borderRadius: 12, overflow: 'hidden', aspectRatio: '2.5/3.5', position: 'relative', cursor: 'pointer', background: '#fafafa', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        onClick={() => document.getElementById(`upload-${side}`)?.click()}
-      >
-        {preview ? (
-          <img src={preview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={label} />
-        ) : (
-          <div style={{ textAlign: 'center', color: '#bbb' }}>
-            <div style={{ fontSize: 40, marginBottom: 8 }}>📷</div>
-            <p style={{ fontSize: 13, fontWeight: 600 }}>{uploading ? '...' : (lang === 'fr' ? 'Cliquer pour ajouter' : 'Click to add')}</p>
-          </div>
+  const ImageUploader = ({ side, label, preview, uploading, aspect }: { side: 'recto' | 'verso' | 'il' | 'ir', label: string, preview: string | null, uploading: boolean, aspect?: string }) => {
+    const clearPreview = () => {
+      if (side === 'recto') { setForm(f => ({ ...f, image_recto: '' })); setPreviewRecto(null) }
+      else if (side === 'verso') { setForm(f => ({ ...f, image_verso: '' })); setPreviewVerso(null) }
+      else if (side === 'il') { setForm(f => ({ ...f, image_interieur_gauche: '' })); setPreviewIL(null) }
+      else { setForm(f => ({ ...f, image_interieur_droite: '' })); setPreviewIR(null) }
+    }
+    return (
+      <div>
+        <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 8 }}>{label}</label>
+        <div
+          style={{ border: '2px dashed #ddd', borderRadius: 12, overflow: 'hidden', aspectRatio: aspect || '2.5/3.5', position: 'relative', cursor: 'pointer', background: '#fafafa', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => document.getElementById(`upload-${side}`)?.click()}
+        >
+          {preview ? (
+            <img src={preview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={label} />
+          ) : (
+            <div style={{ textAlign: 'center', color: '#bbb', padding: 10 }}>
+              <div style={{ fontSize: 32, marginBottom: 6 }}>📷</div>
+              <p style={{ fontSize: 12, fontWeight: 600, margin: 0 }}>{uploading ? '...' : (lang === 'fr' ? 'Cliquer pour ajouter' : 'Click to add')}</p>
+            </div>
+          )}
+          {uploading && (
+            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ color: 'white', fontWeight: 700 }}>Upload...</div>
+            </div>
+          )}
+        </div>
+        <input id={`upload-${side}`} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => handleFileChange(e, side)} />
+        {!preview && !uploading && (side === 'recto' || side === 'verso') && (
+          <button type="button" onClick={() => setCameraModal(side as 'recto' | 'verso')}
+            style={{ marginTop: 6, width: '100%', background: '#f0f4ff', color: '#003DA6', border: 'none', borderRadius: 6, padding: '8px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+            {lang === 'fr' ? '📸 Prendre une photo' : '📸 Take a photo'}
+          </button>
         )}
-        {uploading && (
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ color: 'white', fontWeight: 700 }}>{lang === 'fr' ? 'Upload...' : 'Uploading...'}</div>
-          </div>
+        {preview && (
+          <button type="button" onClick={clearPreview}
+            style={{ marginTop: 6, width: '100%', background: '#fff5f5', color: '#e74c3c', border: 'none', borderRadius: 6, padding: '6px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+            {lang === 'fr' ? '🗑️ Supprimer' : '🗑️ Remove'}
+          </button>
         )}
       </div>
-      {/* Input galerie uniquement */}
-      <input id={`upload-${side}`} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => handleFileChange(e, side)} />
-      {!preview && !uploading && (
-        <button type="button" onClick={() => setCameraModal(side)}
-          style={{ marginTop: 6, width: '100%', background: '#f0f4ff', color: '#003DA6', border: 'none', borderRadius: 6, padding: '8px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-          {lang === 'fr' ? '📸 Prendre une photo' : '📸 Take a photo'}
-        </button>
-      )}
-      {preview && (
-        <button type="button" onClick={() => { setForm(f => ({ ...f, [`image_${side}`]: '' })); side === 'recto' ? setPreviewRecto(null) : setPreviewVerso(null) }}
-          style={{ marginTop: 6, width: '100%', background: '#fff5f5', color: '#e74c3c', border: 'none', borderRadius: 6, padding: '6px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-          {lang === 'fr' ? '🗑️ Supprimer' : '🗑️ Remove'}
-        </button>
-      )}
-    </div>
-  )
+    )
+  }
 
   return (
     <div style={{ maxWidth: 700, margin: '40px auto', fontFamily: 'Inter, sans-serif', padding: '0 10px' }}>
@@ -363,10 +389,33 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
       </h1>
 
       <form onSubmit={handleSubmit}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
-          <ImageUploader side="recto" label={lang === 'fr' ? 'Photo Recto *' : 'Front Photo *'} preview={previewRecto} uploading={uploadingRecto} />
-          <ImageUploader side="verso" label={lang === 'fr' ? 'Photo Verso' : 'Back Photo'} preview={previewVerso} uploading={uploadingVerso} />
+        {/* Toggle Booklet */}
+        <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button type="button" onClick={() => setForm(f => ({ ...f, booklet: !f.booklet }))}
+            style={{ padding: '8px 18px', border: 'none', borderRadius: 20, fontWeight: 800, fontSize: 13, cursor: 'pointer', background: form.booklet ? '#7b1fa2' : '#f0f0f0', color: form.booklet ? 'white' : '#555', transition: '0.2s' }}>
+            📖 Booklet
+          </button>
+          {form.booklet && <span style={{ fontSize: 12, color: '#888' }}>{lang === 'fr' ? '4 photos requises (2 couvertures + 2 intérieurs)' : '4 photos required (2 covers + 2 interiors)'}</span>}
         </div>
+
+        {/* Photos couvertures */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: form.booklet ? 16 : 24 }}>
+          <ImageUploader side="recto" label={lang === 'fr' ? (form.booklet ? 'Couverture avant *' : 'Photo Recto *') : (form.booklet ? 'Front cover *' : 'Front Photo *')} preview={previewRecto} uploading={uploadingRecto} />
+          <ImageUploader side="verso" label={lang === 'fr' ? (form.booklet ? 'Couverture arrière' : 'Photo Verso') : (form.booklet ? 'Back cover' : 'Back Photo')} preview={previewVerso} uploading={uploadingVerso} />
+        </div>
+
+        {/* Photos intérieures (booklet seulement) */}
+        {form.booklet && (
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', color: '#7b1fa2', marginBottom: 10 }}>
+              📖 {lang === 'fr' ? 'Pages intérieures' : 'Interior pages'}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+              <ImageUploader side="il" label={lang === 'fr' ? 'Page gauche' : 'Left page'} preview={previewIL} uploading={uploadingIL} aspect="3.5/2.5" />
+              <ImageUploader side="ir" label={lang === 'fr' ? 'Page droite' : 'Right page'} preview={previewIR} uploading={uploadingIR} aspect="3.5/2.5" />
+            </div>
+          </div>
+        )}
 
         {scanning && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#f0f7ff', border: '1.5px solid #c0d8ff', borderRadius: 10, padding: '10px 16px', marginBottom: 4 }}>
@@ -441,6 +490,7 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
                 { key: 'rc', label: 'RC', activeBg: '#e67e22' },
                 { key: 'auto', label: 'AUTO', activeBg: '#2e7d32' },
                 { key: 'patch', label: 'PATCH', activeBg: '#1976d2' },
+                { key: 'booklet', label: '📖 BOOKLET', activeBg: '#7b1fa2' },
               ].map(tag => (
                 <button key={tag.key} type="button" onClick={() => setForm({ ...form, [tag.key]: !(form as any)[tag.key] })}
                   style={{
