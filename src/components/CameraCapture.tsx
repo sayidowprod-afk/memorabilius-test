@@ -7,9 +7,10 @@ interface FrameRect { x: number; y: number; w: number; h: number }
 interface Props {
   onCapture: (blob: Blob, frameRect: FrameRect) => void
   onClose: () => void
+  ratio?: number
 }
 
-export default function CameraCapture({ onCapture, onClose }: Props) {
+export default function CameraCapture({ onCapture, onClose, ratio }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [ready, setReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -40,7 +41,6 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
     const dh = video.clientHeight
 
     // Cadre overlay : min(78vw, 56vh) × ratio carte — centré
-    const CARD_RATIO = 2.5 / 3.5
     let frameW = Math.min(dw * 0.78, dh * 0.56 * CARD_RATIO)
     let frameH = frameW / CARD_RATIO
     const frameX = (dw - frameW) / 2
@@ -87,7 +87,7 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
     }, 'image/jpeg', 0.92)
   }
 
-  const CARD_RATIO = 2.5 / 3.5
+  const CARD_RATIO = ratio ?? (2.5 / 3.5)
 
   const content = (
     <div style={{ position: 'fixed', inset: 0, background: 'black', zIndex: 9999, display: 'flex', flexDirection: 'column' }}>

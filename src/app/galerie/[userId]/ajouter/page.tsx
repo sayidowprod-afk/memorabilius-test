@@ -29,9 +29,10 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
     image_recto: '', image_verso: '', image_interieur_gauche: '', image_interieur_droite: '',
   })
 
-  const [scannerModal, setScannerModal] = useState<{ side: 'recto' | 'verso'; src: string; frameRect?: { x: number; y: number; w: number; h: number } } | null>(null)
-  const [cameraModal, setCameraModal] = useState<'recto' | 'verso' | null>(null)
-  const [cropModal, setCropModal] = useState<{ side: 'recto' | 'verso'; src: string } | null>(null)
+  type Side = 'recto' | 'verso' | 'il' | 'ir'
+  const [scannerModal, setScannerModal] = useState<{ side: Side; src: string; frameRect?: { x: number; y: number; w: number; h: number } } | null>(null)
+  const [cameraModal, setCameraModal] = useState<Side | null>(null)
+  const [cropModal, setCropModal] = useState<{ side: Side; src: string } | null>(null)
   const [rotation, setRotation] = useState(0)
 
   // Image pan/zoom state (image moves under fixed frame)
@@ -45,6 +46,7 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
   const isDragging = useRef(false)
   const rotationRef = useRef(rotation)
   useEffect(() => { rotationRef.current = rotation }, [rotation])
+  const cropRatioRef = useRef(CARD_RATIO)
 
   const resetTransform = useCallback(() => {
     if (!imgRef.current || !containerRef.current) return
@@ -53,8 +55,8 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
     const cw = container.clientWidth
     const ch = container.clientHeight
 
-    const frameW = Math.min(cw * 0.82, ch * 0.9 * CARD_RATIO)
-    const frameH = frameW / CARD_RATIO
+    const frameW = Math.min(cw * 0.82, ch * 0.9 * cropRatioRef.current)
+    const frameH = frameW / cropRatioRef.current
 
     const angleRad = (rotationRef.current * Math.PI) / 180
     const absCos = Math.abs(Math.cos(angleRad))
@@ -71,7 +73,17 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
   }, [])
 
   useEffect(() => {
+    if (scannerModal && (scannerModal.side === 'il' || scannerModal.side === 'ir')) {
+      setCropModal({ side: scannerModal.side, src: scannerModal.src })
+      setRotation(0)
+      setImgTransform({ x: 0, y: 0, scale: 1 })
+      setScannerModal(null)
+    }
+  }, [scannerModal])
+
+  useEffect(() => {
     if (cropModal) {
+      cropRatioRef.current = (cropModal.side === 'il' || cropModal.side === 'ir') ? 3.5 / 2.5 : CARD_RATIO
       setImgTransform({ x: 0, y: 0, scale: 1 })
     }
   }, [cropModal])
@@ -98,24 +110,8 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, side: 'recto' | 'verso' | 'il' | 'ir') => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (side === 'il' || side === 'ir') {
-      const reader = new FileReader()
-      reader.onload = async () => {
-        const dataUrl = reader.result as string
-        const res = await fetch(dataUrl)
-        const blob = await res.blob()
-        await uploadBlob(blob, side)
-      }
-      reader.readAsDataURL(file)
-      e.target.value = ''
-      return
-    }
     const reader = new FileReader()
-    reader.onload = () => {
-      if (reader.result) {
-        setScannerModal({ side: side as 'recto' | 'verso', src: reader.result as string })
-      }
-    }
+    reader.onload = () => { if (reader.result) setScannerModal({ side, src: reader.result as string }) }
     reader.readAsDataURL(file)
     e.target.value = ''
   }
@@ -234,13 +230,14 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
   const applyCropAndUpload = async () => {
     if (!cropModal || !containerRef.current || !imgRef.current) return
     const side = cropModal.side
+    const cropRatio = (side === 'il' || side === 'ir') ? 3.5 / 2.5 : CARD_RATIO
     const container = containerRef.current
     const cw = container.clientWidth
     const ch = container.clientHeight
 
     // Frame dimensions (same as overlay)
-    const frameW = Math.min(cw * 0.82, ch * CARD_RATIO * 0.9)
-    const frameH = frameW / CARD_RATIO
+    const frameW = Math.min(cw * 0.82, ch * cropRatio * 0.9)
+    const frameH = frameW / cropRatio
 
     const img = imgRef.current
 
@@ -288,15 +285,16 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
     const cropH = frameH * scaleToCanvas
 
     const finalCanvas = document.createElement('canvas')
-    finalCanvas.width = 600
-    finalCanvas.height = 840
+    const isLandscape = side === 'il' || side === 'ir'
+    finalCanvas.width = isLandscape ? 840 : 600
+    finalCanvas.height = isLandscape ? 600 : 840
     const finalCtx = finalCanvas.getContext('2d')!
-    finalCtx.drawImage(srcCanvas, cropX, cropY, cropW, cropH, 0, 0, 600, 840)
+    finalCtx.drawImage(srcCanvas, cropX, cropY, cropW, cropH, 0, 0, finalCanvas.width, finalCanvas.height)
 
     setCropModal(null)
 
     finalCanvas.toBlob(async (blob) => {
-      if (!blob) { setUploadingRecto(false); setUploadingVerso(false); return }
+      if (!blob) { setUploadingRecto(false); setUploadingVerso(false); setUploadingIL(false); setUploadingIR(false); return }
       await uploadBlob(blob, side)
     }, 'image/jpeg', 0.88)
   }
@@ -363,10 +361,9 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
           )}
         </div>
         <input id={`upload-${side}`} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => handleFileChange(e, side)} />
-        <input id={`camera-${side}`} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => handleFileChange(e, side)} />
         {!preview && !uploading && (
           <button type="button"
-            onClick={() => (side === 'recto' || side === 'verso') ? setCameraModal(side) : document.getElementById(`camera-${side}`)?.click()}
+            onClick={() => setCameraModal(side)}
             style={{ marginTop: 6, width: '100%', background: '#f0f4ff', color: '#003DA6', border: 'none', borderRadius: 6, padding: '8px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
             {lang === 'fr' ? '📸 Prendre une photo' : '📸 Take a photo'}
           </button>
@@ -513,6 +510,7 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
 
       {cameraModal && (
         <CameraCapture
+          ratio={(cameraModal === 'il' || cameraModal === 'ir') ? 3.5 / 2.5 : undefined}
           onCapture={(blob, frameRect) => {
             const url = URL.createObjectURL(blob)
             setCameraModal(null)
@@ -522,7 +520,7 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
         />
       )}
 
-      {scannerModal && (
+      {scannerModal && !(scannerModal.side === 'il' || scannerModal.side === 'ir') && (
         <CardScanner
           src={scannerModal.src}
           frameRect={scannerModal.frameRect}
@@ -587,11 +585,16 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
             })()}
 
             {/* Cadre fixe centré — juste les coins, pas de bordure pleine */}
+            {(() => {
+              const isInt = cropModal.side === 'il' || cropModal.side === 'ir'
+              const ar = isInt ? '3.5/2.5' : '2.5/3.5'
+              const w = isInt ? `min(90%, calc(82vh * ${3.5/2.5}))` : `min(82%, calc(90vh * ${CARD_RATIO}))`
+              return (
             <div style={{
               position: 'absolute',
               pointerEvents: 'none',
-              width: `min(82%, calc(90vh * ${CARD_RATIO}))`,
-              aspectRatio: '2.5/3.5',
+              width: w,
+              aspectRatio: ar,
               boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)',
               borderRadius: 6,
             }}>
@@ -605,6 +608,8 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
                 <div key={i} style={{ position: 'absolute', width: 22, height: 22, ...style }} />
               ))}
             </div>
+              )
+            })()}
           </div>
 
           {/* Panneau bas */}
