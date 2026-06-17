@@ -65,11 +65,17 @@ export default function CardValueModule({ cardName, set, year, num, variant, rc,
 
   if (loading) return null
 
-  if (errorMsg) return (
-    <div style={{ borderTop: '1px solid #eee', paddingTop: 10, marginTop: 10, fontSize: 11, color: '#bbb' }}>
-      Valeur estimée — eBay : {errorMsg === 'no app id' ? 'clé API non configurée' : errorMsg}
-    </div>
-  )
+  if (errorMsg) {
+    const ebayUrl = `https://www.ebay.fr/sch/i.html?_nkw=${encodeURIComponent([cardName, set, year].filter(Boolean).join(' '))}&LH_Sold=1&LH_Complete=1`
+    return (
+      <div style={{ borderTop: '1px solid #eee', paddingTop: 10, marginTop: 10 }}>
+        <a href={ebayUrl} target="_blank" rel="noopener noreferrer"
+          style={{ fontSize: 12, fontWeight: 700, color: '#999', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
+          🔍 Voir les ventes eBay ↗
+        </a>
+      </div>
+    )
+  }
 
   if (!data || data.sales.length === 0) return null
 
