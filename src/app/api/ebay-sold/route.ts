@@ -80,12 +80,12 @@ export async function GET(req: NextRequest) {
   try {
     const ebayController = new AbortController()
     const ebayTimeout = setTimeout(() => ebayController.abort(), 12000)
-    const res = await fetch(url, { signal: ebayController.signal, next: { revalidate: 3600 } })
+    const res = await fetch(url, { signal: ebayController.signal, cache: 'no-store' })
     clearTimeout(ebayTimeout)
     const text = await res.text()
     let data: any
     try { data = JSON.parse(text) } catch {
-      return NextResponse.json({ error: `eBay réponse invalide (HTTP ${res.status}): ${text.slice(0, 200)}` }, { status: 502 })
+      return NextResponse.json({ error: `eBay HTTP ${res.status}` }, { status: 502 })
     }
 
     const rawItems = data?.findCompletedItemsResponse?.[0]?.searchResult?.[0]?.item || []
