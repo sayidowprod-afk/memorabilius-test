@@ -54,7 +54,7 @@ export default function CardValueModule({ cardName, set, year, num, variant, rc,
         } as any)
         setLoading(false)
       })
-      .catch(() => { clearTimeout(timeout); setLoading(false) })
+      .catch((err) => { clearTimeout(timeout); setErrorMsg(err?.name === 'AbortError' ? 'timeout' : 'erreur réseau'); setLoading(false) })
 
     return () => { clearTimeout(timeout); controller.abort() }
   }, [cardName, set, year, num, variant, rc, auto, patch])

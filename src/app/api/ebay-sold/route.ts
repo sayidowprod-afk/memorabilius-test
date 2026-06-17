@@ -77,7 +77,11 @@ export async function GET(req: NextRequest) {
 
   try {
     const res = await fetch(url, { next: { revalidate: 3600 } })
-    const data = await res.json()
+    const text = await res.text()
+    let data: any
+    try { data = JSON.parse(text) } catch {
+      return NextResponse.json({ error: `eBay réponse invalide (HTTP ${res.status}): ${text.slice(0, 200)}` }, { status: 502 })
+    }
 
     const rawItems = data?.findCompletedItemsResponse?.[0]?.searchResult?.[0]?.item || []
 
