@@ -3,6 +3,10 @@
     {
       "path": "/api/recalcul-stats",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/monthly-badge",
+      "schedule": "0 6 1 * *"
     }
   ],
   "headers": [

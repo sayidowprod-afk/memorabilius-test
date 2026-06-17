@@ -14,12 +14,12 @@ import { useLang } from '@/lib/LangContext'
 const PAGE_SIZE = 48
 
 interface Card {
-  id_manuelle?: string; // Identifiant unique pour la suppression en BDD
+  id_manuelle?: string;
   f: string; b: string; n: string; t: string; y: string
   br: string; s: string; v: string; num: string
   auto: boolean; rc: boolean; patch: boolean; g: string
   isManuelle?: boolean
-  created_at?: string; position?: number;
+  created_at?: string; position?: number; collection_tag?: string;
 }
 
 export default function GalerieClient({ userId, initialCardUrl }: { userId: string; initialCardUrl?: string }) {
@@ -35,9 +35,11 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
   const [fTeam, setFTeam] = useState('')
   const [fBrand, setFBrand] = useState('')
   const [fYear, setFYear] = useState('')
+  const [fCollectionTag, setFCollectionTag] = useState('')
   const [teams, setTeams] = useState<string[]>([])
   const [brands, setBrands] = useState<string[]>([])
   const [years, setYears] = useState<string[]>([])
+  const [collectionTags, setCollectionTags] = useState<string[]>([])
   const [popup, setPopup] = useState<Card | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [currentUser, setCurrentUser] = useState<string | null>(null)
@@ -46,6 +48,7 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
   const [editMode, setEditMode] = useState(false)
   const [activeTab, setActiveTab] = useState<'collection' | 'wishlist' | 'comments'>('collection')
   const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const [monthlyBadges, setMonthlyBadges] = useState<string[]>([])
   const loaderRef = useRef<HTMLDivElement>(null)
 
   const isOwner = currentUser === userId
@@ -67,6 +70,9 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
       
       supabase.from('profiles').select('*').eq('id', resolvedId).single().then(({ data }) => {
         if (data) { setProfile(data); loadCSV(data.lien_csv ?? null) }
+      })
+      supabase.from('badges').select('mois').eq('user_id', resolvedId).eq('type', 'collectionneur_du_mois').order('mois', { ascending: false }).limit(6).then(({ data }) => {
+        if (data) setMonthlyBadges(data.map((b: any) => b.mois))
       })
     }
     init()
@@ -158,7 +164,8 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
         br: m.marque || '', s: m.collection || '', v: m.variation || '',
         num: m.num || '', auto: m.auto || false, rc: m.rc || false,
         patch: m.patch || false, g: m.grade || 'Raw', isManuelle: true,
-        created_at: m.created_at || '', position: m.position ?? 9999
+        created_at: m.created_at || '', position: m.position ?? 9999,
+        collection_tag: m.collection_tag || ''
       }))
 
       // Trier les cartes manuelles par position sauvegardée
@@ -168,6 +175,7 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
       setTeams([...new Set(allCards.map(d => d.t).filter(Boolean))].sort())
       setBrands([...new Set(allCards.map(d => d.s).filter(Boolean))].sort())
       setYears([...new Set(allCards.map(d => d.y).filter(Boolean))].sort())
+      setCollectionTags([...new Set(allCards.map(d => d.collection_tag).filter(Boolean) as string[])].sort())
       setLoaded(true)
       // Auto-ouvre la carte depuis ?card= ou depuis initialCardUrl (route /[cardSlug])
       const target = initialCardUrl || (cardParam ? decodeURIComponent(cardParam) : null)
@@ -186,6 +194,7 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
         (!fTeam || d.t === fTeam) &&
         (!fBrand || d.s === fBrand) &&
         (!fYear || d.y === fYear) &&
+        (!fCollectionTag || d.collection_tag === fCollectionTag) &&
         (!activeFilters.rc || d.rc) &&
         (!activeFilters.auto || d.auto) &&
         (!activeFilters.patch || d.patch) &&
@@ -222,7 +231,7 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
     setFiltered(sorted)
     setPage(1)
     setDisplayed(sorted.slice(0, PAGE_SIZE))
-  }, [cards, search, fTeam, fBrand, fYear, activeFilters, filterPrivate, privateCards, isOwner, sortBy, cardValues])
+  }, [cards, search, fTeam, fBrand, fYear, fCollectionTag, activeFilters, filterPrivate, privateCards, isOwner, sortBy, cardValues])
 
   useEffect(() => {
     const observer = new IntersectionObserver(entries => {
@@ -347,6 +356,9 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
                 <h1 style={{ fontSize: 24, fontWeight: 900, margin: 0 }}>{profile?.display_name || 'Collectionneur'}</h1>
                 <OnlineIndicator lastSeen={profile?.last_seen} size={12} />
+                {monthlyBadges.length > 0 && (
+                  <span title={`Collectionneur du mois : ${monthlyBadges.join(', ')}`} style={{ fontSize: 20, cursor: 'default' }}>🏆</span>
+                )}
                 {profile?.lien_logo && <img src={profile.lien_logo} style={{ maxHeight: 32, objectFit: 'contain' }} alt="logo" />}
               </div>
 
@@ -526,6 +538,33 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
               </>}
             </select>
           </div>
+          {collectionTags.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              <label style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 5 }}>
+                {lang === 'fr' ? 'Ma collection' : 'My collection'}
+              </label>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <button onClick={() => setFCollectionTag('')} style={{
+                  padding: '5px 12px', border: 'none', borderRadius: 20, cursor: 'pointer',
+                  fontSize: 11, fontWeight: 700,
+                  background: !fCollectionTag ? accent : '#f0f0f0',
+                  color: !fCollectionTag ? 'white' : '#555',
+                }}>
+                  {lang === 'fr' ? 'Tout' : 'All'}
+                </button>
+                {collectionTags.map(tag => (
+                  <button key={tag} onClick={() => setFCollectionTag(fCollectionTag === tag ? '' : tag)} style={{
+                    padding: '5px 12px', border: 'none', borderRadius: 20, cursor: 'pointer',
+                    fontSize: 11, fontWeight: 700,
+                    background: fCollectionTag === tag ? accent : '#f0f0f0',
+                    color: fCollectionTag === tag ? 'white' : '#555',
+                  }}>
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {!loaded && (

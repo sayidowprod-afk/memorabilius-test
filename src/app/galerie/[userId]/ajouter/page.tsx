@@ -20,7 +20,7 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
   const [previewVerso, setPreviewVerso] = useState<string | null>(null)
   const [form, setForm] = useState({
     nom: '', equipe: '', annee: '', marque: '', collection: '', variation: '',
-    grade: 'Raw', num: '', rc: false, auto: false, patch: false,
+    grade: 'Raw', num: '', rc: false, auto: false, patch: false, collection_tag: '',
     image_recto: '', image_verso: '',
   })
 
@@ -296,6 +296,7 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
       marque: form.marque || null, collection: form.collection || null, variation: form.variation || null, grade: form.grade,
       num: form.num || null, rc: form.rc, auto: form.auto, patch: form.patch,
       image_recto: form.image_recto || null, image_verso: form.image_verso || null,
+      collection_tag: form.collection_tag || null,
     })
 
     if (error) { alert('Erreur : ' + error.message); setSaving(false); return }
@@ -423,6 +424,14 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
               <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 6 }}>{lang === 'fr' ? 'Numérotation (ex: 48/99)' : 'Numbering (ex: 48/99)'}</label>
               <input value={form.num} onChange={e => setForm({ ...form, num: e.target.value })} placeholder="48/99" />
             </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 6 }}>
+              {lang === 'fr' ? 'Ma collection (tag perso)' : 'My collection (personal tag)'}
+            </label>
+            <input value={form.collection_tag} onChange={e => setForm({ ...form, collection_tag: e.target.value })} placeholder={lang === 'fr' ? 'ex: PC LeBron, NBA Graded, NFL…' : 'e.g. PC LeBron, Graded, NFL…'} />
+            <p style={{ fontSize: 11, color: '#bbb', marginTop: 4 }}>{lang === 'fr' ? 'Regroupe tes cartes en sous-collections dans ta galerie' : 'Group your cards into sub-collections in your gallery'}</p>
           </div>
 
           <div>

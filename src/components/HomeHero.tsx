@@ -21,7 +21,7 @@ export default function HomeHero({ total, totalCartes }: { total: number; totalC
     <>
       <section style={{
         textAlign: 'center', padding: '80px 20px',
-        background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+        background: dark ? 'linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%)' : 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
         borderRadius: 20, marginBottom: 40,
       }}>
         <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3.5rem)', fontWeight: 900, color: dark ? 'white' : '#003DA6', marginBottom: 20, lineHeight: 1 }}>

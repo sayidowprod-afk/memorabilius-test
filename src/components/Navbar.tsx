@@ -77,7 +77,7 @@ export default function Navbar() {
     <>
       <nav style={{ background: dark ? '#1a1a1a' : 'white', borderBottom: `1px solid ${dark ? '#2a2a2a' : '#eee'}`, padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60, position: 'sticky', top: 0, zIndex: 200 }}>
         <Link href="/" style={{ display: 'flex', alignItems: 'center' }}>
-          <img src="/Memorabiliuslogo.png" alt="Memorabilius" style={{ height: 34, width: 'auto', filter: dark ? 'invert(1)' : 'none', transition: 'filter 0.2s' }} />
+          <img src="/Memorabiliuslogo.png" alt="Memorabilius" style={{ height: 34, width: 'auto', filter: dark ? 'brightness(0) invert(1)' : 'brightness(0)', transition: 'filter 0.2s' }} />
         </Link>
 
         {/* Desktop */}
