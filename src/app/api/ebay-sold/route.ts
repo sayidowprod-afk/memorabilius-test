@@ -3,18 +3,31 @@ import { NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 30
 
 const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
-
-// Mots qui indiquent un grade PSA/BGS/SGC — on les exclut si la carte n'est pas gradée
 const GRADE_KEYWORDS = ['psa', 'bgs', 'sgc', 'cgc', 'beckett', 'graded', 'grade', 'gem', 'mint']
 
 function titleMatchesCard(title: string, mustTerms: string[], isGraded: boolean): boolean {
   const t = normalize(title)
-
-  // Exclure les cartes gradées si la notre ne l'est pas
   if (!isGraded && GRADE_KEYWORDS.some(k => t.includes(k))) return false
-
-  // Tous les termes obligatoires doivent être dans le titre
   return mustTerms.every(term => t.includes(normalize(term)))
+}
+
+async function getOAuthToken(appId: string, certId: string): Promise<string | null> {
+  try {
+    const creds = Buffer.from(`${appId}:${certId}`).toString('base64')
+    const res = await fetch('https://api.ebay.com/identity/v1/oauth2/token', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${creds}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: 'grant_type=client_credentials&scope=https%3A%2F%2Fapi.ebay.com%2Foauth%2Fapi_scope',
+      cache: 'no-store',
+    })
+    const data = await res.json()
+    return data.access_token || null
+  } catch {
+    return null
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -31,79 +44,73 @@ export async function GET(req: NextRequest) {
 
   if (!name) return NextResponse.json({ items: [] })
 
-  const appId = process.env.EBAY_APP_ID
-  if (!appId) return NextResponse.json({ error: 'no app id' }, { status: 500 })
+  const appId  = process.env.EBAY_APP_ID
+  const certId = process.env.EBAY_CERT_ID
+  if (!appId || !certId) return NextResponse.json({ error: 'missing credentials' }, { status: 500 })
 
-  // Extraire /99 de "23/99"
   const normNum = (s: string) => { const m = s?.match(/\/(\d+)/); return m ? `/${m[1]}` : s }
   const printRun = normNum(num)
 
-  // Construire la requête eBay — termes principaux seulement (pas trop restrictif)
   const keywordParts = [
-    name,
-    year,
-    set || variant,  // l'un ou l'autre suffit pour la recherche
+    name, year,
+    set || variant,
     printRun || '',
     rc ? 'RC' : '',
     auto ? 'AUTO' : '',
     patch ? 'PATCH' : '',
   ].filter(Boolean)
-
   const keywords = keywordParts.join(' ')
 
-  // Termes OBLIGATOIRES pour le filtrage côté serveur
   const mustTerms: string[] = [name]
   if (year) mustTerms.push(year)
-  if (printRun) mustTerms.push(printRun.replace('/', ''))  // "99" dans le titre
+  if (printRun) mustTerms.push(printRun.replace('/', ''))
   if (auto) mustTerms.push('auto')
   if (rc) mustTerms.push('rc')
 
   const isGraded = Boolean(grade && grade !== 'Raw' && grade !== 'Non gradée' && grade !== '')
 
-  const params = new URLSearchParams({
-    'OPERATION-NAME': 'findCompletedItems',
-    'SERVICE-VERSION': '1.0.0',
-    'SECURITY-APPNAME': appId,
-    'RESPONSE-DATA-FORMAT': 'JSON',
-    'keywords': keywords,
-    'itemFilter(0).name': 'SoldItemsOnly',
-    'itemFilter(0).value': 'true',
-    'itemFilter(1).name': 'Currency',
-    'itemFilter(1).value': 'EUR',
-    'sortOrder': 'EndTimeSoonest',
-    'paginationInput.entriesPerPage': '20',  // On prend plus pour filtrer ensuite
-    'outputSelector': 'SellingStatus',
-  })
-
-  const url = `https://svcs.ebay.com/services/search/FindingService/v1?${params}`
+  // Obtenir le token OAuth
+  const token = await getOAuthToken(appId, certId)
+  if (!token) return NextResponse.json({ items: [] })
 
   try {
-    const ebayController = new AbortController()
-    const ebayTimeout = setTimeout(() => ebayController.abort(), 12000)
-    const res = await fetch(url, { signal: ebayController.signal, cache: 'no-store' })
-    clearTimeout(ebayTimeout)
-    const text = await res.text()
-    let data: any
-    try { data = JSON.parse(text) } catch {
-      return NextResponse.json({ error: `eBay HTTP ${res.status}` }, { status: 502 })
-    }
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 12000)
 
-    const rawItems = data?.findCompletedItemsResponse?.[0]?.searchResult?.[0]?.item || []
+    // Browse API — items vendus récemment
+    const params = new URLSearchParams({
+      q: keywords,
+      filter: 'soldItems:{true},buyingOptions:{FIXED_PRICE|BEST_OFFER}',
+      limit: '20',
+      sort: 'newlyListed',
+    })
+
+    const res = await fetch(`https://api.ebay.com/buy/browse/v1/item_summary/search?${params}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'X-EBAY-C-MARKETPLACE-ID': 'EBAY_FR',
+        'X-EBAY-C-ENDUSERCTX': 'contextualLocation=country=FR',
+      },
+      signal: controller.signal,
+      cache: 'no-store',
+    })
+    clearTimeout(timeout)
+
+    const data = await res.json()
+    const rawItems = data?.itemSummaries || []
 
     const items = rawItems
       .map((item: any) => ({
-        title: item.title?.[0] || '',
-        price: parseFloat(item.sellingStatus?.[0]?.convertedCurrentPrice?.[0]?.__value__ || item.sellingStatus?.[0]?.currentPrice?.[0]?.__value__ || '0'),
+        title: item.title || '',
+        price: parseFloat(item.price?.value || item.currentBidPrice?.value || '0'),
         currency: '€',
-        date: item.listingInfo?.[0]?.endTime?.[0] || '',
-        url: item.viewItemURL?.[0] || '',
+        date: item.itemEndDate || item.soldDate || new Date().toISOString(),
+        url: item.itemWebUrl || '',
       }))
       .filter((i: any) => i.price > 0)
       .filter((i: any) => titleMatchesCard(i.title, mustTerms, isGraded))
-      // Supprimer les outliers extrêmes (>3x la médiane ou <0.1x)
       .sort((a: any, b: any) => a.price - b.price)
 
-    // Calcul de la médiane pour détecter les outliers
     if (items.length >= 4) {
       const mid = Math.floor(items.length / 2)
       const median = items.length % 2 === 0
