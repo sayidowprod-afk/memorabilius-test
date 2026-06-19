@@ -123,14 +123,13 @@ export default async function Home() {
   ] = await Promise.all([
     supabase.from('profiles').select('*', { count: 'exact', head: true }),
     supabase.from('profiles').select('stats_total').gt('stats_total', 0),
-    supabase.from('cartes_manuelles').select('*', { count: 'exact', head: true }),
+    Promise.resolve({ count: 0 }),
     supabase.from('profiles').select('id, display_name, lien_csv').order('updated_at', { ascending: false }).limit(20),
     fetchPodium(),
   ])
 
   const total = count ?? 0
-  const csvTotal = statsData?.reduce((acc, p) => acc + (p.stats_total || 0), 0) ?? 0
-  const totalCartes = csvTotal + (manuellesCount ?? 0)
+  const totalCartes = statsData?.reduce((acc, p) => acc + (p.stats_total || 0), 0) ?? 0
   const cards = await fetchPepites(profiles || [])
 
   return (
