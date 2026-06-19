@@ -16,7 +16,7 @@ interface Card {
   booklet?: boolean; il?: string; ir?: string
 }
 
-export default function Viewer3D({ popup, accent, onClose, getTags, userId, userSlug, isOwner, onCollectionTagChange, isGrail, onToggleGrail }: {
+export default function Viewer3D({ popup, accent, onClose, getTags, userId, userSlug, isOwner, onCollectionTagChange }: {
   popup: Card
   accent: string
   onClose: () => void
@@ -26,8 +26,6 @@ export default function Viewer3D({ popup, accent, onClose, getTags, userId, user
   isOwner?: boolean
   currentUserId?: string
   onCollectionTagChange?: (card: Card, tag: string) => void
-  isGrail?: boolean
-  onToggleGrail?: (card: Card) => void
 }) {
   const { dark } = useTheme()
   const bg = dark ? '#1a1a1a' : '#fff'
@@ -287,18 +285,6 @@ export default function Viewer3D({ popup, accent, onClose, getTags, userId, user
                 transition: '0.2s',
               }}>
                 {copied ? '✓ Copié' : '🔗 Partager'}
-              </button>
-            )}
-            {isOwner && onToggleGrail && (
-              <button onClick={() => onToggleGrail(popup)} style={{
-                background: isGrail ? '#f59e0b' : (dark ? '#2a2a2a' : '#f0f0f0'),
-                color: isGrail ? 'white' : (dark ? '#eee' : '#555'),
-                border: isGrail ? 'none' : `1px solid ${dark ? '#444' : '#ddd'}`,
-                borderRadius: 10, padding: '12px 14px',
-                fontWeight: 800, cursor: 'pointer', fontSize: 14, whiteSpace: 'nowrap',
-                transition: '0.2s',
-              }} title={isGrail ? 'Retirer du Grail Wall' : 'Ajouter au Grail Wall (max 5)'}>
-                {isGrail ? '💎 Grail' : '📌 Grail'}
               </button>
             )}
           </div>
