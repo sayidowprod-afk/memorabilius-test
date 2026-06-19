@@ -54,6 +54,7 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [monthlyBadges, setMonthlyBadges] = useState<string[]>([])
   const [csvTags, setCsvTags] = useState<Map<string, string>>(new Map())
+  const [grailCards, setGrailCards] = useState<{ card_key: string; position: number }[]>([])
   const loaderRef = useRef<HTMLDivElement>(null)
 
   const isOwner = currentUser === userId
@@ -86,6 +87,9 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
       })
       supabase.from('collection_tab_settings').select('tag, color, position').eq('user_id', resolvedId).then(({ data }) => {
         if (data) setTabSettings(new Map(data.map((r: any) => [r.tag, { color: r.color, position: r.position }])))
+      })
+      supabase.from('grail_cards').select('card_key, position').eq('user_id', resolvedId).order('position').then(({ data }) => {
+        if (data) setGrailCards(data)
       })
     }
     init()
@@ -468,6 +472,63 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
           )}
         </div>
 
+        {/* Grail Wall */}
+        {grailCards.length > 0 && (() => {
+          const grailMap = new Map(cards.map(c => [c.f, c]))
+          const grailItems = grailCards.map(g => grailMap.get(g.card_key)).filter(Boolean) as Card[]
+          if (grailItems.length === 0) return null
+          return (
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <span style={{ fontSize: 18 }}>💎</span>
+                <span style={{ fontWeight: 900, fontSize: 15, color: '#121212', letterSpacing: 0.5 }}>Grail Wall</span>
+                <span style={{ fontSize: 11, color: '#bbb', fontWeight: 600 }}>— {lang === 'fr' ? 'Les pièces maîtresses' : 'The crown jewels'}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 8 }}>
+                {grailItems.map((card, i) => {
+                  const tabColor = (card.collection_tag && tabSettings.get(card.collection_tag)?.color) || accent
+                  return (
+                    <div key={i} onClick={() => setPopup(card)} style={{
+                      flexShrink: 0, width: 130, cursor: 'pointer', position: 'relative',
+                      border: `3px solid ${tabColor}`, borderRadius: 10, overflow: 'hidden',
+                      boxShadow: `0 4px 20px ${tabColor}44`, transition: '0.2s',
+                    }}
+                      onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-4px)')}
+                      onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
+                    >
+                      {isOwner && (
+                        <button onClick={async e => {
+                          e.stopPropagation()
+                          await supabase.from('grail_cards').delete().eq('user_id', userId).eq('card_key', card.f)
+                          setGrailCards(prev => prev.filter(g => g.card_key !== card.f))
+                        }} style={{
+                          position: 'absolute', top: 4, right: 4, zIndex: 3,
+                          background: 'rgba(0,0,0,0.55)', border: 'none', borderRadius: '50%',
+                          width: 20, height: 20, color: 'white', fontSize: 10, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900,
+                        }}>✕</button>
+                      )}
+                      <div style={{ aspectRatio: '2.5/3.5', overflow: 'hidden' }}>
+                        <img src={card.f} alt={card.n} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                      </div>
+                      <div style={{ padding: '6px 8px', background: 'white' }}>
+                        <p style={{ fontWeight: 800, fontSize: 11, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.n}</p>
+                        <p style={{ fontSize: 9, color: tabColor, fontWeight: 700, margin: '1px 0 0', fontStyle: 'italic', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.v || card.s}</p>
+                      </div>
+                    </div>
+                  )
+                })}
+                {isOwner && grailCards.length < 5 && (
+                  <div style={{ flexShrink: 0, width: 130, border: `2px dashed ${accent}55`, borderRadius: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', aspectRatio: '2.5/3.5', color: '#bbb', fontSize: 11, fontWeight: 700, gap: 6, cursor: 'default' }}>
+                    <span style={{ fontSize: 24 }}>💎</span>
+                    <span style={{ textAlign: 'center', lineHeight: 1.3, padding: '0 8px' }}>{lang === 'fr' ? 'Épinglez une carte via 📌' : 'Pin a card via 📌'}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })()}
+
         {/* Onglets Collection / Wishlist / Commentaires */}
         <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: '#f0f0f0', borderRadius: 10, padding: 4, width: 'fit-content' }}>
           {(['collection', 'wishlist', 'comments'] as const).map(tab => (
@@ -795,6 +856,19 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
       {popup && (
         <Viewer3D popup={popup} accent={accent} onClose={() => setPopup(null)} getTags={getTags} userId={userId} userSlug={profile?.slug || userId}
           isOwner={isOwner} currentUserId={currentUser ?? undefined}
+          isGrail={grailCards.some(g => g.card_key === popup.f)}
+          onToggleGrail={async (card) => {
+            const already = grailCards.some(g => g.card_key === card.f)
+            if (already) {
+              await supabase.from('grail_cards').delete().eq('user_id', userId).eq('card_key', card.f)
+              setGrailCards(prev => prev.filter(g => g.card_key !== card.f))
+            } else {
+              if (grailCards.length >= 5) return
+              const pos = grailCards.length
+              await supabase.from('grail_cards').upsert({ user_id: userId, card_key: card.f, position: pos }, { onConflict: 'user_id,card_key' })
+              setGrailCards(prev => [...prev, { card_key: card.f, position: pos }])
+            }
+          }}
           onCollectionTagChange={async (card, tag) => {
             if (card.isManuelle && card.id_manuelle) {
               await supabase.from('cartes_manuelles').update({ collection_tag: tag || null }).eq('id', card.id_manuelle)
