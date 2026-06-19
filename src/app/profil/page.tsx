@@ -4,12 +4,13 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { useLang } from '@/lib/LangContext'
+import { NBA_TEAMS } from '@/lib/nbaTeams'
 
 export default function Profil() {
   const router = useRouter()
   const { t, lang } = useLang()
   const [userId, setUserId] = useState<string | null>(null)
-  const [form, setForm] = useState({ display_name: '', bio: '', lien_csv: '', couleur_bordure: '#003DA6', lien_logo: '', instagram: '', twitter: '', discord: '' })
+  const [form, setForm] = useState({ display_name: '', bio: '', lien_csv: '', couleur_bordure: '#003DA6', lien_logo: '', instagram: '', twitter: '', discord: '', favorite_team: '' })
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [csvLinked, setCsvLinked] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -28,7 +29,7 @@ export default function Profil() {
       await supabase.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', data.user.id)
       const { data: p } = await supabase.from('profiles').select('*').eq('id', data.user.id).single()
       if (p) {
-        setForm({ display_name: p.display_name || '', bio: p.bio || '', lien_csv: p.lien_csv || '', couleur_bordure: p.couleur_bordure || '#003DA6', lien_logo: p.lien_logo || '', instagram: p.instagram || '', twitter: p.twitter || '', discord: p.discord || '' })
+        setForm({ display_name: p.display_name || '', bio: p.bio || '', lien_csv: p.lien_csv || '', couleur_bordure: p.couleur_bordure || '#003DA6', lien_logo: p.lien_logo || '', instagram: p.instagram || '', twitter: p.twitter || '', discord: p.discord || '', favorite_team: p.favorite_team || '' })
         setCsvLinked(!!p.lien_csv)
         setAvatarUrl(p.avatar_url || null)
       }
@@ -70,6 +71,7 @@ export default function Profil() {
       twitter: form.twitter,
       discord: form.discord,
       bio: form.bio,
+      favorite_team: form.favorite_team || null,
       slug,
     }).eq('id', userId)
     if (!error) {
@@ -161,6 +163,15 @@ export default function Profil() {
               <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 6 }}>Discord</label>
               <input value={form.discord} onChange={e => setForm({ ...form, discord: e.target.value })} placeholder="pseudo#0000" />
             </div>
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 6 }}>Équipe NBA préférée</label>
+            <select value={form.favorite_team} onChange={e => setForm({ ...form, favorite_team: e.target.value })} style={{ width: '100%' }}>
+              <option value="">— Aucune —</option>
+              {NBA_TEAMS.map(t => (
+                <option key={t.abbr} value={t.abbr}>{t.name}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 6 }}>{t('profile_border')}</label>

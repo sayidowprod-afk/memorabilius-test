@@ -4,9 +4,10 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { useLang } from '@/lib/LangContext'
+import { NBA_TEAMS, getTeam, getSpeciality } from '@/lib/nbaTeams'
 
 interface Stats { total: number; rc: number; auto: number; num: number; patch: number }
-interface Collector { id: string; display_name: string; avatar_url: string; lien_csv: string; stats?: Stats }
+interface Collector { id: string; display_name: string; avatar_url: string; lien_csv: string; stats?: Stats; favorite_team?: string }
 
 export default function Annuaire() {
   return (
@@ -29,6 +30,7 @@ function AnnuaireContent() {
   const [teams, setTeams] = useState<any[]>([])
   const [teamName, setTeamName] = useState<string>('')
   const [search, setSearch] = useState('')
+  const [nbaFilter, setNbaFilter] = useState('')
 
   useEffect(() => {
     supabase.from('teams').select('id, name').then(({ data }) => {
@@ -49,7 +51,7 @@ function AnnuaireContent() {
   const loadData = async () => {
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, display_name, avatar_url, lien_csv, stats_total, stats_rc, stats_auto, stats_num, stats_patch, stats_updated_at')
+      .select('id, display_name, avatar_url, lien_csv, stats_total, stats_rc, stats_auto, stats_num, stats_patch, stats_updated_at, favorite_team')
       .not('display_name', 'is', null)
       .neq('display_name', '')
 
@@ -58,6 +60,7 @@ function AnnuaireContent() {
     // Utiliser les stats en cache directement
     setCollectors(profiles.map(p => ({
       ...p,
+      favorite_team: p.favorite_team || '',
       stats: {
         total: p.stats_total || 0,
         rc: p.stats_rc || 0,
@@ -118,7 +121,8 @@ function AnnuaireContent() {
   }
 
   const sorted = [...collectors].filter(c =>
-    !search || (c.display_name || '').toLowerCase().includes(search.toLowerCase())
+    (!search || (c.display_name || '').toLowerCase().includes(search.toLowerCase())) &&
+    (!nbaFilter || c.favorite_team === nbaFilter)
   ).sort((a, b) => {
     if (sortKey === 'display_name') return sortAsc ? (a.display_name || '').localeCompare(b.display_name || '') : (b.display_name || '').localeCompare(a.display_name || '')
     const av = (a.stats?.[sortKey] || 0) as number
@@ -163,9 +167,13 @@ function AnnuaireContent() {
           placeholder={lang === 'fr' ? 'Rechercher un collectionneur…' : 'Search collector…'}
           style={{ flex: '1 1 200px', minWidth: 180 }}
         />
-        <select value={teamFilter} onChange={e => handleTeamChange(e.target.value)} style={{ flex: '1 1 180px', minWidth: 160 }}>
+        <select value={teamFilter} onChange={e => handleTeamChange(e.target.value)} style={{ flex: '1 1 160px', minWidth: 140 }}>
           <option value="">{t('all_teams')}</option>
           {teams.map(t => <option key={t.id} value={String(t.id)}>{t.name}</option>)}
+        </select>
+        <select value={nbaFilter} onChange={e => setNbaFilter(e.target.value)} style={{ flex: '1 1 160px', minWidth: 140 }}>
+          <option value="">🏀 Toutes les équipes NBA</option>
+          {NBA_TEAMS.map(t => <option key={t.abbr} value={t.abbr}>{t.name}</option>)}
         </select>
       </div>
 
@@ -197,7 +205,27 @@ function AnnuaireContent() {
                   <td style={{ padding: isMobile ? '10px 8px' : 15, borderBottom: '1px solid #f5f5f5', overflow: 'hidden' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 15, minWidth: 0 }}>
                       <img src={c.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.display_name || 'U')}&background=003DA6&color=fff`} style={{ width: isMobile ? 28 : 42, height: isMobile ? 28 : 42, borderRadius: '50%', border: '2px solid #eee', objectFit: 'cover', flexShrink: 0 }} alt={c.display_name} />
-                      <Link href={`/galerie/${c.id}`} style={{ fontWeight: 800, color: '#121212', fontSize: isMobile ? 12 : 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.display_name || 'Collectionneur'}</Link>
+                      <div style={{ minWidth: 0 }}>
+                        <Link href={`/galerie/${c.id}`} style={{ fontWeight: 800, color: '#121212', fontSize: isMobile ? 12 : 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{c.display_name || 'Collectionneur'}</Link>
+                        {(() => {
+                          const team = c.favorite_team ? getTeam(c.favorite_team) : null
+                          const spec = getSpeciality(c.stats, c.favorite_team)
+                          return (
+                            <div style={{ display: 'flex', gap: 4, marginTop: 3, flexWrap: 'wrap' }}>
+                              {team && (
+                                <span style={{ fontSize: 9, fontWeight: 900, padding: '2px 6px', borderRadius: 4, background: team.color, color: 'white', letterSpacing: 0.5 }}>
+                                  {team.abbr}
+                                </span>
+                              )}
+                              {spec && !team && (
+                                <span style={{ fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 4, background: spec.color + '18', color: spec.color, border: `1px solid ${spec.color}33` }}>
+                                  {spec.label}
+                                </span>
+                              )}
+                            </div>
+                          )
+                        })()}
+                      </div>
                     </div>
                   </td>
                   <td style={{ padding: isMobile ? '10px 4px' : 15, borderBottom: '1px solid #f5f5f5', textAlign: 'center' }}>{badge(c.stats?.total ?? 0, '#f0f0f0', '#333')}</td>
