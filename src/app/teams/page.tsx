@@ -39,23 +39,8 @@ export default function Teams() {
 
   const loadTeamsStats = async (teamsList: any[]) => {
     const stats = await Promise.all(teamsList.map(async (team) => {
-      const { data: members } = await supabase.from('team_members').select('user_id, profiles(lien_csv)').eq('team_id', team.id)
-      let total = 0
-      await Promise.all((members || []).map(async (m: any) => {
-        // CSV cards
-        if (m.profiles?.lien_csv) {
-          try {
-            const r = await fetch(`/api/csv-stats?url=${encodeURIComponent(m.profiles.lien_csv)}`)
-            const s = await r.json()
-            total += s.total || 0
-          } catch {}
-        }
-        // Cartes manuelles
-        if (m.user_id) {
-          const { count } = await supabase.from('cartes_manuelles').select('*', { count: 'exact', head: true }).eq('user_id', m.user_id)
-          total += count || 0
-        }
-      }))
+      const { data: members } = await supabase.from('team_members').select('profiles(stats_total)').eq('team_id', team.id)
+      const total = (members || []).reduce((acc: number, m: any) => acc + (m.profiles?.stats_total || 0), 0)
       return { teamId: team.id, total }
     }))
     setTeamsStats(stats)
