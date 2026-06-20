@@ -181,15 +181,31 @@ RÈGLES BOOLÉENNES :
 - num : UNIQUEMENT si tu lis "X/Y" ou "/Y" imprimé sur la carte comme tirage limité. Pas le numéro de carte (#123), pas le numéro de maillot.
 
 Si une info est absente ou vraiment illisible → chaîne vide "".
-Ne devine pas. Reste factuel à ce qui est visible.`
+Ne devine pas. Reste factuel à ce qui est visible.
+
+IMPORTANT — SI DEUX IMAGES SONT FOURNIES (RECTO + VERSO) :
+- La première image est le RECTO (face avant)
+- La deuxième image est le VERSO (face arrière)
+- Le verso contient souvent : nom exact du set, nom de l'insert en grand, numérotation, infos RC/Auto
+- Le verso FAIT AUTORITÉ sur le recto pour : collection, variation, num, rc, auto, patch
+- Si le verso indique "BANG!" en gros → variation contient "Bang!" (+ parallèle si visible au recto)
+- Si le verso dit "PRIZM" → le parallèle du recto est probablement Silver Prizm ou similaire
+- Croiser les deux faces pour avoir l'information la plus complète et précise possible.`
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'GEMINI_API_KEY non configurée' }, { status: 500 })
 
   try {
-    const { imageBase64, mimeType = 'image/jpeg' } = await req.json()
+    const { imageBase64, imageBase64Verso, mimeType = 'image/jpeg' } = await req.json()
     if (!imageBase64) return NextResponse.json({ error: 'Image manquante' }, { status: 400 })
+
+    const imageParts: object[] = [
+      { inline_data: { mime_type: mimeType, data: imageBase64 } },
+    ]
+    if (imageBase64Verso) {
+      imageParts.push({ inline_data: { mime_type: mimeType, data: imageBase64Verso } })
+    }
 
     const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
       method: 'POST',
@@ -198,7 +214,7 @@ export async function POST(req: NextRequest) {
         contents: [{
           parts: [
             { text: PROMPT },
-            { inline_data: { mime_type: mimeType, data: imageBase64 } },
+            ...imageParts,
           ],
         }],
         generationConfig: {

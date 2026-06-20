@@ -118,6 +118,7 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
 
   const [scanning, setScanning] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
+  const rectoBase64Ref = useRef<string | null>(null)
 
   const uploadBlob = async (blob: Blob, side: 'recto' | 'verso' | 'il' | 'ir') => {
     if (side === 'recto') setUploadingRecto(true)
@@ -137,12 +138,12 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
     const { data } = supabase.storage.from('avatars').getPublicUrl(path)
     const url = data.publicUrl
     if (side === 'recto') { setForm(f => ({ ...f, image_recto: url })); setPreviewRecto(url); setUploadingRecto(false); analyzeCard(blob, false) }
-    else if (side === 'verso') { setForm(f => ({ ...f, image_verso: url })); setPreviewVerso(url); setUploadingVerso(false); analyzeCard(blob, true) }
+    else if (side === 'verso') { setForm(f => ({ ...f, image_verso: url })); setPreviewVerso(url); setUploadingVerso(false); analyzeCard(blob, true, rectoBase64Ref.current) }
     else if (side === 'il') { setForm(f => ({ ...f, image_interieur_gauche: url })); setPreviewIL(url); setUploadingIL(false) }
     else { setForm(f => ({ ...f, image_interieur_droite: url })); setPreviewIR(url); setUploadingIR(false) }
   }
 
-  const analyzeCard = async (blob: Blob, fillMissingOnly = false) => {
+  const analyzeCard = async (blob: Blob, isVerso = false, rectoBase64?: string | null) => {
     setScanning(true)
     setScanError(null)
     try {
@@ -151,10 +152,19 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
         reader.onload = () => res((reader.result as string).split(',')[1])
         reader.readAsDataURL(blob)
       })
+
+      // Stocker le recto pour usage futur avec le verso
+      if (!isVerso) rectoBase64Ref.current = base64
+
+      // Si c'est le verso ET qu'on a le recto → envoyer les deux ensemble
+      const body = isVerso && rectoBase64
+        ? { imageBase64: rectoBase64, imageBase64Verso: base64, mimeType: 'image/jpeg' }
+        : { imageBase64: base64, mimeType: 'image/jpeg' }
+
       const resp = await fetch('/api/scan-card', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: base64, mimeType: 'image/jpeg' }),
+        body: JSON.stringify(body),
       })
       const card = await resp.json()
       if (!resp.ok || card.error) {
@@ -163,14 +173,16 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
       }
       setForm(f => ({
         ...f,
-        nom:        (fillMissingOnly && f.nom)        ? f.nom        : card.nom        || f.nom,
-        equipe:     (fillMissingOnly && f.equipe)     ? f.equipe     : card.equipe     || f.equipe,
-        annee:      (fillMissingOnly && f.annee)      ? f.annee      : card.annee      || f.annee,
-        marque:     (fillMissingOnly && f.marque)     ? f.marque     : card.marque     || f.marque,
-        collection: (fillMissingOnly && f.collection) ? f.collection : card.collection || f.collection,
-        variation:  (fillMissingOnly && f.variation)  ? f.variation  : card.variation  || f.variation,
-        num:        (fillMissingOnly && f.num)        ? f.num        : card.num        || f.num,
-        grade:      (fillMissingOnly && f.grade !== 'Raw') ? f.grade : card.grade      || f.grade,
+        // Verso avec recto : toujours écraser variation/collection/num (le verso fait autorité)
+        // Verso seul (sans recto) : ne remplir que les champs vides
+        nom:        (isVerso && !rectoBase64 && f.nom)        ? f.nom        : card.nom        || f.nom,
+        equipe:     (isVerso && !rectoBase64 && f.equipe)     ? f.equipe     : card.equipe     || f.equipe,
+        annee:      (isVerso && !rectoBase64 && f.annee)      ? f.annee      : card.annee      || f.annee,
+        marque:     (isVerso && !rectoBase64 && f.marque)     ? f.marque     : card.marque     || f.marque,
+        collection: card.collection || f.collection,
+        variation:  card.variation  !== undefined ? card.variation : f.variation,
+        num:        card.num        || f.num,
+        grade:      (isVerso && !rectoBase64 && f.grade !== 'Raw') ? f.grade : card.grade || f.grade,
         rc:         f.rc   || (card.rc   ?? false),
         auto:       f.auto || (card.auto ?? false),
         patch:      f.patch || (card.patch ?? false),
