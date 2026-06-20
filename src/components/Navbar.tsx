@@ -87,6 +87,7 @@ export default function Navbar() {
           <Link href="/trades" style={{ color: dark ? '#ddd' : '#444', fontWeight: 600 }}>{t('nav_trades')}</Link>
           <Link href="/recherche" style={{ color: dark ? '#ddd' : '#444', fontWeight: 600 }}>{t('nav_recherche')}</Link>
           <Link href="/tuto" style={{ color: dark ? '#ddd' : '#444', fontWeight: 600 }}>{t('nav_tuto')}</Link>
+          <Link href="/setlist" style={{ color: dark ? '#ddd' : '#444', fontWeight: 600 }}>Setlist</Link>
           {user ? (
             <>
               <Link href={`/galerie/${user.id}`} style={{ color: dark ? '#ddd' : '#444', fontWeight: 600 }}>{t('nav_galerie')}</Link>
@@ -127,6 +128,7 @@ export default function Navbar() {
           <Link href="/trades" style={ls} onClick={() => setMenuOpen(false)}>{t('nav_trades')}</Link>
           <Link href="/recherche" style={ls} onClick={() => setMenuOpen(false)}>{t('nav_recherche')}</Link>
           <Link href="/tuto" style={ls} onClick={() => setMenuOpen(false)}>{t('nav_tuto')}</Link>
+          <Link href="/setlist" style={ls} onClick={() => setMenuOpen(false)}>Setlist</Link>
           {user ? (
             <>
               <Link href={`/galerie/${user.id}`} style={ls} onClick={() => setMenuOpen(false)}>{t('nav_galerie')}</Link>
