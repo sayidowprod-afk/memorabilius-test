@@ -53,8 +53,8 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
   const coloredBorder = (color: string, width = 2): React.CSSProperties => {
     if (!color) return { border: `${width}px solid ${accent}` }
     if (isGradient(color)) return {
-      border: `${width}px solid transparent`,
-      background: `linear-gradient(#fff, #fff) padding-box, ${color} border-box`,
+      background: color,
+      border: 'none',
     }
     return { border: `${width}px solid ${color}` }
   }
