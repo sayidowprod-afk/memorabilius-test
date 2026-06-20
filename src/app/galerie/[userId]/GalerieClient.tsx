@@ -46,6 +46,9 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
   const [tabSettings, setTabSettings] = useState<Map<string, { color: string; position: number }>>(new Map())
   const [draggedTag, setDraggedTag] = useState<string | null>(null)
   const [colorPickerTag, setColorPickerTag] = useState<string | null>(null)
+  const [cardLikes, setCardLikes] = useState<Map<string, { count: number; liked: boolean }>>(new Map())
+  const [deleteTagConfirm, setDeleteTagConfirm] = useState<string | null>(null)
+  const isGradient = (c: string) => c.startsWith('linear-gradient')
   const [popup, setPopup] = useState<Card | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [currentUser, setCurrentUser] = useState<string | null>(null)
@@ -94,6 +97,19 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
       })
       supabase.from('grail_cards').select('card_key, position').eq('user_id', resolvedId).order('position').then(({ data }) => {
         if (data) setGrailCards(data)
+      })
+      // Charger les likes de la galerie + ceux de l'utilisateur connecté
+      supabase.auth.getUser().then(async ({ data: authData }) => {
+        const uid = authData.user?.id || null
+        const { data: likesData } = await supabase.from('card_likes').select('card_key, liker_user_id').eq('gallery_user_id', resolvedId)
+        if (likesData) {
+          const map = new Map<string, { count: number; liked: boolean }>()
+          for (const l of likesData) {
+            const prev = map.get(l.card_key) || { count: 0, liked: false }
+            map.set(l.card_key, { count: prev.count + 1, liked: prev.liked || l.liker_user_id === uid })
+          }
+          setCardLikes(map)
+        }
       })
     }
     init()
@@ -716,21 +732,38 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
           </div>
           {collectionTags.length > 0 && (() => {
             const TAB_COLORS = [
-              // Rouges / Wines
-              '#CE1141','#860038','#98002E','#E03A3E','#C8102E',
-              // Bleus / Marines
-              '#1D428A','#00538C','#006BB6','#0077C0','#0C2340','#002D62','#00471B',
-              // Verts
-              '#007A33','#236192',
-              // Violets
-              '#552583','#5A2D81','#1D1160','#00788C',
+              // Rouges
+              '#E53935','#C62828','#AD1457','#880E4F',
               // Oranges
-              '#E56020','#EF3B24','#F58426',
+              '#F4511E','#E65100','#FF8F00','#F9A825',
               // Jaunes / Ors
-              '#FEC524','#FFC72C','#FDBB30','#F9A01B','#C8A96E',
-              // Gris / Neutres
-              '#5D76A9','#8A8D8F','#37474f','#000000',
+              '#FDD835','#C8A23A','#A57C00','#FFD700',
+              // Verts
+              '#43A047','#2E7D32','#00796B','#006064',
+              // Bleus clairs
+              '#039BE5','#0288D1','#0277BD','#01579B',
+              // Bleus foncés / Marines
+              '#1565C0','#283593','#1A237E','#003DA6',
+              // Violets
+              '#7B1FA2','#6A1B9A','#4A148C','#512DA8',
+              // Roses
+              '#E91E63','#D81B60','#F06292','#F48FB1',
+              // Neutres
+              '#37474F','#455A64','#546E7A','#000000',
             ]
+            const TAB_GRADIENTS = [
+              { label: 'Sunset', value: 'linear-gradient(135deg,#f97316,#ec4899)' },
+              { label: 'Ocean', value: 'linear-gradient(135deg,#0ea5e9,#6366f1)' },
+              { label: 'Forest', value: 'linear-gradient(135deg,#16a34a,#0d9488)' },
+              { label: 'Galaxy', value: 'linear-gradient(135deg,#7c3aed,#db2777)' },
+              { label: 'Gold', value: 'linear-gradient(135deg,#f59e0b,#b45309)' },
+              { label: 'Ice', value: 'linear-gradient(135deg,#38bdf8,#818cf8)' },
+              { label: 'Lava', value: 'linear-gradient(135deg,#dc2626,#f97316)' },
+              { label: 'Midnight', value: 'linear-gradient(135deg,#1e3a5f,#7c3aed)' },
+              { label: 'Rose', value: 'linear-gradient(135deg,#f43f5e,#fb923c)' },
+              { label: 'Matrix', value: 'linear-gradient(135deg,#14532d,#22c55e)' },
+            ]
+            const resolveColor = (c: string) => isGradient(c) ? c.match(/#[0-9a-fA-F]{6}/)?.[0] || accent : c
             const orderedTags = [...collectionTags].sort((a, b) => {
               const pa = tabSettings.get(a)?.position ?? 999
               const pb = tabSettings.get(b)?.position ?? 999
@@ -814,11 +847,53 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
                           />
                         )}
                         {colorPickerTag === tag && (
-                          <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: '110%', left: 0, background: 'white', borderRadius: 10, padding: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.15)', zIndex: 100, display: 'flex', gap: 5, flexWrap: 'wrap', width: 190 }}>
-                            {TAB_COLORS.map(c => (
-                              <button key={c} onClick={() => { saveTabSetting(tag, { color: c }); setColorPickerTag(null) }}
-                                style={{ width: 22, height: 22, borderRadius: '50%', background: c, border: tabColor === c ? '2px solid #111' : '2px solid transparent', cursor: 'pointer', padding: 0 }} />
-                            ))}
+                          <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: '110%', left: 0, background: 'white', borderRadius: 12, padding: 10, boxShadow: '0 8px 30px rgba(0,0,0,0.18)', zIndex: 100, width: 220 }}>
+                            {/* Preview */}
+                            <div style={{ marginBottom: 8, padding: '5px 10px', borderRadius: 8, border: `2.5px solid ${isGradient(tabColor) ? 'transparent' : tabColor}`, background: isGradient(tabColor) ? 'white' : 'white', backgroundImage: isGradient(tabColor) ? tabColor : 'none', backgroundOrigin: isGradient(tabColor) ? 'border-box' : 'initial', fontSize: 11, fontWeight: 700, color: '#333', textAlign: 'center' }}>
+                              {tag}
+                            </div>
+                            {/* Couleurs unies */}
+                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+                              {TAB_COLORS.map(c => (
+                                <button key={c} onClick={() => { saveTabSetting(tag, { color: c }); setColorPickerTag(null) }}
+                                  style={{ width: 20, height: 20, borderRadius: '50%', background: c, border: tabColor === c ? '2.5px solid #111' : '2px solid transparent', cursor: 'pointer', padding: 0, boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+                              ))}
+                            </div>
+                            {/* Dégradés */}
+                            <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', color: '#aaa', marginBottom: 5 }}>Dégradés</div>
+                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+                              {TAB_GRADIENTS.map(g => (
+                                <button key={g.value} onClick={() => { saveTabSetting(tag, { color: g.value }); setColorPickerTag(null) }}
+                                  title={g.label}
+                                  style={{ width: 36, height: 20, borderRadius: 4, background: g.value, border: tabColor === g.value ? '2.5px solid #111' : '2px solid transparent', cursor: 'pointer', padding: 0 }} />
+                              ))}
+                            </div>
+                            {/* Supprimer la collection */}
+                            {deleteTagConfirm === tag ? (
+                              <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 8 }}>
+                                <p style={{ fontSize: 10, color: '#e53935', fontWeight: 700, margin: '0 0 6px' }}>Supprimer "{tag}" ? Les cartes ne seront pas supprimées.</p>
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                  <button onClick={async () => {
+                                    await supabase.from('cartes_manuelles').update({ collection_tag: null }).eq('user_id', userId).eq('collection_tag', tag)
+                                    await supabase.from('carte_tags').update({ collection_tag: null }).eq('user_id', userId).eq('collection_tag', tag)
+                                    await supabase.from('collection_tab_settings').delete().eq('user_id', userId).eq('tag', tag)
+                                    setTabSettings(prev => { const m = new Map(prev); m.delete(tag); return m })
+                                    setCollectionTags(prev => prev.filter(t => t !== tag))
+                                    setCards(prev => prev.map(c => c.collection_tag === tag ? { ...c, collection_tag: '' } : c))
+                                    setColorPickerTag(null); setDeleteTagConfirm(null)
+                                  }} style={{ flex: 1, background: '#e53935', color: 'white', border: 'none', borderRadius: 6, padding: '5px 0', fontSize: 10, fontWeight: 800, cursor: 'pointer' }}>
+                                    Confirmer
+                                  </button>
+                                  <button onClick={() => setDeleteTagConfirm(null)} style={{ flex: 1, background: '#f0f0f0', color: '#555', border: 'none', borderRadius: 6, padding: '5px 0', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>
+                                    Annuler
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button onClick={() => setDeleteTagConfirm(tag)} style={{ width: '100%', border: 'none', background: 'none', color: '#e53935', fontSize: 10, fontWeight: 700, cursor: 'pointer', paddingTop: 6, borderTop: '1px solid #f5f5f5', textAlign: 'left' }}>
+                                🗑 Supprimer cette collection
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -871,7 +946,9 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
               onDragEnd={handleDragEnd}
               onTouchStart={() => d.isManuelle && handleTouchStart(i)}
               style={{
-              border: `2px solid ${privateCards.has(d.f) && isOwner ? '#e74c3c' : (d.collection_tag && tabSettings.get(d.collection_tag)?.color) || accent}`,
+              border: `2px solid ${privateCards.has(d.f) && isOwner ? '#e74c3c' : isGradient((d.collection_tag && tabSettings.get(d.collection_tag)?.color) || '') ? 'transparent' : (d.collection_tag && tabSettings.get(d.collection_tag)?.color) || accent}`,
+              backgroundImage: !privateCards.has(d.f) && isGradient((d.collection_tag && tabSettings.get(d.collection_tag)?.color) || '') ? `${(d.collection_tag && tabSettings.get(d.collection_tag)?.color)}, linear-gradient(white, white)` : undefined,
+              backgroundOrigin: isGradient((d.collection_tag && tabSettings.get(d.collection_tag)?.color) || '') ? 'border-box, padding-box' : undefined,
               borderRadius: 8, padding: 8,
               background: 'white', cursor: editMode && d.isManuelle ? 'grab' : editMode ? 'default' : 'pointer',
               boxSizing: 'border-box',
@@ -929,9 +1006,46 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
                 <img src={d.f} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt={d.n} />
               </div>
               {getTags(d)}
-              <p style={{ fontWeight: 800, fontSize: 13, margin: '4px 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.n}</p>
-              <p style={{ fontSize: 10, color: accent, fontWeight: 700, margin: '2px 0', fontStyle: 'italic' }}>{d.v}</p>
-              <p style={{ fontSize: 10, color: '#999', marginTop: 2 }}>{d.y} {d.br} {d.s}</p>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 4, marginTop: 4 }}>
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ fontWeight: 800, fontSize: 13, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.n}</p>
+                  <p style={{ fontSize: 10, color: accent, fontWeight: 700, margin: '2px 0', fontStyle: 'italic', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.v}</p>
+                  <p style={{ fontSize: 10, color: '#999', marginTop: 2 }}>{d.y} {d.br} {d.s}</p>
+                </div>
+                {/* Bouton like */}
+                {!editMode && (() => {
+                  const likeInfo = cardLikes.get(d.f) || { count: 0, liked: false }
+                  return (
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        if (!currentUser) return
+                        const isLiked = likeInfo.liked
+                        setCardLikes(prev => {
+                          const m = new Map(prev)
+                          m.set(d.f, { count: likeInfo.count + (isLiked ? -1 : 1), liked: !isLiked })
+                          return m
+                        })
+                        if (isLiked) {
+                          await supabase.from('card_likes').delete().eq('card_key', d.f).eq('gallery_user_id', userId).eq('liker_user_id', currentUser)
+                        } else {
+                          await supabase.from('card_likes').upsert({ card_key: d.f, gallery_user_id: userId, liker_user_id: currentUser }, { onConflict: 'card_key,gallery_user_id,liker_user_id' })
+                        }
+                      }}
+                      style={{
+                        background: 'none', border: 'none', cursor: currentUser ? 'pointer' : 'default',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
+                        padding: '2px 4px', flexShrink: 0,
+                      }}
+                    >
+                      <span style={{ fontSize: 16, lineHeight: 1, transition: '0.15s', transform: likeInfo.liked ? 'scale(1.2)' : 'scale(1)' }}>
+                        {likeInfo.liked ? '❤️' : '🤍'}
+                      </span>
+                      {likeInfo.count > 0 && <span style={{ fontSize: 9, fontWeight: 800, color: likeInfo.liked ? '#e53935' : '#bbb' }}>{likeInfo.count}</span>}
+                    </button>
+                  )
+                })()}
+              </div>
             </div>
           ))}
         </div>
