@@ -957,11 +957,11 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
               onDragEnd={handleDragEnd}
               onTouchStart={() => d.isManuelle && handleTouchStart(i)}
               style={{
+              borderRadius: 8, padding: 8,
+              background: 'white', cursor: editMode && d.isManuelle ? 'grab' : editMode ? 'default' : 'pointer',
               ...((privateCards.has(d.f) && isOwner)
                 ? { border: '2px solid #e74c3c' }
                 : coloredBorder((d.collection_tag && tabSettings.get(d.collection_tag)?.color) || accent)),
-              borderRadius: 8, padding: 8,
-              background: 'white', cursor: editMode && d.isManuelle ? 'grab' : editMode ? 'default' : 'pointer',
               boxSizing: 'border-box',
               opacity: dragIdx === i ? 0.4 : privateCards.has(d.f) && isOwner ? 0.7 : 1,
               position: 'relative',
