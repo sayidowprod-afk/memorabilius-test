@@ -61,6 +61,7 @@ export default function SetDetailPage({ params }: { params: Promise<{ setId: str
       .from('card_set_entries')
       .select('variation')
       .eq('set_id', setId)
+      .limit(100000)
 
     if (!varData) { setLoading(false); return }
 
@@ -82,6 +83,7 @@ export default function SetDetailPage({ params }: { params: Promise<{ setId: str
         .from('card_set_entries')
         .select('id, player_name')
         .eq('set_id', setId)
+        .limit(100000)
 
       if (allEntries) {
         const entryIds = allEntries.map(e => e.id)
