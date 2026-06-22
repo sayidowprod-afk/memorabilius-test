@@ -107,10 +107,11 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
   }
 
   const loadPosts = async (uid: string | null) => {
-    const { data: ps } = await supabase.from('team_posts')
-      .select('*, profiles(id, display_name, avatar_url)')
+    const { data: ps, error: psErr } = await supabase.from('team_posts')
+      .select('*')
       .eq('team_id', parseInt(teamId))
       .order('created_at', { ascending: false })
+    console.log('[loadPosts]', { count: ps?.length, error: psErr })
     setPosts(ps || [])
 
     if (ps?.length) {
@@ -238,16 +239,15 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
 
   const createPost = async () => {
     if ((!newPost.trim() && !postCards.length) || !currentUser) return
-    const { data, error } = await supabase.from('team_posts').insert({
+    const { error } = await supabase.from('team_posts').insert({
       team_id: parseInt(teamId),
       user_id: currentUser,
       content: newPost.trim() || null,
       card_ids: postCards.map(c => c.id),
-    }).select('*, profiles(id, display_name, avatar_url)').single()
-    console.log('[createPost]', { data, error })
+    })
+    console.log('[createPost error]', error)
     setNewPost('')
     setPostCards([])
-    // Recharger tous les posts pour être sûr
     loadPosts(currentUser)
   }
 
