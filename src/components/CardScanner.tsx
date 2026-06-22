@@ -1050,6 +1050,8 @@ export default function CardScanner({ src, onResult, onFallback, onClose, frameR
     setApplying(true)
     const s = scaleRef.current
     const naturalCorners = corners.map(c => ({ x: c.x / s, y: c.y / s }))
+    console.log('[warp] scale:', s, 'natural img:', img.naturalWidth, 'x', img.naturalHeight)
+    console.log('[warp] corners natural:', naturalCorners)
     try {
       const blob = await warpCard(img, naturalCorners)
       onResult(blob)
