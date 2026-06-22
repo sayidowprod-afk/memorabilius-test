@@ -75,24 +75,7 @@ export default function Navbar() {
 
   return (
     <>
-      <div style={{
-        background: 'linear-gradient(90deg, #003DA6 0%, #1a56db 40%, #7c3aed 70%, #003DA6 100%)',
-        backgroundSize: '200% 100%',
-        animation: 'cafeSlide 4s linear infinite',
-        color: 'white',
-        textAlign: 'center',
-        padding: '10px 16px',
-        fontSize: 15,
-        fontWeight: 700,
-        letterSpacing: 0.3,
-        position: 'sticky',
-        top: 0,
-        zIndex: 201,
-      }}>
-        <style>{`@keyframes cafeSlide { 0%{background-position:0% 50%} 100%{background-position:200% 50%} }`}</style>
-        ☕ Bienvenue au Café des Cartes !&nbsp;&nbsp;🃏
-      </div>
-      <nav style={{ background: dark ? '#1a1a1a' : 'white', borderBottom: `1px solid ${dark ? '#2a2a2a' : '#eee'}`, padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60, position: 'sticky', top: 37, zIndex: 200 }}>
+      <nav style={{ background: dark ? '#1a1a1a' : 'white', borderBottom: `1px solid ${dark ? '#2a2a2a' : '#eee'}`, padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60, position: 'sticky', top: 0, zIndex: 200 }}>
         <Link href="/" style={{ display: 'flex', alignItems: 'center', background: dark ? 'white' : 'transparent', borderRadius: dark ? 8 : 0, padding: dark ? '3px 8px' : 0, transition: 'all 0.2s' }}>
           <img src="/memorabilius-logo.png" alt="Memorabilius" style={{ height: 30, width: 'auto' }} />
         </Link>
