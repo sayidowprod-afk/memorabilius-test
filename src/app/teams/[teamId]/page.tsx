@@ -42,6 +42,9 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
   const [postCards, setPostCards] = useState<any[]>([])
   const [showPostCardPicker, setShowPostCardPicker] = useState(false)
   const [showEmojiForPost, setShowEmojiForPost] = useState<number | null>(null)
+  const [comments, setComments] = useState<Record<number, any[]>>({})
+  const [showComments, setShowComments] = useState<Record<number, boolean>>({})
+  const [newComment, setNewComment] = useState<Record<number, string>>({})
 
   useEffect(() => { init() }, [teamId])
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
@@ -107,11 +110,10 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
   }
 
   const loadPosts = async (uid: string | null) => {
-    const { data: ps, error: psErr } = await supabase.from('team_posts')
-      .select('*')
+    const { data: ps } = await supabase.from('team_posts')
+      .select('*, profiles(id, display_name, avatar_url), team_post_comments(count)')
       .eq('team_id', parseInt(teamId))
       .order('created_at', { ascending: false })
-    console.log('[loadPosts]', { count: ps?.length, error: psErr })
     setPosts(ps || [])
 
     if (ps?.length) {
@@ -273,6 +275,35 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
       return { ...prev, [postId]: updated }
     })
     setShowEmojiForPost(null)
+  }
+
+  const deletePost = async (postId: number) => {
+    await supabase.from('team_posts').delete().eq('id', postId).eq('user_id', currentUser)
+    setPosts(prev => prev.filter(p => p.id !== postId))
+  }
+
+  const loadComments = async (postId: number) => {
+    const { data } = await supabase.from('team_post_comments')
+      .select('*, profiles(id, display_name, avatar_url)')
+      .eq('post_id', postId)
+      .order('created_at', { ascending: true })
+    setComments(prev => ({ ...prev, [postId]: data || [] }))
+    setShowComments(prev => ({ ...prev, [postId]: true }))
+  }
+
+  const addComment = async (postId: number) => {
+    const content = newComment[postId]?.trim()
+    if (!content || !currentUser) return
+    const { data } = await supabase.from('team_post_comments').insert({
+      post_id: postId, user_id: currentUser, content
+    }).select('*, profiles(id, display_name, avatar_url)').single()
+    if (data) setComments(prev => ({ ...prev, [postId]: [...(prev[postId] || []), data] }))
+    setNewComment(prev => ({ ...prev, [postId]: '' }))
+  }
+
+  const deleteComment = async (postId: number, commentId: number) => {
+    await supabase.from('team_post_comments').delete().eq('id', commentId).eq('user_id', currentUser)
+    setComments(prev => ({ ...prev, [postId]: (prev[postId] || []).filter(c => c.id !== commentId) }))
   }
 
   const postuler = async () => {
@@ -438,14 +469,20 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
           {posts.length === 0 && <div style={{ textAlign: 'center', padding: 60, color: '#bbb' }}>Aucun post pour l'instant.</div>}
           {posts.map(post => (
             <div key={post.id} style={{ background: 'white', borderRadius: 16, padding: 20, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+              {/* Header */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                 <img src={post.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.profiles?.display_name || 'U')}&background=003DA6&color=fff`}
                   style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover' }} alt="" />
-                <div>
-                  <Link href={`/galerie/${post.user_id}`} style={{ fontWeight: 800, color: '#111', textDecoration: 'none', fontSize: 14 }}>{post.profiles?.display_name}</Link>
+                <div style={{ flex: 1 }}>
+                  <Link href={`/galerie/${post.user_id}`} style={{ fontWeight: 800, color: '#111', textDecoration: 'none', fontSize: 14 }}>{post.profiles?.display_name || 'Membre'}</Link>
                   <div style={{ fontSize: 11, color: '#bbb' }}>{timeAgo(post.created_at)}</div>
                 </div>
+                {post.user_id === currentUser && (
+                  <button onClick={() => { if (confirm('Supprimer ce post ?')) deletePost(post.id) }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#e74c3c', fontSize: 16, padding: 4 }}>🗑️</button>
+                )}
               </div>
+              {/* Contenu */}
               {post.content && <p style={{ fontSize: 15, color: '#222', margin: '0 0 12px', lineHeight: 1.6 }}>{post.content}</p>}
               {post.card_ids?.length > 0 && <PostCardsPreview cardIds={post.card_ids} userId={post.user_id} />}
               {post.card_key && post.card_user_id && !post.card_ids?.length && <CardPreview cardKey={post.card_key} userId={post.card_user_id} />}
@@ -467,7 +504,7 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                       <div style={{ position: 'absolute', bottom: 36, left: 0, background: 'white', borderRadius: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.15)', padding: 8, display: 'flex', gap: 4, zIndex: 100 }}>
                         {EMOJIS.map(e => (
                           <button key={e} onClick={() => togglePostReaction(post.id, e)}
-                            style={{ fontSize: 20, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: 6, transition: 'background 0.1s' }}
+                            style={{ fontSize: 20, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: 6 }}
                             onMouseEnter={ev => (ev.currentTarget as HTMLButtonElement).style.background = '#f0f0f0'}
                             onMouseLeave={ev => (ev.currentTarget as HTMLButtonElement).style.background = 'none'}>{e}</button>
                         ))}
@@ -475,7 +512,43 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                     )}
                   </div>
                 )}
+                {/* Bouton commentaires */}
+                <button onClick={() => showComments[post.id] ? setShowComments(p => ({ ...p, [post.id]: false })) : loadComments(post.id)}
+                  style={{ marginLeft: 'auto', padding: '4px 10px', borderRadius: 20, border: '1.5px solid #e0e0e0', background: 'white', cursor: 'pointer', fontSize: 12, color: '#666', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  💬 {post.team_post_comments?.[0]?.count ?? 0}
+                </button>
               </div>
+              {/* Section commentaires */}
+              {showComments[post.id] && (
+                <div style={{ marginTop: 16, borderTop: '1px solid #f0f0f0', paddingTop: 16 }}>
+                  {(comments[post.id] || []).map(c => (
+                    <div key={c.id} style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'flex-start' }}>
+                      <img src={c.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.profiles?.display_name || 'U')}&background=003DA6&color=fff`}
+                        style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} alt="" />
+                      <div style={{ flex: 1, background: '#f5f7ff', borderRadius: 10, padding: '8px 12px' }}>
+                        <span style={{ fontWeight: 800, fontSize: 12, color: ACCENT }}>{c.profiles?.display_name || 'Membre'}</span>
+                        <span style={{ fontSize: 11, color: '#bbb', marginLeft: 8 }}>{timeAgo(c.created_at)}</span>
+                        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#222' }}>{c.content}</p>
+                      </div>
+                      {c.user_id === currentUser && (
+                        <button onClick={() => deleteComment(post.id, c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: 12, padding: 2, flexShrink: 0 }}>✕</button>
+                      )}
+                    </div>
+                  ))}
+                  {isMember && (
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                      <input value={newComment[post.id] || ''} onChange={e => setNewComment(p => ({ ...p, [post.id]: e.target.value }))}
+                        onKeyDown={e => e.key === 'Enter' && addComment(post.id)}
+                        placeholder="Ajouter un commentaire..."
+                        style={{ flex: 1, border: '1.5px solid #e0e0e0', borderRadius: 20, padding: '8px 14px', fontSize: 13, outline: 'none', fontFamily: 'Inter, sans-serif' }} />
+                      <button onClick={() => addComment(post.id)}
+                        style={{ background: ACCENT, color: 'white', border: 'none', borderRadius: 20, padding: '8px 16px', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+                        Envoyer
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
