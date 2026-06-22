@@ -22,10 +22,13 @@ type Request = {
 type Event = {
   id: number
   title: string
+  description: string | null
   date: string
   city: string
   country: string
   location_name: string | null
+  website: string | null
+  image_url?: string | null
 }
 
 export default function AdminEvenements() {
@@ -36,9 +39,11 @@ export default function AdminEvenements() {
   const [loading, setLoading] = useState(true)
   const [showAddManual, setShowAddManual] = useState(false)
   const [manualForm, setManualForm] = useState({ title: '', description: '', date: '', city: '', country: 'France', location_name: '', website: '', image_url: '' })
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null)
   const [saving, setSaving] = useState(false)
   const [uploadingImg, setUploadingImg] = useState(false)
   const imgInputRef = useRef<HTMLInputElement>(null)
+  const editImgInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -93,6 +98,19 @@ export default function AdminEvenements() {
     setUploadingImg(false)
     if (error) { alert('Erreur upload image : ' + error.message); return null }
     return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl
+  }
+
+  const saveEdit = async () => {
+    if (!editingEvent) return
+    setSaving(true)
+    await supabase.from('events').update({
+      title: editingEvent.title, description: editingEvent.description, date: editingEvent.date,
+      city: editingEvent.city, country: editingEvent.country, location_name: editingEvent.location_name,
+      website: editingEvent.website, image_url: editingEvent.image_url
+    }).eq('id', editingEvent.id)
+    setSaving(false)
+    setEditingEvent(null)
+    loadAll()
   }
 
   const addManual = async () => {
@@ -172,11 +190,17 @@ export default function AdminEvenements() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 40 }}>
                 {events.map(ev => (
                   <div key={ev.id} style={{ background: card, border: `1px solid ${border}`, borderRadius: 10, padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-                    <div>
-                      <p style={{ color: text, margin: 0, fontWeight: 700 }}>{ev.title}</p>
-                      <p style={{ color: sub, margin: '2px 0 0', fontSize: 13 }}>{formatDate(ev.date)} · {ev.city}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      {(ev as any).image_url && <img src={(ev as any).image_url} style={{ width: 48, height: 36, objectFit: 'cover', borderRadius: 6 }} />}
+                      <div>
+                        <p style={{ color: text, margin: 0, fontWeight: 700 }}>{ev.title}</p>
+                        <p style={{ color: sub, margin: '2px 0 0', fontSize: 13 }}>{formatDate(ev.date)} · {ev.city}</p>
+                      </div>
                     </div>
-                    <button onClick={() => deleteEvent(ev.id)} style={{ padding: '6px 14px', borderRadius: 8, background: 'none', border: `1px solid #e74c3c`, color: '#e74c3c', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>Supprimer</button>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => setEditingEvent(ev as any)} style={{ padding: '6px 14px', borderRadius: 8, background: 'none', border: `1px solid #003DA6`, color: '#003DA6', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>Modifier</button>
+                      <button onClick={() => deleteEvent(ev.id)} style={{ padding: '6px 14px', borderRadius: 8, background: 'none', border: `1px solid #e74c3c`, color: '#e74c3c', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>Supprimer</button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -204,6 +228,50 @@ export default function AdminEvenements() {
           </>
         )}
       </div>
+
+      {/* Modal édition événement */}
+      {editingEvent && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setEditingEvent(null)}>
+          <div style={{ background: card, borderRadius: 16, padding: 28, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <h2 style={{ color: text, margin: '0 0 20px', fontSize: 18, fontWeight: 800 }}>Modifier l'événement</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <input style={inp} placeholder="Nom *" value={editingEvent.title} onChange={e => setEditingEvent(ev => ev ? { ...ev, title: e.target.value } : ev)} />
+              <textarea style={{ ...inp, minHeight: 70, resize: 'vertical' }} placeholder="Description" value={editingEvent.description || ''} onChange={e => setEditingEvent(ev => ev ? { ...ev, description: e.target.value } : ev)} />
+              <input style={inp} type="date" value={editingEvent.date} onChange={e => setEditingEvent(ev => ev ? { ...ev, date: e.target.value } : ev)} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <input style={inp} placeholder="Ville *" value={editingEvent.city} onChange={e => setEditingEvent(ev => ev ? { ...ev, city: e.target.value } : ev)} />
+                <input style={inp} placeholder="Pays" value={editingEvent.country} onChange={e => setEditingEvent(ev => ev ? { ...ev, country: e.target.value } : ev)} />
+              </div>
+              <input style={inp} placeholder="Lieu" value={editingEvent.location_name || ''} onChange={e => setEditingEvent(ev => ev ? { ...ev, location_name: e.target.value } : ev)} />
+              <input style={inp} placeholder="Site web" value={(editingEvent as any).website || ''} onChange={e => setEditingEvent(ev => ev ? { ...ev, website: e.target.value } : ev)} />
+              <div>
+                <input ref={editImgInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={async e => {
+                  const file = e.target.files?.[0]; if (!file) return
+                  const url = await uploadEventImage(file)
+                  if (url) setEditingEvent(ev => ev ? { ...ev, image_url: url } : ev)
+                }} />
+                {editingEvent.image_url ? (
+                  <div style={{ position: 'relative', borderRadius: 8, overflow: 'hidden' }}>
+                    <img src={editingEvent.image_url} style={{ width: '100%', maxHeight: 160, objectFit: 'cover', display: 'block' }} />
+                    <button type="button" onClick={() => setEditingEvent(ev => ev ? { ...ev, image_url: undefined } : ev)} style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', width: 26, height: 26, color: 'white', cursor: 'pointer', fontWeight: 700 }}>✕</button>
+                    <button type="button" onClick={() => editImgInputRef.current?.click()} style={{ position: 'absolute', bottom: 6, right: 6, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: 8, padding: '4px 10px', color: 'white', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>Changer</button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => editImgInputRef.current?.click()} disabled={uploadingImg} style={{ width: '100%', padding: '10px', borderRadius: 8, border: `2px dashed ${border}`, background: 'none', color: sub, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                    {uploadingImg ? 'Upload...' : '🖼️ Ajouter une image'}
+                  </button>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                <button onClick={() => setEditingEvent(null)} style={{ flex: 1, padding: '11px', borderRadius: 8, border: `1px solid ${border}`, background: 'none', color: text, fontWeight: 600, cursor: 'pointer' }}>Annuler</button>
+                <button onClick={saveEdit} disabled={saving} style={{ flex: 2, padding: '11px', borderRadius: 8, background: '#003DA6', color: 'white', fontWeight: 700, border: 'none', cursor: 'pointer' }}>
+                  {saving ? 'Sauvegarde...' : 'Enregistrer'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal ajout manuel */}
       {showAddManual && (
