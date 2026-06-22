@@ -138,9 +138,8 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
     const { data } = await supabase.from('cartes_manuelles')
       .select('id, nom, annee, marque, image_recto, card_key')
       .eq('user_id', uid)
-      .not('image_recto', 'is', null)
       .order('created_at', { ascending: false })
-      .limit(50)
+      .limit(100)
     setMyCards(data || [])
   }
 
@@ -390,23 +389,36 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                   <button onClick={() => setPostCard(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#e74c3c', fontWeight: 700 }}>✕</button>
                 </div>
               )}
-              <div style={{ display: 'flex', gap: 8, marginTop: 10, justifyContent: 'flex-end' }}>
-                <button onClick={() => setShowPostCardPicker(!showPostCardPicker)}
-                  style={{ background: '#f0f4ff', color: ACCENT, border: 'none', borderRadius: 8, padding: '8px 14px', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
-                  🃏 Carte
-                </button>
-                <button onClick={createPost}
-                  style={{ background: ACCENT, color: 'white', border: 'none', borderRadius: 8, padding: '8px 20px', fontWeight: 700, cursor: 'pointer' }}>
-                  Publier
-                </button>
+              <div style={{ display: 'flex', gap: 8, marginTop: 10, justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {EMOJIS.map(e => (
+                    <button key={e} onClick={() => setNewPost(p => p + e)}
+                      style={{ fontSize: 18, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 3px', borderRadius: 6 }}
+                      onMouseEnter={ev => (ev.currentTarget as HTMLButtonElement).style.background = '#f0f0f0'}
+                      onMouseLeave={ev => (ev.currentTarget as HTMLButtonElement).style.background = 'none'}>{e}</button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => setShowPostCardPicker(!showPostCardPicker)}
+                    style={{ background: '#f0f4ff', color: ACCENT, border: 'none', borderRadius: 8, padding: '8px 14px', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+                    🃏 Carte
+                  </button>
+                  <button onClick={createPost}
+                    style={{ background: ACCENT, color: 'white', border: 'none', borderRadius: 8, padding: '8px 20px', fontWeight: 700, cursor: 'pointer' }}>
+                    Publier
+                  </button>
+                </div>
               </div>
               {showPostCardPicker && (
                 <div style={{ marginTop: 10, maxHeight: 200, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 6 }}>
                   {myCards.map(c => (
-                    <div key={c.id} onClick={() => { setPostCard(c); setShowPostCardPicker(false) }} style={{ cursor: 'pointer', borderRadius: 6, overflow: 'hidden', border: '2px solid transparent', transition: 'border-color 0.15s' }}
+                    <div key={c.id} onClick={() => { setPostCard(c); setShowPostCardPicker(false) }}
+                      style={{ cursor: 'pointer', borderRadius: 6, overflow: 'hidden', border: '2px solid transparent', transition: 'border-color 0.15s', background: '#f0f0f0', aspectRatio: '2.5/3.5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.borderColor = ACCENT}
                       onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'transparent'}>
-                      <img src={c.image_recto} style={{ width: '100%', aspectRatio: '2.5/3.5', objectFit: 'cover' }} alt={c.nom} />
+                      {c.image_recto
+                        ? <img src={c.image_recto} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={c.nom} />
+                        : <span style={{ fontSize: 10, color: '#999', textAlign: 'center', padding: 4 }}>{c.nom}</span>}
                     </div>
                   ))}
                 </div>
@@ -611,8 +623,11 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
           {showCardPicker && (
             <div style={{ padding: '8px 16px', borderTop: '1px solid #f0f0f0', maxHeight: 160, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(60px, 1fr))', gap: 4 }}>
               {myCards.map(c => (
-                <div key={c.id} onClick={() => { setPendingCard(c); setShowCardPicker(false) }} style={{ cursor: 'pointer', borderRadius: 4, overflow: 'hidden' }}>
-                  <img src={c.image_recto} style={{ width: '100%', aspectRatio: '2.5/3.5', objectFit: 'cover' }} alt={c.nom} />
+                <div key={c.id} onClick={() => { setPendingCard(c); setShowCardPicker(false) }}
+                  style={{ cursor: 'pointer', borderRadius: 4, overflow: 'hidden', background: '#f0f0f0', aspectRatio: '2.5/3.5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {c.image_recto
+                    ? <img src={c.image_recto} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={c.nom} />
+                    : <span style={{ fontSize: 9, color: '#999', textAlign: 'center', padding: 2 }}>{c.nom}</span>}
                 </div>
               ))}
             </div>
