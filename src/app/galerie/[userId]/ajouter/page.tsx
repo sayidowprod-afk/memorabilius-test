@@ -67,7 +67,7 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
 
     const scaleW = frameW / (displayW * absCos + displayH * absSin)
     const scaleH = frameH / (displayW * absSin + displayH * absCos)
-    const scale = Math.min(scaleW, scaleH)
+    const scale = Math.max(scaleW, scaleH)
 
     setImgTransform({ x: 0, y: 0, scale })
   }, [])
