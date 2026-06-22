@@ -745,28 +745,26 @@ async function warpCard(img: HTMLImageElement, corners: Pt[]): Promise<Blob> {
   // Angle de rotation (depuis le bord supérieur)
   const angle = Math.atan2(tr.y - tl.y, tr.x - tl.x)
 
-  // Portrait ou paysage ?
+  // Toujours sortir en portrait (600×840), rotation 90° si la carte est paysage
+  const OUT_W = 600, OUT_H = 840
   const isLandscape = w > h
-  const OUT_W = isLandscape ? 840 : 600
-  const OUT_H = isLandscape ? 600 : 840
+  // Pour une carte paysage, on pivote de 90° pour la mettre en portrait
+  const effectiveAngle = isLandscape ? angle - Math.PI / 2 : angle
+  const effectiveW = isLandscape ? h : w
+  const effectiveH = isLandscape ? w : h
 
   const outC = document.createElement('canvas')
   outC.width = OUT_W; outC.height = OUT_H
   const ctx = outC.getContext('2d')!
 
-  // Fond blanc (pas de zone noire si la carte dépasse légèrement)
   ctx.fillStyle = '#fff'
   ctx.fillRect(0, 0, OUT_W, OUT_H)
 
-  // Transformer : placer le centre du quadrilatère au centre de la sortie,
-  // dérotation, puis scale pour que la carte remplisse OUT_W × OUT_H
-  const scaleX = OUT_W / w
-  const scaleY = OUT_H / h
-  const scale  = Math.min(scaleX, scaleY)
+  const scale = Math.min(OUT_W / effectiveW, OUT_H / effectiveH)
 
   ctx.save()
   ctx.translate(OUT_W / 2, OUT_H / 2)
-  ctx.rotate(-angle)
+  ctx.rotate(-effectiveAngle)
   ctx.scale(scale, scale)
   ctx.drawImage(img, -cx, -cy)
   ctx.restore()
