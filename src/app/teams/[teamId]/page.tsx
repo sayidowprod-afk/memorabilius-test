@@ -111,17 +111,30 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
 
   const loadPosts = async (uid: string | null) => {
     const { data: ps } = await supabase.from('team_posts')
-      .select('*, profiles(id, display_name, avatar_url), team_post_comments(count)')
+      .select('*')
       .eq('team_id', parseInt(teamId))
       .order('created_at', { ascending: false })
-    setPosts(ps || [])
+    if (!ps?.length) { setPosts([]); return }
 
-    if (ps?.length) {
-      const ids = ps.map((p: any) => p.id)
-      const { data: reacts } = await supabase.from('team_post_reactions')
-        .select('*').in('post_id', ids)
-      buildPostReactions(reacts || [], ids, uid)
-    }
+    // Charger les profils des auteurs séparément
+    const userIds = [...new Set(ps.map((p: any) => p.user_id))]
+    const { data: profs } = await supabase.from('profiles')
+      .select('id, display_name, avatar_url').in('id', userIds)
+    const profMap = Object.fromEntries((profs || []).map((p: any) => [p.id, p]))
+    const postsWithProfiles = ps.map((p: any) => ({ ...p, profiles: profMap[p.user_id] || null }))
+
+    // Compter les commentaires
+    const { data: counts } = await supabase.from('team_post_comments')
+      .select('post_id').in('post_id', ps.map((p: any) => p.id))
+    const countMap: Record<number, number> = {}
+    for (const c of counts || []) countMap[c.post_id] = (countMap[c.post_id] || 0) + 1
+
+    setPosts(postsWithProfiles.map((p: any) => ({ ...p, commentCount: countMap[p.id] || 0 })))
+
+    const ids = ps.map((p: any) => p.id)
+    const { data: reacts } = await supabase.from('team_post_reactions')
+      .select('*').in('post_id', ids)
+    buildPostReactions(reacts || [], ids, uid)
   }
 
   const loadGalerie = async (membersList: any[]) => {
@@ -515,7 +528,7 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                 {/* Bouton commentaires */}
                 <button onClick={() => showComments[post.id] ? setShowComments(p => ({ ...p, [post.id]: false })) : loadComments(post.id)}
                   style={{ marginLeft: 'auto', padding: '4px 10px', borderRadius: 20, border: '1.5px solid #e0e0e0', background: 'white', cursor: 'pointer', fontSize: 12, color: '#666', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  💬 {post.team_post_comments?.[0]?.count ?? 0}
+                  💬 {post.commentCount ?? 0}
                 </button>
               </div>
               {/* Section commentaires */}
