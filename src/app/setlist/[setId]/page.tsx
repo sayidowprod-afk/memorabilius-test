@@ -90,14 +90,20 @@ export default function SetDetailPage({ params }: { params: Promise<{ setId: str
       if (allEntries) {
         const entryIds = allEntries.map(e => e.id)
 
-        const { data: completions } = await supabase
-          .from('user_set_completion')
-          .select('id, entry_id, manually_checked')
-          .eq('user_id', userId)
-          .in('entry_id', entryIds)
+        // Charger les completions en chunks (évite 400 si trop d'entry_ids)
+        const allCompletions: { id: string; entry_id: number; manually_checked: boolean }[] = []
+        const CHUNK = 500
+        for (let i = 0; i < entryIds.length; i += CHUNK) {
+          const { data: chunk } = await supabase
+            .from('user_set_completion')
+            .select('id, entry_id, manually_checked')
+            .eq('user_id', userId)
+            .in('entry_id', entryIds.slice(i, i + CHUNK))
+          if (chunk) allCompletions.push(...chunk)
+        }
 
-        if (completions) {
-          for (const c of completions) {
+        if (allCompletions.length) {
+          for (const c of allCompletions) {
             completedEntryIds.add(c.entry_id)
             completionDetails.set(c.entry_id, { id: c.id, manually_checked: c.manually_checked })
           }
