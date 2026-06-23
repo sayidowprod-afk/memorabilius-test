@@ -126,17 +126,6 @@ export default function SetDetailPage({ params }: { params: Promise<{ setId: str
             const cy = (c.annee||'').trim()
             return cy === yearStr || cy === yearNext || cy === yearPrev
           })
-          console.log('[automatch] set:', setData.year, setData.brand, setData.name)
-          console.log('[automatch] entries:', allEntries?.length, '| galerie this year:', cardsThisYear.length)
-          for (const c of cardsThisYear) {
-            const nb = norm(c.marque||''), ns = norm(setData.brand||'')
-            const brandOk = !setData.brand || !c.marque || nb.includes(ns) || ns.includes(nb)
-            const collToTest2 = c.collection || c.collection_tag || ''
-            const userWords2 = words(collToTest2)
-            const setNorm2 = norm(setData.name)
-            const collOk = !collToTest2 || userWords2.length === 0 || userWords2.some((w: string) => setNorm2.includes(w))
-            console.log(`  [${c.nom}] annee:${c.annee} coll:"${c.collection}" tag:"${c.collection_tag}" var:"${c.variation}" → brand:${brandOk} coll:${collOk}`)
-          }
 
           for (const e of allEntries) {
             if (completedEntryIds.has(e.id)) continue
@@ -183,17 +172,7 @@ export default function SetDetailPage({ params }: { params: Promise<{ setId: str
               }
             })
 
-            if (matched) {
-              completedEntryIds.add(e.id)
-              const matchCard = (galleryCards as any[]).find(card => {
-                const y = setData.year!
-                const yearStr = String(y), yearNext = `${y}-${String(y+1).slice(2)}`, yearPrev = `${y-1}-${yearStr.slice(2)}`
-                const norm2 = (s: string) => s?.toLowerCase().replace(/[^a-z0-9]/g, '') || ''
-                const cardYear = (card.annee||'').trim()
-                return norm2(card.nom) === norm2(e.player_name) && (cardYear === yearStr || cardYear === yearNext || cardYear === yearPrev)
-              })
-              console.log('[automatch] MATCH:', e.player_name, e.variation||'(base)', '←', matchCard?.nom, matchCard?.annee, matchCard?.coll, matchCard?.var)
-            }
+            if (matched) completedEntryIds.add(e.id)
           }
         }
 
