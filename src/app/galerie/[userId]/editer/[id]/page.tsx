@@ -206,31 +206,32 @@ export default function EditerCarte({ params }: { params: Promise<{ userId: stri
   const applyCropAndUpload = async () => {
     if (!cropModal || !containerRef.current || !imgRef.current) return
     const side = cropModal.side
+    const cropRatio = CARD_RATIO
     const container = containerRef.current
     const cw = container.clientWidth; const ch = container.clientHeight
-    const frameW = Math.min(cw * 0.82, ch * CARD_RATIO * 0.9)
-    const frameH = frameW / CARD_RATIO
+    const frameW = Math.min(cw * 0.82, ch * cropRatio * 0.9)
+    const frameH = frameW / cropRatio
     const img = imgRef.current
     const angleRad = (rotation * Math.PI) / 180
-    const absCos = Math.abs(Math.cos(angleRad)); const absSin = Math.abs(Math.sin(angleRad))
-    const rotW = img.naturalWidth * absCos + img.naturalHeight * absSin
-    const rotH = img.naturalWidth * absSin + img.naturalHeight * absCos
-    const srcCanvas = document.createElement('canvas')
-    srcCanvas.width = rotW; srcCanvas.height = rotH
-    const srcCtx = srcCanvas.getContext('2d')!
-    srcCtx.translate(rotW / 2, rotH / 2); srcCtx.rotate(angleRad)
-    srcCtx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2)
-    const displayedImgW = img.width * imgTransform.scale; const displayedImgH = img.height * imgTransform.scale
-    const cx = cw / 2; const cy = ch / 2
-    const imgCx = cx + imgTransform.x; const imgCy = cy + imgTransform.y
-    const frameX = cx - frameW / 2; const frameY = cy - frameH / 2
-    const relX = frameX - (imgCx - displayedImgW / 2); const relY = frameY - (imgCy - displayedImgH / 2)
-    const scaleToCanvas = rotW / displayedImgW
-    const cropX = relX * scaleToCanvas; const cropY = relY * scaleToCanvas
-    const cropW = frameW * scaleToCanvas; const cropH = frameH * scaleToCanvas
+    const frameX = (cw - frameW) / 2
+    const frameY = (ch - frameH) / 2
+    const cssDisplayedW = img.naturalWidth * imgTransform.scale
+    const rawPixelScale = img.naturalWidth / cssDisplayedW
+    const pixelScale = Math.min(rawPixelScale, 1200 / frameW)
+    const outCanvas = document.createElement('canvas')
+    outCanvas.width = Math.round(frameW * pixelScale)
+    outCanvas.height = Math.round(frameH * pixelScale)
+    const outCtx = outCanvas.getContext('2d')!
+    outCtx.translate(
+      (cw / 2 + imgTransform.x - frameX) * pixelScale,
+      (ch / 2 + imgTransform.y - frameY) * pixelScale
+    )
+    outCtx.rotate(angleRad)
+    outCtx.scale(imgTransform.scale * pixelScale, imgTransform.scale * pixelScale)
+    outCtx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2)
     const finalCanvas = document.createElement('canvas')
     finalCanvas.width = 600; finalCanvas.height = 840
-    finalCanvas.getContext('2d')!.drawImage(srcCanvas, cropX, cropY, cropW, cropH, 0, 0, 600, 840)
+    finalCanvas.getContext('2d')!.drawImage(outCanvas, 0, 0, 600, 840)
     setCropModal(null)
     finalCanvas.toBlob(async (blob) => {
       if (!blob) { setUploadingRecto(false); setUploadingVerso(false); return }

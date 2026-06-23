@@ -258,9 +258,10 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
     const frameX = (cw - frameW) / 2
     const frameY = (ch - frameH) / 2
 
-    // pixelScale : ratio pixels naturels / pixels CSS (pour sortir à haute résolution)
+    // pixelScale : ratio pixels naturels / pixels CSS, plafonné à 2× le final (600px max → 1200px)
     const cssDisplayedW = img.naturalWidth * imgTransform.scale
-    const pixelScale = img.naturalWidth / cssDisplayedW  // = 1 / imgTransform.scale
+    const rawPixelScale = img.naturalWidth / cssDisplayedW
+    const pixelScale = Math.min(rawPixelScale, 1200 / frameW)
 
     const outCanvas = document.createElement('canvas')
     outCanvas.width = Math.round(frameW * pixelScale)
