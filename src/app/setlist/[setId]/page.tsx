@@ -145,6 +145,8 @@ export default function SetDetailPage({ params }: { params: Promise<{ setId: str
           } catch { /* CSV indisponible, on ignore */ }
         }
 
+        const autoMatchedIds: number[] = []
+
         if (galleryCards.length && setData.year) {
           const norm = (s: string) => s?.toLowerCase().replace(/[^a-z0-9]/g, '') || ''
           const words = (s: string) => s?.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 2) || []
@@ -156,7 +158,8 @@ export default function SetDetailPage({ params }: { params: Promise<{ setId: str
             return cy === yearStr || cy === yearNext || cy === yearPrev
           })
 
-          console.log('[debug] galleryCards total:', (galleryCards as any[]).length, '| mogbo:', (galleryCards as any[]).filter((c:any) => c.nom?.toLowerCase().includes('mogbo')))
+          const mogboCards = (galleryCards as any[]).filter((c:any) => c.nom?.toLowerCase().includes('mogbo'))
+          console.log('[debug] galleryCards total:', (galleryCards as any[]).length, '| mogbo:', mogboCards.map((c:any) => `nom:${c.nom} annee:${c.annee} coll:${c.collection} var:${c.variation}`))
 
           for (const e of allEntries) {
             if (completedEntryIds.has(e.id)) continue
@@ -203,7 +206,20 @@ export default function SetDetailPage({ params }: { params: Promise<{ setId: str
               }
             })
 
-            if (matched) completedEntryIds.add(e.id)
+            if (matched) {
+              completedEntryIds.add(e.id)
+              autoMatchedIds.push(e.id)
+            }
+          }
+
+          // Persister les auto-matchs en base (sans écraser les coches manuelles)
+          if (autoMatchedIds.length > 0) {
+            const rows = autoMatchedIds.map(eid => ({
+              user_id: userId,
+              entry_id: eid,
+              manually_checked: false,
+            }))
+            await supabase.from('user_set_completion').upsert(rows, { onConflict: 'user_id,entry_id', ignoreDuplicates: true })
           }
         }
 
