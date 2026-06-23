@@ -4,7 +4,7 @@ import HomeHero from '@/components/HomeHero'
 import PodiumSection from '@/components/PodiumSection'
 import PWAInstall from '@/components/PWAInstall'
 
-export const revalidate = 300
+export const dynamic = 'force-dynamic'
 
 interface Card {
   img: string; name: string; variant: string; year: string
@@ -45,7 +45,7 @@ async function fetchPepites(profiles: { id: string; display_name: string; lien_c
   // Cartes CSV récentes
   await Promise.all(profiles.filter(p => p.lien_csv).map(async p => {
     try {
-      const r = await fetch(p.lien_csv!, { next: { revalidate: 300 } })
+      const r = await fetch(p.lien_csv!, { signal: AbortSignal.timeout(5000) })
       if (!r.ok) return
       const text = await r.text()
       const rows = text.split(/\r?\n/).filter(row => row.includes('http'))
