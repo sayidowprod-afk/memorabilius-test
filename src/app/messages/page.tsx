@@ -5,6 +5,34 @@ import { supabase } from '@/lib/supabase'
 import { useLang } from '@/lib/LangContext'
 import { useTheme } from '@/lib/ThemeContext'
 
+// Préfixe marqueur pour les messages contenant une image (évite une migration de schéma)
+const IMG_PREFIX = '[[img]]'
+const isImageMsg = (c: string) => typeof c === 'string' && c.startsWith(IMG_PREFIX)
+const imgUrlOf = (c: string) => c.slice(IMG_PREFIX.length)
+
+// Réduit une image à 1200px max et l'encode en JPEG pour limiter le poids
+function compressImage(file: File): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const max = 1200
+      let { width, height } = img
+      if (width > max || height > max) {
+        if (width >= height) { height = Math.round((height * max) / width); width = max }
+        else { width = Math.round((width * max) / height); height = max }
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width; canvas.height = height
+      canvas.getContext('2d')!.drawImage(img, 0, 0, width, height)
+      canvas.toBlob(b => (b ? resolve(b) : reject(new Error('compression échouée'))), 'image/jpeg', 0.85)
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image illisible')) }
+    img.src = url
+  })
+}
+
 function MessagesContent() {
   const { t } = useLang()
   const { dark } = useTheme()
@@ -22,7 +50,9 @@ function MessagesContent() {
   const [tradesMap, setTradesMap] = useState<Record<number, any>>({})
   const [loading, setLoading] = useState(true)
   const [contextTrade, setContextTrade] = useState<any>(null)
+  const [uploading, setUploading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const bg = dark ? '#1a1a1a' : 'white'
   const bgPanel = dark ? '#222' : 'white'
@@ -113,6 +143,30 @@ function MessagesContent() {
     loadConversations(userId)
   }
 
+  const sendPhoto = async (file: File) => {
+    if (!userId || !activeConv) return
+    setUploading(true)
+    try {
+      const blob = await compressImage(file)
+      const path = `messages/${userId}/${Date.now()}.jpg`
+      const { error } = await supabase.storage.from('avatars').upload(path, blob, { upsert: true, contentType: 'image/jpeg' })
+      if (error) { alert('Erreur upload : ' + error.message); return }
+      const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+      await supabase.from('messages').insert({
+        from_user_id: userId,
+        to_user_id: activeConv,
+        contenu: IMG_PREFIX + data.publicUrl,
+        trade_id: tradeParam ? parseInt(tradeParam) : null,
+      })
+      loadMessages(userId, activeConv)
+      loadConversations(userId)
+    } catch (e: any) {
+      alert('Erreur : ' + (e?.message || 'envoi impossible'))
+    } finally {
+      setUploading(false)
+    }
+  }
+
   const selectConv = (id: string) => {
     setActiveConv(id)
     if (userId) loadMessages(userId, id)
@@ -154,7 +208,7 @@ function MessagesContent() {
                     <span>{profiles[conv.id]?.display_name || '...'}</span>
                     {conv.unread > 0 && <span style={{ background: '#003DA6', color: 'white', borderRadius: '50%', width: 18, height: 18, fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}>{conv.unread}</span>}
                   </p>
-                  <p style={{ fontSize: 11, color: textMuted, margin: '2px 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{conv.lastMsg}</p>
+                  <p style={{ fontSize: 11, color: textMuted, margin: '2px 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{isImageMsg(conv.lastMsg) ? '📷 Photo' : conv.lastMsg}</p>
                 </div>
               </div>
             ))}
@@ -172,11 +226,20 @@ function MessagesContent() {
               {/* Header */}
               <div style={{ padding: '12px 16px', borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
                 <button onClick={() => setActiveConv(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: '#003DA6', padding: '0 8px 0 0', fontWeight: 700 }} className="msg-back">←</button>
-                <img src={profiles[activeConv]?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profiles[activeConv]?.display_name || 'U')}&background=003DA6&color=fff`}
-                  style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} alt="" />
-                <div>
-                  <p style={{ fontWeight: 800, fontSize: 14, margin: 0, color: textMain }}>{profiles[activeConv]?.display_name}</p>
-                  {contextTrade && <p style={{ fontSize: 11, color: '#003DA6', margin: 0 }}>Re: {contextTrade.titre}</p>}
+                <div
+                  onClick={() => router.push(`/galerie/${activeConv}`)}
+                  title="Voir la galerie"
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
+                >
+                  <img src={profiles[activeConv]?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profiles[activeConv]?.display_name || 'U')}&background=003DA6&color=fff`}
+                    style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} alt="" />
+                  <div>
+                    <p style={{ fontWeight: 800, fontSize: 14, margin: 0, color: textMain, textDecoration: 'underline', textDecorationColor: 'transparent', transition: 'text-decoration-color 0.15s' }}
+                      onMouseEnter={e => (e.currentTarget.style.textDecorationColor = textMain)}
+                      onMouseLeave={e => (e.currentTarget.style.textDecorationColor = 'transparent')}
+                    >{profiles[activeConv]?.display_name}</p>
+                    {contextTrade && <p style={{ fontSize: 11, color: '#003DA6', margin: 0 }}>Re: {contextTrade.titre}</p>}
+                  </div>
                 </div>
               </div>
 
@@ -208,17 +271,29 @@ function MessagesContent() {
                         )}
 
                         {/* Bulle de message */}
-                        <div style={{
-                          padding: '10px 14px', borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                          background: isMe ? bubbleMeBg : bubbleThemBg,
-                          color: isMe ? 'white' : bubbleThemText,
-                          fontSize: 13, lineHeight: 1.5,
-                        }}>
-                          <p style={{ margin: 0 }}>{msg.contenu}</p>
-                          <p style={{ margin: '4px 0 0', fontSize: 10, opacity: 0.6, textAlign: 'right' }}>
-                            {new Date(msg.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                        </div>
+                        {isImageMsg(msg.contenu) ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+                            <a href={imgUrlOf(msg.contenu)} target="_blank" rel="noopener noreferrer">
+                              <img src={imgUrlOf(msg.contenu)} alt="photo"
+                                style={{ maxWidth: 220, maxHeight: 280, borderRadius: 12, display: 'block', objectFit: 'cover' }} />
+                            </a>
+                            <span style={{ fontSize: 10, color: textMuted }}>
+                              {new Date(msg.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        ) : (
+                          <div style={{
+                            padding: '10px 14px', borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                            background: isMe ? bubbleMeBg : bubbleThemBg,
+                            color: isMe ? 'white' : bubbleThemText,
+                            fontSize: 13, lineHeight: 1.5,
+                          }}>
+                            <p style={{ margin: 0 }}>{msg.contenu}</p>
+                            <p style={{ margin: '4px 0 0', fontSize: 10, opacity: 0.6, textAlign: 'right' }}>
+                              {new Date(msg.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )
@@ -227,7 +302,24 @@ function MessagesContent() {
               </div>
 
               {/* Input */}
-              <div style={{ padding: '12px 20px', borderTop: `1px solid ${border}`, display: 'flex', gap: 10 }}>
+              <div style={{ padding: '12px 20px', borderTop: `1px solid ${border}`, display: 'flex', gap: 10, alignItems: 'center' }}>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) sendPhoto(f); e.target.value = '' }}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  title="Envoyer une photo"
+                  style={{
+                    background: 'none', border: `1px solid ${border}`, color: '#003DA6',
+                    width: 40, height: 40, borderRadius: 8, fontSize: 18, cursor: uploading ? 'default' : 'pointer',
+                    flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >{uploading ? '…' : '📷'}</button>
                 <input
                   value={newMsg}
                   onChange={e => setNewMsg(e.target.value)}
