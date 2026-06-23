@@ -109,12 +109,41 @@ export default function SetDetailPage({ params }: { params: Promise<{ setId: str
           }
         }
 
-        // Auto-match galerie
+        // Auto-match galerie (cartes_manuelles + CSV si présent)
         const { data: gc } = await supabase
           .from('cartes_manuelles')
           .select('nom, annee, marque, collection, collection_tag, variation')
           .eq('user_id', userId)
         galleryCards = gc || []
+
+        // Ajouter les cartes CSV si l'utilisateur en a un
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('lien_csv')
+          .eq('id', userId)
+          .single()
+        if (profileData?.lien_csv) {
+          try {
+            const r = await fetch(profileData.lien_csv + '&t=' + Date.now())
+            const text = await r.text()
+            const rows = text.split(/\r?\n/).slice(4)
+            const csvCards = rows
+              .map(row => {
+                const c = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/)
+                if (!c[0] || !c[0].includes('http')) return null
+                return {
+                  nom: c[2]?.trim() || '',
+                  annee: c[4]?.trim() || '',
+                  marque: c[5]?.trim() || '',
+                  collection: c[6]?.trim() || '',
+                  collection_tag: '',
+                  variation: c[7]?.trim() || '',
+                }
+              })
+              .filter(Boolean) as typeof galleryCards
+            galleryCards = [...galleryCards, ...csvCards]
+          } catch { /* CSV indisponible, on ignore */ }
+        }
 
         if (galleryCards.length && setData.year) {
           const norm = (s: string) => s?.toLowerCase().replace(/[^a-z0-9]/g, '') || ''
