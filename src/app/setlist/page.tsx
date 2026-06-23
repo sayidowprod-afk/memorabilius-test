@@ -19,6 +19,14 @@ interface GalleryCard {
   nom: string; annee: string; marque: string; collection: string; collection_tag: string; variation: string
 }
 
+interface SetCandidate {
+  setId: number; setName: string; setYear: number | null; entryId: number
+}
+
+interface UnmatchedCard extends GalleryCard {
+  candidates: SetCandidate[]
+}
+
 function CompletionBar({ pct }: { pct: number }) {
   const color = pct >= 80 ? '#2ecc71' : pct >= 40 ? '#f39c12' : pct > 0 ? '#3498db' : '#e0e0e0'
   return (
@@ -41,12 +49,35 @@ export default function SetlistPage() {
   const [syncProgress, setSyncProgress] = useState(0)
   const [syncDone, setSyncDone] = useState(false)
   const [newMatchCount, setNewMatchCount] = useState(0)
-  const [unmatchedCards, setUnmatchedCards] = useState<GalleryCard[]>([])
+  const [unmatchedCards, setUnmatchedCards] = useState<UnmatchedCard[]>([])
   const [showMissing, setShowMissing] = useState(false)
+  const [placingIdx, setPlacingIdx] = useState<number | null>(null)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null))
   }, [])
+
+  // Restaurer la liste des cartes non placées depuis le stockage local
+  useEffect(() => {
+    if (!userId) return
+    try {
+      const raw = localStorage.getItem(`setlist_unmatched_${userId}`)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed?.cards)) {
+          setUnmatchedCards(parsed.cards)
+          setSyncDone(true)
+        }
+      }
+    } catch {}
+  }, [userId])
+
+  const saveUnmatched = useCallback((cards: UnmatchedCard[]) => {
+    if (!userId) return
+    try {
+      localStorage.setItem(`setlist_unmatched_${userId}`, JSON.stringify({ cards, syncedAt: Date.now() }))
+    } catch {}
+  }, [userId])
 
   const loadSets = useCallback(async () => {
     setLoading(true)
@@ -221,9 +252,55 @@ export default function SetlistPage() {
     }
     setSyncProgress(88)
 
-    // 6. Cartes galerie NON placées dans aucun setlist
-    const unmatched = galleryCards.filter((_, i) => !matchedGalleryIdx.has(i))
+    // 6. Cartes galerie NON placées : on construit pour chacune les setlists candidats
+    // (même joueur + même année), pour permettre un placement manuel via menu déroulant.
+    const yearMatchesSet = (cardYear: string, setYear: number | null) => {
+      if (!setYear) return false
+      const ys = String(setYear), yn = `${setYear}-${String(setYear+1).slice(2)}`, yp = `${setYear-1}-${ys.slice(2)}`
+      const cy = (cardYear || '').trim()
+      return cy === ys || cy === yn || cy === yp
+    }
+
+    const unmatched: UnmatchedCard[] = []
+    for (let gi = 0; gi < galleryCards.length; gi++) {
+      if (matchedGalleryIdx.has(gi)) continue
+      const card = galleryCards[gi]
+      const playerEntries = entriesByPlayer.get(norm(card.nom)) || []
+      const coll = (card.collection || card.collection_tag || '').trim()
+      const uw = words(coll)
+
+      // Une entrée par set (on garde celle dont la variation colle le mieux)
+      const bySet = new Map<number, { entryId: number; varMatch: boolean }>()
+      for (const e of playerEntries) {
+        const set = setsMap.get(e.set_id)
+        if (!set) continue
+        if (!yearMatchesSet(card.annee, set.year)) continue
+        const cv = (card.variation || '').trim(), ev = (e.variation || '').trim()
+        const varMatch = !cv ? !ev : !!ev && (norm(cv).includes(norm(ev)) || norm(ev).includes(norm(cv)) || words(cv).some(w => norm(ev).includes(w)))
+        const prev = bySet.get(e.set_id)
+        // priorité : entrée dont la variation matche, sinon entrée de base (ev vide), sinon la première
+        if (!prev || (varMatch && !prev.varMatch) || (!ev && !prev.varMatch)) {
+          bySet.set(e.set_id, { entryId: e.id, varMatch })
+        }
+      }
+
+      const candidates: SetCandidate[] = [...bySet.entries()].map(([setId, v]) => {
+        const set = setsMap.get(setId)!
+        return { setId, setName: set.name, setYear: set.year, entryId: v.entryId }
+      })
+
+      // Tri : sets dont le nom contient un mot de la collection en premier, puis alphabétique
+      candidates.sort((a, b) => {
+        const am = uw.some(w => norm(a.setName).includes(w)) ? 0 : 1
+        const bm = uw.some(w => norm(b.setName).includes(w)) ? 0 : 1
+        if (am !== bm) return am - bm
+        return a.setName.localeCompare(b.setName)
+      })
+
+      unmatched.push({ ...card, candidates })
+    }
     setUnmatchedCards(unmatched)
+    saveUnmatched(unmatched)
 
     // 7. Sauvegarde des nouveaux matches
     for (let i = 0; i < newRows.length; i += 500)
@@ -234,6 +311,21 @@ export default function SetlistPage() {
     setSyncDone(true)
     setSyncing(false)
     await loadSets()
+  }
+
+  // Placer manuellement une carte non placée dans un setlist choisi
+  const placeCard = async (cardIdx: number, entryId: number) => {
+    if (!userId) return
+    setPlacingIdx(cardIdx)
+    const { error } = await supabase.from('user_set_completion')
+      .upsert({ user_id: userId, entry_id: entryId, manually_checked: true }, { onConflict: 'user_id,entry_id' })
+    if (!error) {
+      const updated = unmatchedCards.filter((_, i) => i !== cardIdx)
+      setUnmatchedCards(updated)
+      saveUnmatched(updated)
+      await loadSets()
+    }
+    setPlacingIdx(null)
   }
 
   // Saisons disponibles (triées desc)
@@ -309,7 +401,7 @@ export default function SetlistPage() {
               </h2>
               <button onClick={() => setShowMissing(false)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#aaa' }}>✕</button>
             </div>
-            {!syncDone ? (
+            {!syncDone && unmatchedCards.length === 0 ? (
               <div style={{ textAlign: 'center', color: '#888', padding: '30px 0' }}>
                 Lance une synchronisation pour voir quelles cartes de ta galerie ne sont pas dans un setlist.
               </div>
@@ -320,11 +412,11 @@ export default function SetlistPage() {
             ) : (
               <>
                 <p style={{ color: '#888', fontSize: 13, marginBottom: 16 }}>
-                  {unmatchedCards.length} carte{unmatchedCards.length !== 1 ? 's' : ''} de ta galerie sans correspondance dans les setlists.
+                  {unmatchedCards.length} carte{unmatchedCards.length !== 1 ? 's' : ''} sans correspondance. Choisis un setlist pour la placer.
                 </p>
                 {unmatchedCards.map((card, i) => (
-                  <div key={i} style={{ padding: '10px 0', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                    <div>
+                  <div key={i} style={{ padding: '12px 0', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <div style={{ flex: 1, minWidth: 180 }}>
                       <div style={{ fontWeight: 700, fontSize: 14, color: '#111' }}>
                         {card.nom || '—'}
                         {card.variation && <span style={{ fontWeight: 400, color: '#888', marginLeft: 6 }}>{card.variation}</span>}
@@ -333,9 +425,24 @@ export default function SetlistPage() {
                         {[card.annee, card.marque, card.collection].filter(Boolean).join(' · ')}
                       </div>
                     </div>
-                    <span style={{ fontSize: 11, color: '#e74c3c', fontWeight: 700, background: '#fff0f0', borderRadius: 6, padding: '3px 8px', whiteSpace: 'nowrap' }}>
-                      non placée
-                    </span>
+                    {placingIdx === i ? (
+                      <span style={{ fontSize: 12, color: '#003DA6', fontWeight: 700 }}>Placement...</span>
+                    ) : card.candidates && card.candidates.length > 0 ? (
+                      <select
+                        defaultValue=""
+                        onChange={e => { const v = Number(e.target.value); if (v) placeCard(i, v) }}
+                        style={{ fontSize: 13, padding: '7px 10px', borderRadius: 8, border: '1.5px solid #003DA6', color: '#003DA6', fontWeight: 600, background: 'white', cursor: 'pointer', maxWidth: 240 }}
+                      >
+                        <option value="">Placer dans… ({card.candidates.length})</option>
+                        {card.candidates.map(c => (
+                          <option key={c.entryId} value={c.entryId}>{c.setName}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span style={{ fontSize: 11, color: '#e74c3c', fontWeight: 700, background: '#fff0f0', borderRadius: 6, padding: '3px 8px', whiteSpace: 'nowrap' }}>
+                        aucun setlist
+                      </span>
+                    )}
                   </div>
                 ))}
               </>
