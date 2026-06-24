@@ -15,6 +15,10 @@ export default function CameraCapture({ onCapture, onClose, ratio }: Props) {
   const [ready, setReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const [torch, setTorch] = useState(false)
+  const torchRef = useRef(false)
+  const torchCapable = useRef(false)
+  const [focusPt, setFocusPt] = useState<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     navigator.mediaDevices.getUserMedia({
@@ -22,6 +26,9 @@ export default function CameraCapture({ onCapture, onClose, ratio }: Props) {
       audio: false,
     }).then(stream => {
       streamRef.current = stream
+      const track = stream.getVideoTracks()[0]
+      const caps = (track.getCapabilities?.() ?? {}) as any
+      if (caps.torch) torchCapable.current = true
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         videoRef.current.onloadedmetadata = () => setReady(true)
@@ -30,6 +37,34 @@ export default function CameraCapture({ onCapture, onClose, ratio }: Props) {
 
     return () => { streamRef.current?.getTracks().forEach(t => t.stop()) }
   }, [])
+
+  const toggleTorch = async () => {
+    const track = streamRef.current?.getVideoTracks()[0]
+    if (!track || !torchCapable.current) return
+    const next = !torchRef.current
+    try {
+      await (track as any).applyConstraints({ advanced: [{ torch: next }] })
+      torchRef.current = next
+      setTorch(next)
+    } catch { /* non supporté */ }
+  }
+
+  const handleTapFocus = async (e: React.MouseEvent<HTMLVideoElement> | React.TouchEvent<HTMLVideoElement>) => {
+    const track = streamRef.current?.getVideoTracks()[0]
+    if (!track || !ready) return
+    const video = videoRef.current!
+    const rect = video.getBoundingClientRect()
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY
+    const x = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+    const y = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height))
+    // Indicateur visuel de mise au point
+    setFocusPt({ x: clientX - rect.left, y: clientY - rect.top })
+    setTimeout(() => setFocusPt(null), 900)
+    try {
+      await (track as any).applyConstraints({ advanced: [{ focusMode: 'manual', pointOfInterest: { x, y } }] })
+    } catch { /* non supporté sur cet appareil */ }
+  }
 
   const capture = () => {
     const video = videoRef.current
@@ -91,6 +126,7 @@ export default function CameraCapture({ onCapture, onClose, ratio }: Props) {
 
   const content = (
     <div style={{ position: 'fixed', inset: 0, background: 'black', zIndex: 9999, display: 'flex', flexDirection: 'column' }}>
+      <style>{`@keyframes focusFade { 0%{opacity:1;transform:scale(1)} 60%{opacity:1;transform:scale(0.85)} 100%{opacity:0;transform:scale(0.8)} }`}</style>
       {error ? (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white', gap: 16 }}>
           <p style={{ fontSize: 16 }}>{error}</p>
@@ -98,14 +134,29 @@ export default function CameraCapture({ onCapture, onClose, ratio }: Props) {
         </div>
       ) : (
         <>
-          {/* Vidéo */}
+          {/* Vidéo — tap pour faire la mise au point */}
           <video
             ref={videoRef}
             autoPlay
             playsInline
             muted
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+            onClick={handleTapFocus}
+            onTouchStart={handleTapFocus}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'crosshair' }}
           />
+
+          {/* Indicateur de mise au point */}
+          {focusPt && (
+            <div style={{
+              position: 'absolute',
+              left: focusPt.x - 28, top: focusPt.y - 28,
+              width: 56, height: 56,
+              border: '2px solid #ffeb3b',
+              borderRadius: 4,
+              pointerEvents: 'none',
+              animation: 'focusFade 0.9s ease forwards',
+            }} />
+          )}
 
           {/* Overlay sombre avec découpe */}
           {ready && (
@@ -121,8 +172,22 @@ export default function CameraCapture({ onCapture, onClose, ratio }: Props) {
             <button onClick={capture} disabled={!ready}
               style={{ width: 72, height: 72, borderRadius: '50%', background: ready ? 'white' : '#666', border: '4px solid rgba(255,255,255,0.5)', cursor: ready ? 'pointer' : 'default', boxShadow: '0 0 0 3px white' }}>
             </button>
-            <div style={{ width: 48 }} />
+            {torchCapable.current ? (
+              <button onClick={toggleTorch}
+                title={torch ? 'Éteindre la lampe' : 'Allumer la lampe'}
+                style={{ width: 48, height: 48, borderRadius: '50%', background: torch ? 'rgba(255,235,59,0.35)' : 'rgba(255,255,255,0.2)', border: `2px solid ${torch ? '#ffeb3b' : 'white'}`, color: torch ? '#ffeb3b' : 'white', fontSize: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {torch ? '🔦' : '💡'}
+              </button>
+            ) : (
+              <div style={{ width: 48 }} />
+            )}
           </div>
+
+          {ready && (
+            <p style={{ position: 'absolute', top: 16, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: 0, pointerEvents: 'none' }}>
+              Touchez l'écran pour faire la mise au point
+            </p>
+          )}
 
           {!ready && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

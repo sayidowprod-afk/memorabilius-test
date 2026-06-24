@@ -167,6 +167,30 @@ async function detectCardOpenCV(img: HTMLImageElement, cv: any): Promise<Pt[] | 
     }
   }
 
+  // ── Méthode C : CLAHE + Canny (éclairage non uniforme, reflets) ─────────
+  // CLAHE normalise le contraste local → les méthodes A/B échouent sur fond
+  // gradient ou avec un reflet sur un côté de la carte ; CLAHE corrige cela.
+  if (!best) {
+    try {
+      const clahe    = cv.createCLAHE(3.0, new cv.Size(8, 8))
+      const enhanced = new cv.Mat()
+      clahe.apply(blur, enhanced)
+      clahe.delete()
+      for (const [lo, hi] of [[20, 60], [35, 100], [60, 150]]) {
+        const edges   = new cv.Mat()
+        const dilated = new cv.Mat()
+        cv.Canny(enhanced, edges, lo, hi)
+        const kernel = cv.Mat.ones(5, 5, cv.CV_8U)
+        cv.dilate(edges, dilated, kernel)
+        kernel.delete()
+        best = extractQuads(dilated)
+        edges.delete(); dilated.delete()
+        if (best) break
+      }
+      enhanced.delete()
+    } catch { /* createCLAHE non disponible dans cette version OpenCV.js */ }
+  }
+
   src.delete(); gray.delete(); blur.delete()
   return best
 }
@@ -659,7 +683,9 @@ async function detectCard(img: HTMLImageElement): Promise<Pt[] | null> {
     } finally { clearTimeout(t) }
 
     if (res!.ok) {
-      const { topLeft: tl, topRight: tr, bottomRight: br, bottomLeft: bl } = await res!.json()
+      const { topLeft: tl, topRight: tr, bottomRight: br, bottomLeft: bl, confidence } = await res!.json()
+      // Reject low-confidence Gemini results → let OpenCV try
+      if (confidence !== null && confidence !== undefined && confidence < 0.55) throw new Error('low confidence')
       if (tl && tr && br && bl) {
         const corners: Pt[] = [
           { x: tl.x * W, y: tl.y * H },
@@ -731,45 +757,67 @@ function gaussElim(A: number[][], b: number[]): number[] {
 }
 
 async function warpCard(img: HTMLImageElement, corners: Pt[]): Promise<Blob> {
-  // corners = [TL, TR, BR, BL] en coordonnées naturelles de l'image
+  // Vraie correction perspective par homographie inverse + interpolation bilinéaire.
+  // Remplace l'ancienne approche rotation/scale qui ne corrigeait pas la déformation
+  // d'une carte photographiée en biais.
   const [tl, tr, br, bl] = corners
 
-  // Centre du quadrilatère
-  const cx = (tl.x + tr.x + br.x + bl.x) / 4
-  const cy = (tl.y + tr.y + br.y + bl.y) / 4
+  const avgW = (Math.hypot(tr.x - tl.x, tr.y - tl.y) + Math.hypot(br.x - bl.x, br.y - bl.y)) / 2
+  const avgH = (Math.hypot(bl.x - tl.x, bl.y - tl.y) + Math.hypot(br.x - tr.x, br.y - tr.y)) / 2
 
-  // Largeur et hauteur moyennes
-  const w = (Math.hypot(tr.x - tl.x, tr.y - tl.y) + Math.hypot(br.x - bl.x, br.y - bl.y)) / 2
-  const h = (Math.hypot(bl.x - tl.x, bl.y - tl.y) + Math.hypot(br.x - tr.x, br.y - tr.y)) / 2
-
-  // Angle de rotation (depuis le bord supérieur)
-  const angle = Math.atan2(tr.y - tl.y, tr.x - tl.x)
-
-  // Toujours sortir en portrait (600×840), rotation 90° si la carte est paysage
   const OUT_W = 600, OUT_H = 840
-  const isLandscape = w > h
-  // Pour une carte paysage, on pivote de 90° pour la mettre en portrait
-  const effectiveAngle = isLandscape ? angle - Math.PI / 2 : angle
-  const effectiveW = isLandscape ? h : w
-  const effectiveH = isLandscape ? w : h
+  const isLandscape = avgW > avgH
+
+  // Destination toujours portrait 600×840.
+  // Paysage → pivote 90° CW : TL→(600,0) TR→(600,840) BR→(0,840) BL→(0,0)
+  const dst: Pt[] = isLandscape
+    ? [{ x: OUT_W, y: 0 }, { x: OUT_W, y: OUT_H }, { x: 0, y: OUT_H }, { x: 0, y: 0 }]
+    : [{ x: 0, y: 0 }, { x: OUT_W, y: 0 }, { x: OUT_W, y: OUT_H }, { x: 0, y: OUT_H }]
+
+  // Homographie inverse : pixel de sortie → pixel source (inverse mapping)
+  const Hi = computeHomography(dst, corners)
+  const [h0, h1, h2, h3, h4, h5, h6, h7] = Hi  // h8 = 1 (fixé par convention)
+
+  // Image source en pleine résolution
+  const srcC = document.createElement('canvas')
+  srcC.width = img.naturalWidth; srcC.height = img.naturalHeight
+  srcC.getContext('2d')!.drawImage(img, 0, 0)
+  const srcPx = srcC.getContext('2d')!.getImageData(0, 0, img.naturalWidth, img.naturalHeight).data
+  const IW = img.naturalWidth, IH = img.naturalHeight
 
   const outC = document.createElement('canvas')
   outC.width = OUT_W; outC.height = OUT_H
-  const ctx = outC.getContext('2d')!
+  const ctx  = outC.getContext('2d')!
+  const out  = ctx.createImageData(OUT_W, OUT_H)
 
-  ctx.fillStyle = '#fff'
-  ctx.fillRect(0, 0, OUT_W, OUT_H)
+  for (let dy = 0; dy < OUT_H; dy++) {
+    for (let dx = 0; dx < OUT_W; dx++) {
+      const denom = h6 * dx + h7 * dy + 1
+      const sx    = (h0 * dx + h1 * dy + h2) / denom
+      const sy    = (h3 * dx + h4 * dy + h5) / denom
+      const oi    = (dy * OUT_W + dx) * 4
+      out.data[oi + 3] = 255
 
-  const scale = Math.min(OUT_W / effectiveW, OUT_H / effectiveH)
+      const x0 = sx | 0, y0 = sy | 0
+      if (x0 < 0 || y0 < 0 || x0 >= IW - 1 || y0 >= IH - 1) {
+        out.data[oi] = out.data[oi + 1] = out.data[oi + 2] = 255
+        continue
+      }
 
-  ctx.save()
-  ctx.translate(OUT_W / 2, OUT_H / 2)
-  ctx.rotate(-effectiveAngle)
-  ctx.scale(scale, scale)
-  ctx.drawImage(img, -cx, -cy)
-  ctx.restore()
+      // Interpolation bilinéaire
+      const fx = sx - x0, fy = sy - y0
+      const i00 = (y0 * IW + x0) * 4,         i10 = (y0 * IW + x0 + 1) * 4
+      const i01 = ((y0 + 1) * IW + x0) * 4,   i11 = ((y0 + 1) * IW + x0 + 1) * 4
+      const w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy)
+      const w01 = (1 - fx) * fy,       w11 = fx * fy
+      out.data[oi]     = w00 * srcPx[i00]     + w10 * srcPx[i10]     + w01 * srcPx[i01]     + w11 * srcPx[i11]
+      out.data[oi + 1] = w00 * srcPx[i00 + 1] + w10 * srcPx[i10 + 1] + w01 * srcPx[i01 + 1] + w11 * srcPx[i11 + 1]
+      out.data[oi + 2] = w00 * srcPx[i00 + 2] + w10 * srcPx[i10 + 2] + w01 * srcPx[i01 + 2] + w11 * srcPx[i11 + 2]
+    }
+  }
 
-  return new Promise(res => outC.toBlob(b => res(b!), 'image/jpeg', 0.90))
+  ctx.putImageData(out, 0, 0)
+  return new Promise(res => outC.toBlob(b => res(b!), 'image/jpeg', 0.92))
 }
 
 // ── Composant ────────────────────────────────────────────────────────────
@@ -1050,8 +1098,6 @@ export default function CardScanner({ src, onResult, onFallback, onClose, frameR
     setApplying(true)
     const s = scaleRef.current
     const naturalCorners = corners.map(c => ({ x: c.x / s, y: c.y / s }))
-    console.log('[warp] scale:', s, 'natural img:', img.naturalWidth, 'x', img.naturalHeight)
-    console.log('[warp] corners natural:', naturalCorners)
     try {
       const blob = await warpCard(img, naturalCorners)
       onResult(blob)
