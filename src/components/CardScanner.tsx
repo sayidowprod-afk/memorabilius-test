@@ -548,6 +548,7 @@ async function imageToBase64(img: HTMLImageElement, maxSize = 800): Promise<{ b6
   c.width = W; c.height = H
   c.getContext('2d')!.drawImage(img, 0, 0, W, H)
   const dataUrl = c.toDataURL('image/jpeg', 0.85)
+  c.width = 0
   return { b64: dataUrl.split(',')[1], scale }
 }
 
@@ -798,6 +799,7 @@ async function warpCard(img: HTMLImageElement, corners: Pt[]): Promise<Blob> {
   srcC.width = IW; srcC.height = IH
   srcC.getContext('2d')!.drawImage(img, 0, 0, IW, IH)
   const srcPx = srcC.getContext('2d')!.getImageData(0, 0, IW, IH).data
+  srcC.width = 0 // libère le backing store
   // Homographie inverse sur les coins à l'échelle réduite
   const scaledCorners = corners.map(p => ({ x: p.x * srcScale, y: p.y * srcScale }))
   const [h0, h1, h2, h3, h4, h5, h6, h7] = computeHomography(dst, scaledCorners)
@@ -834,7 +836,7 @@ async function warpCard(img: HTMLImageElement, corners: Pt[]): Promise<Blob> {
   }
 
   ctx.putImageData(out, 0, 0)
-  return new Promise(res => outC.toBlob(b => res(b!), 'image/jpeg', 0.92))
+  return new Promise(res => outC.toBlob(b => { outC.width = 0; res(b!) }, 'image/jpeg', 0.92))
 }
 
 // ── Composant ────────────────────────────────────────────────────────────
@@ -970,15 +972,21 @@ export default function CardScanner({ src, onResult, onFallback, onClose, frameR
     const rotW = Math.ceil(Math.abs(W * Math.cos(rad)) + Math.abs(H * Math.sin(rad)))
     const rotH = Math.ceil(Math.abs(W * Math.sin(rad)) + Math.abs(H * Math.cos(rad)))
 
+    // Cap à 1500px — rotation 45° sur 4K = ~5000×5000 = 100MB → OOM mobile
+    const MAX_ROT = 1500
+    const rs = Math.min(1, MAX_ROT / Math.max(rotW, rotH))
+    const cW = Math.round(rotW * rs), cH = Math.round(rotH * rs)
+
     const rotC = document.createElement('canvas')
-    rotC.width = rotW; rotC.height = rotH
+    rotC.width = cW; rotC.height = cH
     const rotCtx = rotC.getContext('2d')!
-    rotCtx.translate(rotW / 2, rotH / 2)
+    rotCtx.translate(cW / 2, cH / 2)
     rotCtx.rotate(rad)
-    rotCtx.drawImage(origImg, -W / 2, -H / 2)
+    rotCtx.drawImage(origImg, -Math.round(W * rs) / 2, -Math.round(H * rs) / 2, Math.round(W * rs), Math.round(H * rs))
 
     const newImg = new Image()
-    newImg.src = rotC.toDataURL('image/jpeg', 0.95)
+    newImg.src = rotC.toDataURL('image/jpeg', 0.92)
+    rotC.width = 0 // libère le backing store canvas
     await new Promise(r => { newImg.onload = r })
     imgRef.current = newImg
     await initCanvas(newImg)
