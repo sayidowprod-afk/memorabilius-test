@@ -81,11 +81,21 @@ export default function SetlistPage() {
 
   const loadSets = useCallback(async () => {
     setLoading(true)
-    const { data: setsData } = await supabase
-      .from('card_sets')
-      .select('id, tcdb_id, name, year, brand, sport, total_cards')
-      .eq('sport', 'nba')
-      .order('year', { ascending: false })
+
+    // Pagination obligatoire — Supabase max_rows=1000 par requête sans .range()
+    const allRaw: any[] = []
+    for (let from = 0; ; from += 1000) {
+      const { data: page } = await supabase
+        .from('card_sets')
+        .select('id, tcdb_id, name, year, brand, sport, total_cards')
+        .eq('sport', 'nba')
+        .order('year', { ascending: false })
+        .range(from, from + 999)
+      if (!page?.length) break
+      allRaw.push(...page)
+      if (page.length < 1000) break
+    }
+    const setsData = allRaw.length ? allRaw : null
 
     if (!setsData) { setLoading(false); return }
 
@@ -159,9 +169,15 @@ export default function SetlistPage() {
     await supabase.from('user_set_completion').delete().eq('user_id', userId).eq('manually_checked', false)
     setSyncProgress(10)
 
-    // 2. Tous les sets (métadonnées)
-    const { data: allSetsData } = await supabase.from('card_sets').select('id, name, year, brand').eq('sport', 'nba')
-    const setsMap = new Map((allSetsData || []).map(s => [s.id, s]))
+    // 2. Tous les sets (métadonnées) — paginé pour dépasser la limite max_rows=1000
+    const allSetsData: { id: number; name: string; year: number | null; brand: string | null }[] = []
+    for (let from = 0; ; from += 1000) {
+      const { data: page } = await supabase.from('card_sets').select('id, name, year, brand').eq('sport', 'nba').range(from, from + 999)
+      if (!page?.length) break
+      allSetsData.push(...page)
+      if (page.length < 1000) break
+    }
+    const setsMap = new Map(allSetsData.map(s => [s.id, s]))
     setSyncProgress(15)
 
     // 3. Entrées pour nos joueurs (par chunks de 30 noms)
