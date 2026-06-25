@@ -24,7 +24,7 @@ export default function Navbar() {
       fontSize: 12, fontWeight: 700, color: dark ? '#ddd' : '#666',
       display: 'flex', alignItems: 'center', gap: 4,
     }}>
-      {lang === 'fr' ? 'EN' : 'FR'}
+      {lang === 'fr' ? '🇬🇧 EN' : '🇫🇷 FR'}
     </button>
   )
 
@@ -103,18 +103,18 @@ export default function Navbar() {
                 {t('nav_messages')} <Badge count={unread} />
               </Link>
               <Link href="/notifications" style={{ color: dark ? '#ddd' : '#444', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                Notifs <Badge count={notifs} />
+                🔔 <Badge count={notifs} />
               </Link>
               <Link href="/profil" style={{ color: dark ? '#ddd' : '#444', fontWeight: 600 }}>{t('nav_profil')}</Link>
               <LangToggle />
-              <button onClick={toggle} style={{ background: 'none', border: `1px solid ${dark ? '#555' : '#ddd'}`, borderRadius: 20, padding: '4px 12px', cursor: 'pointer', fontSize: 14 }}>{dark ? 'Clair' : 'Sombre'}</button>
+              <button onClick={toggle} style={{ background: 'none', border: `1px solid ${dark ? '#555' : '#ddd'}`, borderRadius: 20, padding: '4px 12px', cursor: 'pointer', fontSize: 14 }}>{dark ? '☀️' : '🌙'}</button>
               <button onClick={handleLogout} className="btn-main btn-secondary" style={{ padding: '8px 16px', fontSize: 13 }}>{t('nav_deconnexion')}</button>
             </>
           ) : (
             <>
               <Link href="/connexion" style={{ color: dark ? '#ddd' : '#444', fontWeight: 600 }}>{t('nav_connexion')}</Link>
               <LangToggle />
-              <button onClick={toggle} style={{ background: 'none', border: `1px solid ${dark ? '#555' : '#ddd'}`, borderRadius: 20, padding: '4px 12px', cursor: 'pointer', fontSize: 14 }}>{dark ? 'Clair' : 'Sombre'}</button>
+              <button onClick={toggle} style={{ background: 'none', border: `1px solid ${dark ? '#555' : '#ddd'}`, borderRadius: 20, padding: '4px 12px', cursor: 'pointer', fontSize: 14 }}>{dark ? '☀️' : '🌙'}</button>
               <Link href="/sinscrire" className="btn-main btn-primary" style={{ padding: '8px 16px', fontSize: 13 }}>{t('nav_inscription')}</Link>
             </>
           )}
@@ -145,8 +145,8 @@ export default function Navbar() {
               <Link href="/notifications" style={ls} onClick={() => setMenuOpen(false)}>Notifications <Badge count={notifs} /></Link>
               <Link href="/profil" style={ls} onClick={() => setMenuOpen(false)}>{t('nav_profil')}</Link>
               <div style={{ padding: '12px 0', borderBottom: `1px solid ${dark ? '#2a2a2a' : '#f5f5f5'}`, display: 'flex', gap: 8 }}>
-                <button onClick={toggle} style={{ flex: 1, background: dark ? '#2a2a2a' : '#f5f5f5', border: 'none', borderRadius: 8, padding: '10px', cursor: 'pointer', fontSize: 14, color: dark ? '#ddd' : '#333', fontWeight: 600 }}>{dark ? 'Mode clair' : 'Mode sombre'}</button>
-                <button onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')} style={{ flex: 1, background: dark ? '#2a2a2a' : '#f5f5f5', border: 'none', borderRadius: 8, padding: '10px', cursor: 'pointer', fontSize: 14, color: dark ? '#ddd' : '#333', fontWeight: 700 }}>{lang === 'fr' ? 'English' : 'Francais'}</button>
+                <button onClick={toggle} style={{ flex: 1, background: dark ? '#2a2a2a' : '#f5f5f5', border: 'none', borderRadius: 8, padding: '10px', cursor: 'pointer', fontSize: 14, color: dark ? '#ddd' : '#333', fontWeight: 600 }}>{dark ? '☀️' : '🌙'}</button>
+                <button onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')} style={{ flex: 1, background: dark ? '#2a2a2a' : '#f5f5f5', border: 'none', borderRadius: 8, padding: '10px', cursor: 'pointer', fontSize: 14, color: dark ? '#ddd' : '#333', fontWeight: 700 }}>{lang === 'fr' ? '🇬🇧 EN' : '🇫🇷 FR'}</button>
               </div>
               <div style={{ padding: '16px 0' }}>
                 <button onClick={handleLogout} style={{ width: '100%', background: '#003DA6', color: 'white', border: 'none', borderRadius: 8, padding: '12px', fontWeight: 700, cursor: 'pointer', fontSize: 15 }}>{t('nav_deconnexion')}</button>
@@ -156,8 +156,8 @@ export default function Navbar() {
             <>
               <Link href="/connexion" style={ls} onClick={() => setMenuOpen(false)}>{t('nav_connexion')}</Link>
               <div style={{ padding: '12px 0', borderBottom: `1px solid ${dark ? '#2a2a2a' : '#f5f5f5'}`, display: 'flex', gap: 8 }}>
-                <button onClick={toggle} style={{ flex: 1, background: dark ? '#2a2a2a' : '#f5f5f5', border: 'none', borderRadius: 8, padding: '10px', cursor: 'pointer', fontSize: 14, color: dark ? '#ddd' : '#333', fontWeight: 600 }}>{dark ? 'Mode clair' : 'Mode sombre'}</button>
-                <button onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')} style={{ flex: 1, background: dark ? '#2a2a2a' : '#f5f5f5', border: 'none', borderRadius: 8, padding: '10px', cursor: 'pointer', fontSize: 14, color: dark ? '#ddd' : '#333', fontWeight: 700 }}>{lang === 'fr' ? 'English' : 'Francais'}</button>
+                <button onClick={toggle} style={{ flex: 1, background: dark ? '#2a2a2a' : '#f5f5f5', border: 'none', borderRadius: 8, padding: '10px', cursor: 'pointer', fontSize: 14, color: dark ? '#ddd' : '#333', fontWeight: 600 }}>{dark ? '☀️' : '🌙'}</button>
+                <button onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')} style={{ flex: 1, background: dark ? '#2a2a2a' : '#f5f5f5', border: 'none', borderRadius: 8, padding: '10px', cursor: 'pointer', fontSize: 14, color: dark ? '#ddd' : '#333', fontWeight: 700 }}>{lang === 'fr' ? '🇬🇧 EN' : '🇫🇷 FR'}</button>
               </div>
               <div style={{ padding: '16px 0' }}>
                 <Link href="/sinscrire" style={{ display: 'block', background: '#003DA6', color: 'white', borderRadius: 8, padding: '12px', fontWeight: 700, fontSize: 15, textAlign: 'center', textDecoration: 'none' }} onClick={() => setMenuOpen(false)}>{t('nav_inscription')}</Link>
