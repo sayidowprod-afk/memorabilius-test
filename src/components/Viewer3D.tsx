@@ -10,13 +10,13 @@ import BookletViewer from '@/components/BookletViewer'
 
 interface Card {
   f: string; b: string; n: string; t: string; y: string
-  br: string; s: string; v: string; num: string
+  br: string; s: string; v: string; num: string; card_number?: string
   auto: boolean; rc: boolean; patch: boolean; g: string
   isManuelle?: boolean; id_manuelle?: string; collection_tag?: string
   booklet?: boolean; il?: string; ir?: string
 }
 
-export default function Viewer3D({ popup, accent, onClose, getTags, userId, userSlug, isOwner, onCollectionTagChange }: {
+export default function Viewer3D({ popup, accent, onClose, getTags, userId, userSlug, isOwner, onCollectionTagChange, onAddToMyGallery }: {
   popup: Card
   accent: string
   onClose: () => void
@@ -26,6 +26,7 @@ export default function Viewer3D({ popup, accent, onClose, getTags, userId, user
   isOwner?: boolean
   currentUserId?: string
   onCollectionTagChange?: (card: Card, tag: string) => void
+  onAddToMyGallery?: () => Promise<'added' | 'duplicate'>
 }) {
   const { dark } = useTheme()
   const bg = dark ? '#1a1a1a' : '#fff'
@@ -57,6 +58,7 @@ export default function Viewer3D({ popup, accent, onClose, getTags, userId, user
   const rafRef = useRef<number>(0)
   const [showVideo, setShowVideo] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [addState, setAddState] = useState<'idle' | 'loading' | 'added' | 'duplicate'>('idle')
   const { lang } = useLang()
 
   const handleShare = () => {
@@ -288,6 +290,29 @@ export default function Viewer3D({ popup, accent, onClose, getTags, userId, user
               </button>
             )}
           </div>
+
+          {/* Ajouter à ma galerie — visiteur connecté seulement */}
+          {!isOwner && onAddToMyGallery && (
+            <div style={{ marginTop: 10 }}>
+              <button
+                disabled={addState === 'loading' || addState === 'added' || addState === 'duplicate'}
+                onClick={async () => {
+                  setAddState('loading')
+                  const result = await onAddToMyGallery()
+                  setAddState(result)
+                }}
+                style={{
+                  width: '100%', border: 'none', borderRadius: 10, padding: '12px',
+                  fontWeight: 800, cursor: addState === 'idle' ? 'pointer' : 'default', fontSize: 14,
+                  background: addState === 'added' ? '#2e7d32' : addState === 'duplicate' ? (dark ? '#2a2a2a' : '#f0f0f0') : '#003DA6',
+                  color: addState === 'duplicate' ? (dark ? '#aaa' : '#666') : 'white',
+                  transition: '0.2s',
+                }}
+              >
+                {addState === 'loading' ? '...' : addState === 'added' ? (lang === 'fr' ? '✓ Ajoutée à ta galerie !' : '✓ Added to your gallery!') : addState === 'duplicate' ? (lang === 'fr' ? 'Déjà dans ta galerie' : 'Already in your gallery') : (lang === 'fr' ? '+ J\'ai cette carte' : '+ I have this card')}
+              </button>
+            </div>
+          )}
 
           <CardValueModule
             cardName={popup.n}

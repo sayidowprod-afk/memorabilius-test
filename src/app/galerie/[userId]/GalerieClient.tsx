@@ -1095,6 +1095,24 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
       {popup && (
         <Viewer3D popup={popup} accent={accent} onClose={() => setPopup(null)} getTags={getTags} userId={userId} userSlug={profile?.slug || userId}
           isOwner={isOwner} currentUserId={currentUser ?? undefined}
+          onAddToMyGallery={!isOwner && currentUser ? async () => {
+            const { data: existing } = await supabase.from('cartes_manuelles')
+              .select('id').eq('user_id', currentUser)
+              .eq('nom', popup.n).eq('collection', popup.s).eq('variation', popup.v || '')
+              .limit(1)
+            if (existing && existing.length > 0) return 'duplicate'
+            const verso = popup.b !== popup.f ? popup.b : null
+            await supabase.from('cartes_manuelles').insert({
+              user_id: currentUser,
+              nom: popup.n || null, equipe: popup.t || null, annee: popup.y || null,
+              marque: popup.br || null, collection: popup.s || null, variation: popup.v || null,
+              num: popup.num || null, card_number: popup.card_number || null,
+              auto: popup.auto, rc: popup.rc, patch: popup.patch, booklet: popup.booklet || false,
+              grade: popup.g || 'Raw',
+              image_recto: popup.f || null, image_verso: verso,
+            })
+            return 'added'
+          } : undefined}
           onCollectionTagChange={async (card, tag) => {
             if (card.isManuelle && card.id_manuelle) {
               await supabase.from('cartes_manuelles').update({ collection_tag: tag || null }).eq('id', card.id_manuelle)
