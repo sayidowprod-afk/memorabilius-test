@@ -1096,10 +1096,11 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
         <Viewer3D popup={popup} accent={accent} onClose={() => setPopup(null)} getTags={getTags} userId={userId} userSlug={profile?.slug || userId}
           isOwner={isOwner} currentUserId={currentUser ?? undefined}
           onAddToMyGallery={!isOwner && currentUser ? async () => {
-            const { data: existing } = await supabase.from('cartes_manuelles')
-              .select('id').eq('user_id', currentUser)
-              .eq('nom', popup.n).eq('collection', popup.s).eq('variation', popup.v || '')
-              .limit(1)
+            let dupQuery = supabase.from('cartes_manuelles')
+              .select('id').eq('user_id', currentUser).eq('nom', popup.n).eq('collection', popup.s || '')
+            if (popup.v) dupQuery = dupQuery.eq('variation', popup.v)
+            else dupQuery = (dupQuery as any).is('variation', null)
+            const { data: existing } = await dupQuery.limit(1)
             if (existing && existing.length > 0) return 'duplicate'
             const verso = popup.b !== popup.f ? popup.b : null
             await supabase.from('cartes_manuelles').insert({
