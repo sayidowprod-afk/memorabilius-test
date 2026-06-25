@@ -8,13 +8,13 @@ export default function HomeHero({ total, totalCartes }: { total: number; totalC
   const { dark } = useTheme()
 
   const steps = lang === 'fr' ? [
-    { n: 1, title: 'Préparez votre Google Sheet', desc: "Utilisez notre modèle pré-rempli pour lister vos cartes (photos, noms, variations). C'est votre base de données personnelle.", link: 'https://docs.google.com/spreadsheets/d/1_3HVVrWiKq8IVO0x2_AIrhkiJBY3p-wAuAxXO7Eb8N8/copy', linkText: '📄 Créer ma copie du modèle →' },
-    { n: 2, title: 'Publiez au format CSV', desc: 'Dans Google Sheets, allez dans Fichier > Partager > Publier sur le Web. Choisissez le format "Valeurs séparées par des virgules (.csv)".' },
-    { n: 3, title: 'Liez et admirez', desc: 'Collez votre lien CSV dans votre profil Memorabilius. Votre galerie 3D interactive est générée instantanément.', link: '/sinscrire', linkText: "S'inscrire maintenant →" },
+    { n: 1, title: 'Crée ton compte', desc: "Inscris-toi gratuitement en quelques secondes. Ton profil devient ta vitrine de collectionneur.", link: '/sinscrire', linkText: "Créer mon compte →" },
+    { n: 2, title: 'Ajoute tes cartes', desc: "Prends en photo ta carte, l'IA reconnaît le joueur, l'année et la variation automatiquement. Tu n'as plus qu'à valider.", link: '/tuto', linkText: "Voir le tutoriel →" },
+    { n: 3, title: 'Suis ta collection', desc: "Compare ta galerie à la Setlist NBA, vois ce qu'il te manque, partage ton profil et échange avec d'autres collectionneurs.", link: '/setlist', linkText: "Explorer la Setlist →" },
   ] : [
-    { n: 1, title: 'Prepare your Google Sheet', desc: "Use our pre-filled template to list your cards (photos, names, variants). It's your personal database.", link: 'https://docs.google.com/spreadsheets/d/1_3HVVrWiKq8IVO0x2_AIrhkiJBY3p-wAuAxXO7Eb8N8/copy', linkText: '📄 Create my copy →' },
-    { n: 2, title: 'Publish as CSV', desc: 'In Google Sheets, go to File > Share > Publish to Web. Choose "Comma-separated values (.csv)" format.' },
-    { n: 3, title: 'Link and admire', desc: 'Paste your CSV link in your Memorabilius profile. Your interactive 3D gallery is generated instantly.', link: '/sinscrire', linkText: 'Sign up now →' },
+    { n: 1, title: 'Create your account', desc: "Sign up for free in seconds. Your profile becomes your collector showcase.", link: '/sinscrire', linkText: "Create my account →" },
+    { n: 2, title: 'Add your cards', desc: "Take a photo of your card, AI automatically recognizes the player, year and variation. Just confirm and save.", link: '/tuto', linkText: "See the tutorial →" },
+    { n: 3, title: 'Track your collection', desc: "Compare your gallery to the NBA Setlist, see what you are missing, share your profile and trade with other collectors.", link: '/setlist', linkText: "Explore the Setlist →" },
   ]
 
   return (

@@ -24,13 +24,13 @@ export default function Navbar() {
       fontSize: 12, fontWeight: 700, color: dark ? '#ddd' : '#666',
       display: 'flex', alignItems: 'center', gap: 4,
     }}>
-      {lang === 'fr' ? 'ðŸ‡¬ðŸ‡§ EN' : 'ðŸ‡«ðŸ‡· FR'}
+      {lang === 'fr' ? 'EN' : 'FR'}
     </button>
   )
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user ?? null)  // null = confirmÃ© dÃ©connectÃ©
+      setUser(data.user ?? null)
       if (data.user) { loadUnread(data.user.id); loadNotifs(data.user.id); updateLastSeen(data.user.id) }
     })
     const { data: listener } = supabase.auth.onAuthStateChange((_e, session) => {
@@ -89,13 +89,12 @@ export default function Navbar() {
           <Link href="/tuto" style={{ color: dark ? '#ddd' : '#444', fontWeight: 600 }}>{t('nav_tuto')}</Link>
           <Link href="/setlist" style={{ color: dark ? '#ddd' : '#444', fontWeight: 600 }}>Setlist</Link>
           <Link href="/evenements" style={{ color: dark ? '#ddd' : '#444', fontWeight: 600 }}>Events</Link>
-          {/* Pendant le chargement auth (undefined) : placeholder invisible de mÃªme taille */}
           {user === undefined ? (
             <div style={{ visibility: 'hidden', display: 'flex', gap: 20, alignItems: 'center' }}>
               <span style={{ fontWeight: 600 }}>Ma galerie</span>
               <span style={{ fontWeight: 600 }}>Messages</span>
               <span style={{ fontWeight: 600 }}>Profil</span>
-              <button className="btn-main btn-secondary" style={{ padding: '8px 16px', fontSize: 13 }}>DÃ‰CONNEXION</button>
+              <button className="btn-main btn-secondary" style={{ padding: '8px 16px', fontSize: 13 }}>Connexion</button>
             </div>
           ) : user ? (
             <>
@@ -104,18 +103,18 @@ export default function Navbar() {
                 {t('nav_messages')} <Badge count={unread} />
               </Link>
               <Link href="/notifications" style={{ color: dark ? '#ddd' : '#444', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                ðŸ”” <Badge count={notifs} />
+                Notifs <Badge count={notifs} />
               </Link>
               <Link href="/profil" style={{ color: dark ? '#ddd' : '#444', fontWeight: 600 }}>{t('nav_profil')}</Link>
               <LangToggle />
-              <button onClick={toggle} style={{ background: 'none', border: `1px solid ${dark ? '#555' : '#ddd'}`, borderRadius: 20, padding: '4px 12px', cursor: 'pointer', fontSize: 14 }}>{dark ? 'â˜€ï¸' : 'ðŸŒ™'}</button>
+              <button onClick={toggle} style={{ background: 'none', border: `1px solid ${dark ? '#555' : '#ddd'}`, borderRadius: 20, padding: '4px 12px', cursor: 'pointer', fontSize: 14 }}>{dark ? 'Clair' : 'Sombre'}</button>
               <button onClick={handleLogout} className="btn-main btn-secondary" style={{ padding: '8px 16px', fontSize: 13 }}>{t('nav_deconnexion')}</button>
             </>
           ) : (
             <>
               <Link href="/connexion" style={{ color: dark ? '#ddd' : '#444', fontWeight: 600 }}>{t('nav_connexion')}</Link>
               <LangToggle />
-              <button onClick={toggle} style={{ background: 'none', border: `1px solid ${dark ? '#555' : '#ddd'}`, borderRadius: 20, padding: '4px 12px', cursor: 'pointer', fontSize: 14 }}>{dark ? 'â˜€ï¸' : 'ðŸŒ™'}</button>
+              <button onClick={toggle} style={{ background: 'none', border: `1px solid ${dark ? '#555' : '#ddd'}`, borderRadius: 20, padding: '4px 12px', cursor: 'pointer', fontSize: 14 }}>{dark ? 'Clair' : 'Sombre'}</button>
               <Link href="/sinscrire" className="btn-main btn-primary" style={{ padding: '8px 16px', fontSize: 13 }}>{t('nav_inscription')}</Link>
             </>
           )}
@@ -138,16 +137,16 @@ export default function Navbar() {
           <Link href="/recherche" style={ls} onClick={() => setMenuOpen(false)}>{t('nav_recherche')}</Link>
           <Link href="/tuto" style={ls} onClick={() => setMenuOpen(false)}>{t('nav_tuto')}</Link>
           <Link href="/setlist" style={ls} onClick={() => setMenuOpen(false)}>Setlist</Link>
-          <Link href="/evenements" style={ls} onClick={() => setMenuOpen(false)}>ðŸ“… Events</Link>
+          <Link href="/evenements" style={ls} onClick={() => setMenuOpen(false)}>Events</Link>
           {user ? (
             <>
               <Link href={`/galerie/${user.id}`} style={ls} onClick={() => setMenuOpen(false)}>{t('nav_galerie')}</Link>
               <Link href="/messages" style={ls} onClick={() => setMenuOpen(false)}>{t('nav_messages')} <Badge count={unread} /></Link>
-              <Link href="/notifications" style={ls} onClick={() => setMenuOpen(false)}>ðŸ”” {t('nav_profil')} <Badge count={notifs} /></Link>
+              <Link href="/notifications" style={ls} onClick={() => setMenuOpen(false)}>Notifications <Badge count={notifs} /></Link>
               <Link href="/profil" style={ls} onClick={() => setMenuOpen(false)}>{t('nav_profil')}</Link>
               <div style={{ padding: '12px 0', borderBottom: `1px solid ${dark ? '#2a2a2a' : '#f5f5f5'}`, display: 'flex', gap: 8 }}>
-                <button onClick={toggle} style={{ flex: 1, background: dark ? '#2a2a2a' : '#f5f5f5', border: 'none', borderRadius: 8, padding: '10px', cursor: 'pointer', fontSize: 14, color: dark ? '#ddd' : '#333', fontWeight: 600 }}>{dark ? 'â˜€ï¸' : 'ðŸŒ™'}</button>
-                <button onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')} style={{ flex: 1, background: dark ? '#2a2a2a' : '#f5f5f5', border: 'none', borderRadius: 8, padding: '10px', cursor: 'pointer', fontSize: 14, color: dark ? '#ddd' : '#333', fontWeight: 700 }}>{lang === 'fr' ? 'ðŸ‡¬ðŸ‡§ EN' : 'ðŸ‡«ðŸ‡· FR'}</button>
+                <button onClick={toggle} style={{ flex: 1, background: dark ? '#2a2a2a' : '#f5f5f5', border: 'none', borderRadius: 8, padding: '10px', cursor: 'pointer', fontSize: 14, color: dark ? '#ddd' : '#333', fontWeight: 600 }}>{dark ? 'Mode clair' : 'Mode sombre'}</button>
+                <button onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')} style={{ flex: 1, background: dark ? '#2a2a2a' : '#f5f5f5', border: 'none', borderRadius: 8, padding: '10px', cursor: 'pointer', fontSize: 14, color: dark ? '#ddd' : '#333', fontWeight: 700 }}>{lang === 'fr' ? 'English' : 'Francais'}</button>
               </div>
               <div style={{ padding: '16px 0' }}>
                 <button onClick={handleLogout} style={{ width: '100%', background: '#003DA6', color: 'white', border: 'none', borderRadius: 8, padding: '12px', fontWeight: 700, cursor: 'pointer', fontSize: 15 }}>{t('nav_deconnexion')}</button>
@@ -157,8 +156,8 @@ export default function Navbar() {
             <>
               <Link href="/connexion" style={ls} onClick={() => setMenuOpen(false)}>{t('nav_connexion')}</Link>
               <div style={{ padding: '12px 0', borderBottom: `1px solid ${dark ? '#2a2a2a' : '#f5f5f5'}`, display: 'flex', gap: 8 }}>
-                <button onClick={toggle} style={{ flex: 1, background: dark ? '#2a2a2a' : '#f5f5f5', border: 'none', borderRadius: 8, padding: '10px', cursor: 'pointer', fontSize: 14, color: dark ? '#ddd' : '#333', fontWeight: 600 }}>{dark ? 'â˜€ï¸' : 'ðŸŒ™'}</button>
-                <button onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')} style={{ flex: 1, background: dark ? '#2a2a2a' : '#f5f5f5', border: 'none', borderRadius: 8, padding: '10px', cursor: 'pointer', fontSize: 14, color: dark ? '#ddd' : '#333', fontWeight: 700 }}>{lang === 'fr' ? 'ðŸ‡¬ðŸ‡§ EN' : 'ðŸ‡«ðŸ‡· FR'}</button>
+                <button onClick={toggle} style={{ flex: 1, background: dark ? '#2a2a2a' : '#f5f5f5', border: 'none', borderRadius: 8, padding: '10px', cursor: 'pointer', fontSize: 14, color: dark ? '#ddd' : '#333', fontWeight: 600 }}>{dark ? 'Mode clair' : 'Mode sombre'}</button>
+                <button onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')} style={{ flex: 1, background: dark ? '#2a2a2a' : '#f5f5f5', border: 'none', borderRadius: 8, padding: '10px', cursor: 'pointer', fontSize: 14, color: dark ? '#ddd' : '#333', fontWeight: 700 }}>{lang === 'fr' ? 'English' : 'Francais'}</button>
               </div>
               <div style={{ padding: '16px 0' }}>
                 <Link href="/sinscrire" style={{ display: 'block', background: '#003DA6', color: 'white', borderRadius: 8, padding: '12px', fontWeight: 700, fontSize: 15, textAlign: 'center', textDecoration: 'none' }} onClick={() => setMenuOpen(false)}>{t('nav_inscription')}</Link>
@@ -167,8 +166,6 @@ export default function Navbar() {
           )}
         </div>
       )}
-
     </>
   )
 }
-
