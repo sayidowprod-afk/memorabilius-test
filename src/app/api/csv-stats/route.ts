@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from 'next/server'
 export async function GET(req: NextRequest) {
   const url = req.nextUrl.searchParams.get('url')
   if (!url) return NextResponse.json({ error: 'No URL' }, { status: 400 })
+  if (!url.startsWith('https://docs.google.com/spreadsheets/')) {
+    return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
+  }
 
   try {
     const r = await fetch(url, { next: { revalidate: 3600 } })

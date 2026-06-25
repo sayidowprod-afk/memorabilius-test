@@ -22,15 +22,28 @@ function cardMatchesWish(card: any, wish: any) {
   return true
 }
 
+async function verifyToken(req: NextRequest): Promise<string | null> {
+  const token = req.headers.get('authorization')?.replace('Bearer ', '')
+  if (!token) return null
+  const { data: { user } } = await supabase.auth.getUser(token)
+  return user?.id || null
+}
+
 // Appelé quand un user ajoute une carte à sa wishlist → notifier les possesseurs
 export async function POST(req: NextRequest) {
+  const callerId = await verifyToken(req)
+  if (!callerId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const { wishItem, wishUserId } = await req.json()
   if (!wishItem || !wishUserId) return NextResponse.json({ ok: false })
+  if (callerId !== wishUserId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+  // Filtrer par nom en SQL pour éviter un scan complet
   const { data: cards } = await supabase
     .from('cartes_manuelles')
     .select('user_id, nom, annee, marque, collection, image_recto')
     .neq('user_id', wishUserId)
+    .ilike('nom', wishItem.nom)
 
   const { data: wishUser } = await supabase
     .from('profiles')
@@ -60,13 +73,19 @@ export async function POST(req: NextRequest) {
 
 // Appelé quand un user ajoute une carte manuelle → notifier les wishlisteurs
 export async function PUT(req: NextRequest) {
+  const callerId = await verifyToken(req)
+  if (!callerId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const { card, cardUserId } = await req.json()
   if (!card || !cardUserId) return NextResponse.json({ ok: false })
+  if (callerId !== cardUserId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+  // Filtrer les wishlists par nom en SQL pour éviter un scan complet
   const { data: wishes } = await supabase
     .from('wishlist')
     .select('*')
     .neq('user_id', cardUserId)
+    .ilike('nom', card.nom)
 
   const { data: cardUser } = await supabase
     .from('profiles')

@@ -67,10 +67,12 @@ export default function PublicWishlist({ userId, accent, isOwner }: { userId: st
     if (data) {
       setItems(prev => [data, ...prev])
       // Notifier les collectionneurs qui ont cette carte
-      fetch('/api/wishlist-notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ wishItem: data, wishUserId: userId }),
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        fetch('/api/wishlist-notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ wishItem: data, wishUserId: userId }),
+        })
       })
     }
     setForm(empty)
