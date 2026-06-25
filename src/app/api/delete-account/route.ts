@@ -11,6 +11,12 @@ export async function DELETE(req: NextRequest) {
     const { userId } = await req.json()
     if (!userId) return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
 
+    // Vérifier que l'appelant est bien le propriétaire du compte
+    const token = req.headers.get('authorization')?.replace('Bearer ', '')
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { data: { user } } = await supabaseAdmin.auth.getUser(token)
+    if (!user || user.id !== userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
     // Supprimer toutes les données
     await supabaseAdmin.from('messages').delete().eq('from_user_id', userId)
     await supabaseAdmin.from('messages').delete().eq('to_user_id', userId)

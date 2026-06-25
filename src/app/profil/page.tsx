@@ -109,7 +109,8 @@ export default function Profil() {
     if (deleteConfirm !== 'SUPPRIMER' || !userId) return
     setDeleting(true)
     try {
-      const r = await fetch('/api/delete-account', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) })
+      const { data: { session } } = await supabase.auth.getSession()
+      const r = await fetch('/api/delete-account', { method: 'DELETE', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` }, body: JSON.stringify({ userId }) })
       if (r.ok) { await supabase.auth.signOut(); window.location.href = '/' }
       else { alert('Erreur lors de la suppression'); setDeleting(false) }
     } catch { alert('Erreur'); setDeleting(false) }

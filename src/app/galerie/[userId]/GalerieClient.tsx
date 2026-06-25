@@ -71,6 +71,7 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
   const [grailCards, setGrailCards] = useState<{ card_key: string; position: number }[]>([])
   const [grailSearch, setGrailSearch] = useState('')
   const [grailPickerOpen, setGrailPickerOpen] = useState(false)
+  const [addedCards, setAddedCards] = useState<Set<string>>(new Set())
   const loaderRef = useRef<HTMLDivElement>(null)
 
   const isOwner = currentUser === userId
@@ -557,7 +558,7 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
                         }}>✕</button>
                       )}
                       <div style={{ aspectRatio: '2.5/3.5', overflow: 'hidden' }}>
-                        <img src={card.f} alt={card.n} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        <img src={card.f} alt={card.n} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                       </div>
                       <div style={{ padding: '6px 8px' }}>
                         <p style={{ fontWeight: 800, fontSize: 10, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.n}</p>
@@ -637,7 +638,7 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
                                 onMouseLeave={e => { if (!isGradient(tabColor)) e.currentTarget.style.borderColor = tabColor + '55' }}
                               >
                                 <div style={{ aspectRatio: '2.5/3.5', overflow: 'hidden' }}>
-                                  <img src={card.f} alt={card.n} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                                  <img src={card.f} alt={card.n} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                                 </div>
                                 <div style={{ padding: '4px 6px', background: 'white' }}>
                                   <p style={{ fontWeight: 800, fontSize: 10, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.n}</p>
@@ -1086,6 +1087,22 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
               </div>
             ) : filtered.length > 0 ? (
               <p style={{ color: '#bbb', fontSize: 12 }}>{filtered.length} {t('gallery_total')}</p>
+            ) : cards.length === 0 ? (
+              <div style={{ padding: '60px 20px', textAlign: 'center' }}>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>🃏</div>
+                {isOwner ? (
+                  <>
+                    <p style={{ fontWeight: 800, fontSize: 16, marginBottom: 8 }}>Ta galerie est vide</p>
+                    <p style={{ color: '#999', fontSize: 13, marginBottom: 20 }}>Ajoute ta première carte ou connecte ton Google Sheets depuis le profil.</p>
+                    <a href={`/galerie/${userId}/ajouter`} style={{ background: '#003DA6', color: 'white', padding: '12px 24px', borderRadius: 50, fontWeight: 800, fontSize: 14, textDecoration: 'none', display: 'inline-block' }}>+ Ajouter une carte</a>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ fontWeight: 800, fontSize: 16, marginBottom: 8 }}>Galerie vide</p>
+                    <p style={{ color: '#999', fontSize: 13 }}>Ce collectionneur n'a pas encore ajouté de cartes.</p>
+                  </>
+                )}
+              </div>
             ) : null}
           </div>
         )}
@@ -1096,12 +1113,16 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
         <Viewer3D popup={popup} accent={accent} onClose={() => setPopup(null)} getTags={getTags} userId={userId} userSlug={profile?.slug || userId}
           isOwner={isOwner} currentUserId={currentUser ?? undefined}
           onAddToMyGallery={!isOwner && currentUser ? async () => {
+            if (addedCards.has(popup.f)) return 'duplicate'
             let dupQuery = supabase.from('cartes_manuelles')
               .select('id').eq('user_id', currentUser).eq('nom', popup.n).eq('collection', popup.s || '')
             if (popup.v) dupQuery = dupQuery.eq('variation', popup.v)
             else dupQuery = (dupQuery as any).is('variation', null)
             const { data: existing } = await dupQuery.limit(1)
-            if (existing && existing.length > 0) return 'duplicate'
+            if (existing && existing.length > 0) {
+              setAddedCards(prev => new Set(prev).add(popup.f))
+              return 'duplicate'
+            }
             const verso = popup.b !== popup.f ? popup.b : null
             await supabase.from('cartes_manuelles').insert({
               user_id: currentUser,
@@ -1112,8 +1133,10 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
               grade: popup.g || 'Raw',
               image_recto: popup.f || null, image_verso: verso,
             })
+            setAddedCards(prev => new Set(prev).add(popup.f))
             return 'added'
           } : undefined}
+          initialAddState={addedCards.has(popup.f) ? 'added' : 'idle'}
           onCollectionTagChange={async (card, tag) => {
             if (card.isManuelle && card.id_manuelle) {
               await supabase.from('cartes_manuelles').update({ collection_tag: tag || null }).eq('id', card.id_manuelle)

@@ -16,7 +16,7 @@ interface Card {
   booklet?: boolean; il?: string; ir?: string
 }
 
-export default function Viewer3D({ popup, accent, onClose, getTags, userId, userSlug, isOwner, onCollectionTagChange, onAddToMyGallery }: {
+export default function Viewer3D({ popup, accent, onClose, getTags, userId, userSlug, isOwner, onCollectionTagChange, onAddToMyGallery, initialAddState }: {
   popup: Card
   accent: string
   onClose: () => void
@@ -27,6 +27,7 @@ export default function Viewer3D({ popup, accent, onClose, getTags, userId, user
   currentUserId?: string
   onCollectionTagChange?: (card: Card, tag: string) => void
   onAddToMyGallery?: () => Promise<'added' | 'duplicate'>
+  initialAddState?: 'idle' | 'added' | 'duplicate'
 }) {
   const { dark } = useTheme()
   const bg = dark ? '#1a1a1a' : '#fff'
@@ -58,7 +59,7 @@ export default function Viewer3D({ popup, accent, onClose, getTags, userId, user
   const rafRef = useRef<number>(0)
   const [showVideo, setShowVideo] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [addState, setAddState] = useState<'idle' | 'loading' | 'added' | 'duplicate'>('idle')
+  const [addState, setAddState] = useState<'idle' | 'loading' | 'added' | 'duplicate'>(initialAddState ?? 'idle')
   const { lang } = useLang()
 
   const handleShare = () => {

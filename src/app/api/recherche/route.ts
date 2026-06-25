@@ -59,10 +59,10 @@ export async function GET(req: NextRequest) {
     })
   })
 
-  // Cartes CSV
-  await Promise.all(profiles.filter(p => p.lien_csv).map(async (p) => {
+  // Cartes CSV — max 20 profils, timeout 2.5s chacun
+  await Promise.all(profiles.filter(p => p.lien_csv).slice(0, 20).map(async (p) => {
     try {
-      const r = await fetch(p.lien_csv, { next: { revalidate: 3600 } })
+      const r = await fetch(p.lien_csv, { next: { revalidate: 3600 }, signal: AbortSignal.timeout(2500) })
       if (!r.ok) return
       const text = await r.text()
       const rows = text.split(/\r?\n/).slice(4)

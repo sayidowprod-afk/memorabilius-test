@@ -10,6 +10,9 @@ export async function POST(req: NextRequest) {
   try {
     const { userId, csvUrl } = await req.json()
     if (!userId) return NextResponse.json({ error: 'Missing params' }, { status: 400 })
+    if (csvUrl && !csvUrl.startsWith('https://docs.google.com/spreadsheets/')) {
+      return NextResponse.json({ error: 'Invalid CSV URL' }, { status: 400 })
+    }
 
     const stats = { total: 0, rc: 0, auto: 0, num: 0, patch: 0 }
 
