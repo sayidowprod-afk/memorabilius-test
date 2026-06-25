@@ -56,6 +56,7 @@ export default function SetlistPage() {
   const [placingIdx, setPlacingIdx] = useState<number | null>(null)
   const [gotoPickerIdx, setGotoPickerIdx] = useState<number | null>(null)
   const [gotoSetId, setGotoSetId] = useState<string>('')
+  const [gotoAllSets, setGotoAllSets] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -497,7 +498,26 @@ export default function SetlistPage() {
                   dans {setsWithCards} setlist{setsWithCards !== 1 ? 's' : ''}
                 </div>
                 <button
-                  onClick={() => setShowMissing(true)}
+                  onClick={async () => {
+                    // Retire du localStorage les cartes déjà placées manuellement depuis la dernière synchro
+                    if (userId && unmatchedCards.length > 0) {
+                      const { data: placed } = await supabase
+                        .from('user_set_completion')
+                        .select('entry_id')
+                        .eq('user_id', userId)
+                      if (placed?.length) {
+                        const placedIds = new Set(placed.map((r: any) => r.entry_id))
+                        const stillUnmatched = unmatchedCards.filter(c =>
+                          !c.candidates?.some((cd: any) => placedIds.has(cd.entryId))
+                        )
+                        if (stillUnmatched.length !== unmatchedCards.length) {
+                          setUnmatchedCards(stillUnmatched)
+                          saveUnmatched(stillUnmatched)
+                        }
+                      }
+                    }
+                    setShowMissing(true)
+                  }}
                   style={{ marginTop: 4, padding: '7px 14px', borderRadius: 8, border: '1.5px solid #003DA6', background: 'white', color: '#003DA6', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
                 >
                   {syncDone ? `Voir les cartes non placées (${unmatchedCards.length})` : 'Voir les cartes non placées →'}
@@ -550,17 +570,26 @@ export default function SetlistPage() {
                     </div>
                     {placingIdx === i ? (
                       <span style={{ fontSize: 12, color: '#003DA6', fontWeight: 700 }}>Placement...</span>
-                    ) : card.candidates && card.candidates.length > 0 ? (
-                      <select
-                        defaultValue=""
-                        onChange={e => { const v = Number(e.target.value); if (v) placeCard(i, v) }}
-                        style={{ fontSize: 13, padding: '7px 10px', borderRadius: 8, border: '1.5px solid #003DA6', color: '#003DA6', fontWeight: 600, background: 'white', cursor: 'pointer', maxWidth: 240 }}
-                      >
-                        <option value="">Placer dans… ({card.candidates.length})</option>
-                        {card.candidates.map(c => (
-                          <option key={c.entryId} value={c.entryId}>{c.setName}</option>
-                        ))}
-                      </select>
+                    ) : card.candidates && card.candidates.length > 0 && gotoPickerIdx !== i ? (
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <select
+                          defaultValue=""
+                          onChange={e => { const v = Number(e.target.value); if (v) placeCard(i, v) }}
+                          style={{ fontSize: 13, padding: '7px 10px', borderRadius: 8, border: '1.5px solid #003DA6', color: '#003DA6', fontWeight: 600, background: 'white', cursor: 'pointer', maxWidth: 200 }}
+                        >
+                          <option value="">Placer dans… ({card.candidates.length})</option>
+                          {card.candidates.map(c => (
+                            <option key={c.entryId} value={c.entryId}>{c.setName}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => { setGotoPickerIdx(i); setGotoSetId('') }}
+                          title="Choisir un autre set"
+                          style={{ fontSize: 12, padding: '6px 9px', borderRadius: 8, border: '1px solid #ccc', background: 'white', cursor: 'pointer', color: '#888', whiteSpace: 'nowrap' }}
+                        >
+                          Autre set →
+                        </button>
+                      </div>
                     ) : gotoPickerIdx === i ? (
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                         <select
@@ -570,11 +599,17 @@ export default function SetlistPage() {
                         >
                           <option value="">Choisir un set…</option>
                           {sets
-                            .filter(s => !card.annee || String(s.year) === card.annee || `${s.year}-${String((s.year||0)+1).slice(2)}` === card.annee)
+                            .filter(s => gotoAllSets || !card.annee || String(s.year) === card.annee || `${s.year}-${String((s.year||0)+1).slice(2)}` === card.annee)
                             .sort((a, b) => (b.year || 0) - (a.year || 0) || a.name.localeCompare(b.name))
                             .map(s => <option key={s.id} value={s.id}>{s.name}</option>)
                           }
                         </select>
+                        <button
+                          onClick={() => { setGotoAllSets(v => !v); setGotoSetId('') }}
+                          style={{ fontSize: 11, padding: '5px 8px', borderRadius: 6, border: '1px solid #ccc', background: gotoAllSets ? '#eee' : 'white', cursor: 'pointer', color: '#666', whiteSpace: 'nowrap' }}
+                        >
+                          {gotoAllSets ? 'Filtrés' : 'Tous'}
+                        </button>
                         {gotoSetId && (
                           <Link
                             href={`/setlist/${gotoSetId}`}
