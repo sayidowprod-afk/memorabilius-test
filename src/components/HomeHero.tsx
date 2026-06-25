@@ -1,19 +1,28 @@
 'use client'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { supabase } from '@/lib/supabase'
 import { useLang } from '@/lib/LangContext'
 import { useTheme } from '@/lib/ThemeContext'
 
 export default function HomeHero({ total, totalCartes }: { total: number; totalCartes: number }) {
   const { t, lang } = useLang()
   const { dark } = useTheme()
+  const [galerieHref, setGalerieHref] = useState('/sinscrire')
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) setGalerieHref(`/galerie/${data.user.id}/ajouter`)
+    })
+  }, [])
 
   const steps = lang === 'fr' ? [
     { n: 1, title: 'Crée ton compte', desc: "Inscris-toi gratuitement en quelques secondes. Ton profil devient ta vitrine de collectionneur.", link: '/sinscrire', linkText: "Créer mon compte →" },
-    { n: 2, title: 'Ajoute tes cartes', desc: "Prends en photo ta carte, l'IA reconnaît le joueur, l'année et la variation automatiquement. Tu n'as plus qu'à valider.", link: '/galerie', linkText: "Ajouter une carte →" },
+    { n: 2, title: 'Ajoute tes cartes', desc: "Prends en photo ta carte, l'IA reconnaît le joueur, l'année et la variation automatiquement. Tu n'as plus qu'à valider.", link: galerieHref, linkText: "Ajouter une carte →" },
     { n: 3, title: 'Suis ta collection', desc: "Compare ta galerie à la Setlist NBA, vois ce qu'il te manque, partage ton profil et échange avec d'autres collectionneurs.", link: '/setlist', linkText: "Explorer la Setlist →" },
   ] : [
     { n: 1, title: 'Create your account', desc: "Sign up for free in seconds. Your profile becomes your collector showcase.", link: '/sinscrire', linkText: "Create my account →" },
-    { n: 2, title: 'Add your cards', desc: "Take a photo of your card, AI automatically recognizes the player, year and variation. Just confirm and save.", link: '/galerie', linkText: "Add a card →" },
+    { n: 2, title: 'Add your cards', desc: "Take a photo of your card, AI automatically recognizes the player, year and variation. Just confirm and save.", link: galerieHref, linkText: "Add a card →" },
     { n: 3, title: 'Track your collection', desc: "Compare your gallery to the NBA Setlist, see what you are missing, share your profile and trade with other collectors.", link: '/setlist', linkText: "Explore the Setlist →" },
   ]
 
