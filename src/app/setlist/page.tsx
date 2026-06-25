@@ -68,7 +68,7 @@ export default function SetlistPage() {
     })
   }, [])
 
-  // Restaurer la liste des cartes non placées depuis le stockage local
+  // Restaurer la liste des cartes non placées + total synced depuis le stockage local
   useEffect(() => {
     if (!userId) return
     try {
@@ -80,6 +80,10 @@ export default function SetlistPage() {
           setSyncDone(true)
         }
       }
+    } catch {}
+    try {
+      const stored = localStorage.getItem(`setlist_synced_total_${userId}`)
+      if (stored) setTotalSynced(Number(stored))
     } catch {}
   }, [userId])
 
@@ -164,9 +168,6 @@ export default function SetlistPage() {
       if (setId) countBySet.set(setId, (countBySet.get(setId) || 0) + 1)
     })
 
-    // Total galerie synchro = seulement manually_checked = false (placées automatiquement)
-    const syncedCount = allCompletions.filter(c => !c.manually_checked).length
-    setTotalSynced(syncedCount)
 
     const enriched = setsData.map(s => {
       const owned = countBySet.get(s.id) || 0
@@ -459,6 +460,13 @@ export default function SetlistPage() {
     // 7. Sauvegarde des nouveaux matches
     for (let i = 0; i < newRows.length; i += 500)
       await supabase.from('user_set_completion').upsert(newRows.slice(i, i + 500), { onConflict: 'user_id,entry_id', ignoreDuplicates: true })
+
+    // Stocker le total de cartes galerie syncées (distinct du total user_set_completion)
+    const syncedTotal = matchedGalleryIdx.size
+    setTotalSynced(syncedTotal)
+    if (userId) {
+      try { localStorage.setItem(`setlist_synced_total_${userId}`, String(syncedTotal)) } catch {}
+    }
 
     setSyncProgress(100)
     setNewMatchCount(newRows.length)
