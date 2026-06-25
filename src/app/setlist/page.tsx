@@ -53,11 +53,12 @@ export default function SetlistPage() {
   const [newMatchCount, setNewMatchCount] = useState(0)
   const [unmatchedCards, setUnmatchedCards] = useState<UnmatchedCard[]>([])
   const [showMissing, setShowMissing] = useState(false)
+  const [showAddManual, setShowAddManual] = useState(false)
+  const [manualForm, setManualForm] = useState({ nom: '', annee: '', marque: '', collection: '', variation: '' })
   const [placingIdx, setPlacingIdx] = useState<number | null>(null)
   const [gotoPickerIdx, setGotoPickerIdx] = useState<number | null>(null)
   const [gotoSetId, setGotoSetId] = useState<string>('')
   const [gotoAllSets, setGotoAllSets] = useState(false)
-  const [gotoVisited, setGotoVisited] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -87,6 +88,31 @@ export default function SetlistPage() {
       localStorage.setItem(`setlist_unmatched_${userId}`, JSON.stringify({ cards, syncedAt: Date.now() }))
     } catch {}
   }, [userId])
+
+  const cardFingerprint = (c: Pick<UnmatchedCard, 'nom' | 'annee' | 'collection' | 'variation'>) =>
+    `${c.nom}|${c.annee}|${c.collection}|${c.variation || ''}`
+
+  const getDismissed = useCallback((): Set<string> => {
+    if (!userId) return new Set()
+    try { return new Set(JSON.parse(localStorage.getItem(`setlist_dismissed_${userId}`) || '[]')) } catch { return new Set() }
+  }, [userId])
+
+  const saveDismissed = useCallback((s: Set<string>) => {
+    if (!userId) return
+    try { localStorage.setItem(`setlist_dismissed_${userId}`, JSON.stringify([...s])) } catch {}
+  }, [userId])
+
+  const dismissCard = useCallback(async (idx: number) => {
+    const card = unmatchedCards[idx]
+    const dismissed = getDismissed()
+    dismissed.add(cardFingerprint(card))
+    saveDismissed(dismissed)
+    const updated = unmatchedCards.filter((_, i) => i !== idx)
+    setUnmatchedCards(updated)
+    saveUnmatched(updated)
+    await fetchAndCacheSets(false)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unmatchedCards, getDismissed, saveDismissed, saveUnmatched])
 
   const SETS_CACHE_KEY = userId ? `setlist_sets_v2_${userId}` : null
 
@@ -418,8 +444,11 @@ export default function SetlistPage() {
 
       unmatched.push({ ...card, candidates })
     }
-    setUnmatchedCards(unmatched)
-    saveUnmatched(unmatched)
+    // Filtrer les cartes déjà ignorées par l'utilisateur
+    const dismissed = getDismissed()
+    const filteredUnmatched = unmatched.filter(c => !dismissed.has(cardFingerprint(c)))
+    setUnmatchedCards(filteredUnmatched)
+    saveUnmatched(filteredUnmatched)
 
     // 7. Sauvegarde des nouveaux matches
     for (let i = 0; i < newRows.length; i += 500)
@@ -558,6 +587,52 @@ export default function SetlistPage() {
                 <p style={{ color: '#888', fontSize: 13, marginBottom: 16 }}>
                   {unmatchedCards.length} carte{unmatchedCards.length !== 1 ? 's' : ''} sans correspondance. Choisis un setlist pour la placer.
                 </p>
+                {/* Ajout manuel d'une carte non trouvée */}
+                <div style={{ marginBottom: 16 }}>
+                  {!showAddManual ? (
+                    <button
+                      onClick={() => setShowAddManual(true)}
+                      style={{ fontSize: 13, padding: '7px 14px', borderRadius: 8, border: '1.5px dashed #ccc', background: 'white', color: '#888', cursor: 'pointer', width: '100%' }}
+                    >
+                      + Ajouter une carte manuellement
+                    </button>
+                  ) : (
+                    <div style={{ background: '#f8f8f8', borderRadius: 10, padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                        {(['nom', 'annee', 'marque', 'collection', 'variation'] as const).map(f => (
+                          <input
+                            key={f}
+                            placeholder={{ nom: 'Joueur *', annee: 'Année (ex: 2024-25)', marque: 'Marque', collection: 'Collection', variation: 'Variation' }[f]}
+                            value={manualForm[f]}
+                            onChange={e => setManualForm(p => ({ ...p, [f]: e.target.value }))}
+                            style={{ fontSize: 12, padding: '7px 10px', borderRadius: 7, border: '1px solid #ddd', gridColumn: f === 'nom' ? '1 / -1' : undefined }}
+                          />
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          disabled={!manualForm.nom.trim()}
+                          onClick={() => {
+                            const card: UnmatchedCard = { nom: manualForm.nom.trim(), annee: manualForm.annee.trim(), marque: manualForm.marque.trim(), collection: manualForm.collection.trim(), collection_tag: '', variation: manualForm.variation.trim(), candidates: [] }
+                            const fp = cardFingerprint(card)
+                            const dismissed = getDismissed()
+                            dismissed.delete(fp)
+                            saveDismissed(dismissed)
+                            const updated = [card, ...unmatchedCards]
+                            setUnmatchedCards(updated)
+                            saveUnmatched(updated)
+                            setManualForm({ nom: '', annee: '', marque: '', collection: '', variation: '' })
+                            setShowAddManual(false)
+                          }}
+                          style={{ flex: 1, fontSize: 13, padding: '8px', borderRadius: 8, border: 'none', background: manualForm.nom.trim() ? '#003DA6' : '#ccc', color: 'white', fontWeight: 700, cursor: manualForm.nom.trim() ? 'pointer' : 'default' }}
+                        >
+                          Ajouter
+                        </button>
+                        <button onClick={() => setShowAddManual(false)} style={{ fontSize: 13, padding: '8px 12px', borderRadius: 8, border: '1px solid #ccc', background: 'white', cursor: 'pointer', color: '#888' }}>Annuler</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
                 {unmatchedCards.map((card, i) => (
                   <div key={i} style={{ padding: '12px 0', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                     <div style={{ flex: 1, minWidth: 180 }}>
@@ -576,7 +651,7 @@ export default function SetlistPage() {
                         <select
                           defaultValue=""
                           onChange={e => { const v = Number(e.target.value); if (v) placeCard(i, v) }}
-                          style={{ fontSize: 13, padding: '7px 10px', borderRadius: 8, border: '1.5px solid #003DA6', color: '#003DA6', fontWeight: 600, background: 'white', cursor: 'pointer', maxWidth: 200 }}
+                          style={{ fontSize: 13, padding: '7px 10px', borderRadius: 8, border: '1.5px solid #003DA6', color: '#003DA6', fontWeight: 600, background: 'white', cursor: 'pointer', maxWidth: 160 }}
                         >
                           <option value="">Placer dans… ({card.candidates.length})</option>
                           {card.candidates.map(c => (
@@ -586,9 +661,16 @@ export default function SetlistPage() {
                         <button
                           onClick={() => { setGotoPickerIdx(i); setGotoSetId('') }}
                           title="Choisir un autre set"
-                          style={{ fontSize: 12, padding: '6px 9px', borderRadius: 8, border: '1px solid #ccc', background: 'white', cursor: 'pointer', color: '#888', whiteSpace: 'nowrap' }}
+                          style={{ fontSize: 11, padding: '5px 8px', borderRadius: 6, border: '1px solid #ccc', background: 'white', cursor: 'pointer', color: '#888', whiteSpace: 'nowrap' }}
                         >
-                          Autre set →
+                          Autre
+                        </button>
+                        <button
+                          onClick={() => dismissCard(i)}
+                          title="Marquer comme traité"
+                          style={{ fontSize: 11, color: '#2ecc71', fontWeight: 700, background: '#f0fdf4', border: '1.5px solid #2ecc71', borderRadius: 6, padding: '4px 7px', cursor: 'pointer' }}
+                        >
+                          ✓
                         </button>
                       </div>
                     ) : gotoPickerIdx === i ? (
@@ -596,7 +678,7 @@ export default function SetlistPage() {
                         <select
                           value={gotoSetId}
                           onChange={e => setGotoSetId(e.target.value)}
-                          style={{ fontSize: 12, padding: '6px 8px', borderRadius: 8, border: '1.5px solid #888', maxWidth: 200 }}
+                          style={{ fontSize: 12, padding: '6px 8px', borderRadius: 8, border: '1.5px solid #888', maxWidth: 160 }}
                         >
                           <option value="">Choisir un set…</option>
                           {sets
@@ -607,45 +689,33 @@ export default function SetlistPage() {
                         </select>
                         <button
                           onClick={() => { setGotoAllSets(v => !v); setGotoSetId('') }}
-                          style={{ fontSize: 11, padding: '5px 8px', borderRadius: 6, border: '1px solid #ccc', background: gotoAllSets ? '#eee' : 'white', cursor: 'pointer', color: '#666', whiteSpace: 'nowrap' }}
+                          style={{ fontSize: 11, padding: '5px 7px', borderRadius: 6, border: '1px solid #ccc', background: gotoAllSets ? '#eee' : 'white', cursor: 'pointer', color: '#666' }}
                         >
                           {gotoAllSets ? 'Filtrés' : 'Tous'}
                         </button>
-                        {gotoSetId && !gotoVisited.has(i) && (
-                          <a
-                            href={`/setlist/${gotoSetId}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={() => setGotoVisited(prev => new Set([...prev, i]))}
-                            style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, background: '#003DA6', color: 'white', fontWeight: 700, textDecoration: 'none' }}
-                          >
+                        {gotoSetId && (
+                          <Link href={`/setlist/${gotoSetId}`} onClick={() => setShowMissing(false)} style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, background: '#003DA6', color: 'white', fontWeight: 700, textDecoration: 'none' }}>
                             Voir →
-                          </a>
+                          </Link>
                         )}
-                        {gotoVisited.has(i) && (
-                          <button
-                            onClick={async () => {
-                              const updated = unmatchedCards.filter((_, idx) => idx !== i)
-                              setUnmatchedCards(updated)
-                              saveUnmatched(updated)
-                              setGotoPickerIdx(null)
-                              setGotoVisited(prev => { const s = new Set(prev); s.delete(i); return s })
-                              await fetchAndCacheSets(false)
-                            }}
-                            style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, border: 'none', background: '#2ecc71', color: 'white', fontWeight: 700, cursor: 'pointer' }}
-                          >
-                            ✓ J&apos;ai coché la carte
-                          </button>
-                        )}
-                        {!gotoVisited.has(i) && <button onClick={() => setGotoPickerIdx(null)} style={{ fontSize: 12, padding: '6px 8px', borderRadius: 8, border: '1px solid #ccc', background: 'white', cursor: 'pointer', color: '#888' }}>✕</button>}
+                        <button onClick={() => setGotoPickerIdx(null)} style={{ fontSize: 12, padding: '6px 8px', borderRadius: 8, border: '1px solid #ccc', background: 'white', cursor: 'pointer', color: '#888' }}>✕</button>
                       </div>
                     ) : (
-                      <button
-                        onClick={() => { setGotoPickerIdx(i); setGotoSetId('') }}
-                        style={{ fontSize: 11, color: '#888', fontWeight: 700, background: '#f5f5f5', border: '1.5px solid #ddd', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                      >
-                        Voir le set →
-                      </button>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <button
+                          onClick={() => { setGotoPickerIdx(i); setGotoSetId('') }}
+                          style={{ fontSize: 11, color: '#555', fontWeight: 700, background: '#f5f5f5', border: '1.5px solid #ddd', borderRadius: 6, padding: '4px 9px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                        >
+                          Voir le set
+                        </button>
+                        <button
+                          onClick={() => dismissCard(i)}
+                          title="Marquer comme traité"
+                          style={{ fontSize: 11, color: '#2ecc71', fontWeight: 700, background: '#f0fdf4', border: '1.5px solid #2ecc71', borderRadius: 6, padding: '4px 9px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                        >
+                          ✓ Fait
+                        </button>
+                      </div>
                     )}
                   </div>
                 ))}
