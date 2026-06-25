@@ -33,23 +33,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message: 'Badge already awarded for this month' })
   }
 
-  // Count cards added per user during the month
+  // Count cards added per user during the month (CSV + manuelles via monthly_additions)
   const { data: counts } = await supabase
-    .from('cartes_manuelles')
-    .select('user_id')
-    .gte('created_at', monthStart)
-    .lt('created_at', monthEnd)
+    .from('monthly_additions')
+    .select('user_id, count')
+    .eq('month', monthLabel)
+    .order('count', { ascending: false })
 
   if (!counts || counts.length === 0) {
     return NextResponse.json({ message: 'No cards added this month' })
   }
 
-  const tally: Record<string, number> = {}
-  for (const row of counts) {
-    tally[row.user_id] = (tally[row.user_id] || 0) + 1
-  }
-
-  const winner = Object.entries(tally).sort((a, b) => b[1] - a[1])[0]
+  const winner = counts.map(r => [r.user_id, r.count] as [string, number]).sort((a, b) => b[1] - a[1])[0]
   if (!winner) return NextResponse.json({ message: 'No winner' })
 
   const [winnerId, cardCount] = winner

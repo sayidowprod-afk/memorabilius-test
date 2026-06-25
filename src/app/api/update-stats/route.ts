@@ -47,6 +47,11 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    // Lire l'ancien total avant d'écraser (pour calculer le delta mensuel)
+    const { data: prev } = await supabase.from('profiles').select('stats_total').eq('id', userId).single()
+    const prevTotal = prev?.stats_total || 0
+    const delta = Math.max(0, stats.total - prevTotal)
+
     await supabase.from('profiles').update({
       stats_total: stats.total,
       stats_rc: stats.rc,
@@ -55,6 +60,16 @@ export async function POST(req: NextRequest) {
       stats_patch: stats.patch,
       stats_updated_at: new Date().toISOString(),
     }).eq('id', userId)
+
+    // Incrémenter le compteur mensuel si des cartes ont été ajoutées
+    if (delta > 0) {
+      const month = new Date().toISOString().slice(0, 7)
+      const { data: existing } = await supabase.from('monthly_additions').select('count').eq('user_id', userId).eq('month', month).single()
+      await supabase.from('monthly_additions').upsert(
+        { user_id: userId, month, count: (existing?.count || 0) + delta },
+        { onConflict: 'user_id,month' }
+      )
+    }
 
     return NextResponse.json({ ok: true, stats })
   } catch (err) {
