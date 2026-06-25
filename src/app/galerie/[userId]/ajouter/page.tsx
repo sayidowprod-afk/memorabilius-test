@@ -111,7 +111,16 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
-    reader.onload = () => { if (reader.result) setScannerModal({ side, src: reader.result as string }) }
+    reader.onload = () => {
+      if (!reader.result) return
+      if (side === 'il' || side === 'ir') {
+        setCropModal({ side, src: reader.result as string })
+        setRotation(0)
+        setImgTransform({ x: 0, y: 0, scale: 1 })
+      } else {
+        setScannerModal({ side, src: reader.result as string })
+      }
+    }
     reader.readAsDataURL(file)
     e.target.value = ''
   }
@@ -128,7 +137,11 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
     setScannerModal(null)
 
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) {
+      setUploadingRecto(false); setUploadingVerso(false); setUploadingIL(false); setUploadingIR(false)
+      router.push('/connexion')
+      return
+    }
 
     const path = `cartes/${user.id}/${Date.now()}_${side}.jpg`
     const file = new File([blob], `${Date.now()}_${side}.jpg`, { type: 'image/jpeg' })
