@@ -152,8 +152,9 @@ export default function EditerCarte({ params }: { params: Promise<{ userId: stri
         reader.onload = () => res((reader.result as string).split(',')[1])
         reader.readAsDataURL(blob)
       })
+      const { data: { session: scanSession } } = await supabase.auth.getSession()
       const resp = await fetch('/api/scan-card', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${scanSession?.access_token}` },
         body: JSON.stringify({ imageBase64: base64, mimeType: 'image/jpeg' }),
       })
       const card = await resp.json()

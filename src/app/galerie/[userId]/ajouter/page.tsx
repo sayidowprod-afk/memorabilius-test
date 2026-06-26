@@ -174,9 +174,10 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
         ? { imageBase64: rectoBase64, imageBase64Verso: base64, mimeType: 'image/jpeg' }
         : { imageBase64: base64, mimeType: 'image/jpeg' }
 
+      const { data: { session: scanSession } } = await supabase.auth.getSession()
       const resp = await fetch('/api/scan-card', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${scanSession?.access_token}` },
         body: JSON.stringify(body),
       })
       const card = await resp.json()
