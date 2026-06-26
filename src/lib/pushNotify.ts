@@ -1,12 +1,6 @@
 import webpush from 'web-push'
 import { createClient } from '@supabase/supabase-js'
 
-webpush.setVapidDetails(
-  `mailto:${process.env.VAPID_MAILTO || 'contact@memorabilius.fr'}`,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-)
-
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -22,6 +16,12 @@ export async function sendPushToUser(
     .eq('user_id', userId)
 
   if (!subs?.length) return
+
+  webpush.setVapidDetails(
+    `mailto:${process.env.VAPID_MAILTO || 'contact@memorabilius.fr'}`,
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+    process.env.VAPID_PRIVATE_KEY!
+  )
 
   const payloadStr = JSON.stringify(payload)
 
