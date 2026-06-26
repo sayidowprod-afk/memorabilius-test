@@ -48,7 +48,6 @@ export async function POST(req: NextRequest) {
         generationConfig: {
           temperature: 0,
           maxOutputTokens: 256,
-          thinkingConfig: { thinkingBudget: 0 }
         }
       })
     })
