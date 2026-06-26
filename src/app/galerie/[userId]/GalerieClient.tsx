@@ -452,7 +452,7 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
                   <span className="sticker-badge" data-label={`Collectionneur du mois : ${monthlyBadges.join(', ')}`} style={{ fontSize: 26 }}>🏆</span>
                 )}
                 {profile?.is_donor && (
-                  <span className="sticker-badge" data-label="Donateur Ko-fi ☕" style={{ fontSize: 26 }}>☕</span>
+                  <span className="sticker-holo" data-label="Donateur Ko-fi" style={{ fontSize: 26 }}>☕</span>
                 )}
                 {profile?.lien_logo && <img src={profile.lien_logo} style={{ maxHeight: 32, objectFit: 'contain' }} alt="logo" />}
                 {(() => {
@@ -1057,6 +1057,52 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
             font-family: inherit;
           }
           .sticker-team:hover::after { opacity: 1; }
+
+          .sticker-holo {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: default;
+            line-height: 1;
+            transition: transform 0.15s;
+          }
+          .sticker-holo:hover { transform: scale(1.15); }
+          .sticker-holo::before {
+            content: '';
+            position: absolute;
+            inset: -5px;
+            border-radius: 50%;
+            background: conic-gradient(#ff6b6b, #ffd93d, #6bcb77, #4d96ff, #c77dff, #ff6b6b);
+            animation: holo-spin 2s linear infinite;
+            opacity: 0.75;
+            z-index: -1;
+            filter: blur(4px);
+          }
+          .sticker-holo::after {
+            content: attr(data-label);
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.82);
+            color: white;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 8px;
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s;
+            z-index: 20;
+            font-family: inherit;
+          }
+          .sticker-holo:hover::after { opacity: 1; }
+          @keyframes holo-spin {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+          }
         `}</style>
         
         {editMode && isOwner && selectedCards.size > 0 && (

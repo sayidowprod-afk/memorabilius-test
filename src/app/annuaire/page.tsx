@@ -8,7 +8,7 @@ import { SPORTS_TEAMS, getSpeciality, getTeamById } from '@/lib/sportsTeams'
 import TeamBadge from '@/components/TeamBadge'
 
 interface Stats { total: number; rc: number; auto: number; num: number; patch: number }
-interface Collector { id: string; display_name: string; avatar_url: string; lien_csv: string; stats?: Stats; favorite_teams?: string[] }
+interface Collector { id: string; display_name: string; avatar_url: string; lien_csv: string; stats?: Stats; favorite_teams?: string[]; is_donor?: boolean }
 
 export default function Annuaire() {
   return (
@@ -52,7 +52,7 @@ function AnnuaireContent() {
   const loadData = async () => {
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, display_name, avatar_url, lien_csv, stats_total, stats_rc, stats_auto, stats_num, stats_patch, stats_updated_at, favorite_teams')
+      .select('id, display_name, avatar_url, lien_csv, stats_total, stats_rc, stats_auto, stats_num, stats_patch, stats_updated_at, favorite_teams, is_donor')
       .not('display_name', 'is', null)
       .neq('display_name', '')
 
@@ -182,6 +182,52 @@ function AnnuaireContent() {
           font-family: inherit;
         }
         .sticker-badge-sm:hover::after { opacity: 1; }
+
+        .sticker-holo {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: default;
+          line-height: 1;
+          transition: transform 0.15s;
+        }
+        .sticker-holo:hover { transform: scale(1.2); }
+        .sticker-holo::before {
+          content: '';
+          position: absolute;
+          inset: -4px;
+          border-radius: 50%;
+          background: conic-gradient(#ff6b6b, #ffd93d, #6bcb77, #4d96ff, #c77dff, #ff6b6b);
+          animation: holo-spin 2s linear infinite;
+          opacity: 0.7;
+          z-index: -1;
+          filter: blur(3px);
+        }
+        .sticker-holo::after {
+          content: attr(data-label);
+          position: absolute;
+          bottom: calc(100% + 6px);
+          left: 50%;
+          transform: translateX(-50%);
+          background: rgba(0,0,0,0.82);
+          color: white;
+          font-size: 11px;
+          font-weight: 700;
+          padding: 3px 8px;
+          border-radius: 6px;
+          white-space: nowrap;
+          pointer-events: none;
+          opacity: 0;
+          transition: opacity 0.15s;
+          z-index: 20;
+          font-family: inherit;
+        }
+        .sticker-holo:hover::after { opacity: 1; }
+        @keyframes holo-spin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
       `}</style>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
         <h1 style={{ fontWeight: 900, fontSize: 28, margin: 0 }}>
@@ -256,6 +302,9 @@ function AnnuaireContent() {
                                   {s.label.match(/^\S+/)?.[0] ?? '⭐'}
                                 </span>
                               ))}
+                              {c.is_donor && (
+                                <span className="sticker-holo" data-label="Donateur Ko-fi" style={{ fontSize: 18 }}>☕</span>
+                              )}
                             </div>
                           )
                         })()}
