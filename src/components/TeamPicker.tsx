@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { SPORTS_TEAMS, SPORT_LABELS, teamLogoUrl, type Sport } from '@/lib/sportsTeams'
+import { SPORTS_TEAMS, SPORT_LABELS, FOOTBALL_LEAGUE_LABELS, teamLogoUrl, type Sport, type FootballLeague } from '@/lib/sportsTeams'
 
 interface Props {
   value: string[]
@@ -11,13 +11,18 @@ interface Props {
 export default function TeamPicker({ value, onChange, max = 5 }: Props) {
   const [open, setOpen] = useState(false)
   const [sport, setSport] = useState<Sport>('nba')
+  const [league, setLeague] = useState<FootballLeague>('premier-league')
   const [search, setSearch] = useState('')
 
-  const sports: Sport[] = ['nba', 'nfl', 'mlb', 'nhl']
-  const filtered = SPORTS_TEAMS.filter(t =>
-    t.sport === sport &&
-    (!search || t.name.toLowerCase().includes(search.toLowerCase()) || t.abbr.toLowerCase().includes(search.toLowerCase()))
-  )
+  const sports: Sport[] = ['nba', 'nfl', 'mlb', 'nhl', 'football']
+  const footballLeagues: FootballLeague[] = ['premier-league', 'bundesliga', 'serie-a', 'laliga', 'ligue-1']
+
+  const filtered = SPORTS_TEAMS.filter(t => {
+    if (t.sport !== sport) return false
+    if (sport === 'football' && !search && t.league !== league) return false
+    if (!search) return true
+    return t.name.toLowerCase().includes(search.toLowerCase()) || t.abbr.toLowerCase().includes(search.toLowerCase())
+  })
 
   const toggle = (id: string) => {
     if (value.includes(id)) {
@@ -37,7 +42,7 @@ export default function TeamPicker({ value, onChange, max = 5 }: Props) {
           if (!team) return null
           return (
             <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 6, background: team.color + '14', border: `1.5px solid ${team.color}44`, borderRadius: 20, padding: '4px 10px 4px 6px' }}>
-              <img src={teamLogoUrl(team.sport, team.abbr)} alt={team.abbr} width={20} height={20} style={{ borderRadius: '50%', objectFit: 'contain', background: team.color + '22' }} />
+              <img src={teamLogoUrl(team)} alt={team.abbr} width={20} height={20} style={{ borderRadius: '50%', objectFit: 'contain', background: team.color + '22' }} />
               <span style={{ fontSize: 12, fontWeight: 800, color: team.color }}>{team.abbr}</span>
               <button onClick={() => toggle(id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', fontSize: 12, padding: 0, lineHeight: 1 }}>✕</button>
             </div>
@@ -64,7 +69,7 @@ export default function TeamPicker({ value, onChange, max = 5 }: Props) {
             <div style={{ display: 'flex', gap: 4, background: '#f5f5f5', borderRadius: 10, padding: 4 }}>
               {sports.map(s => (
                 <button key={s} onClick={() => { setSport(s); setSearch('') }} style={{
-                  flex: 1, border: 'none', borderRadius: 8, padding: '7px 4px', fontWeight: 800, fontSize: 12, cursor: 'pointer', transition: '0.15s',
+                  flex: 1, border: 'none', borderRadius: 8, padding: '7px 4px', fontWeight: 800, fontSize: 11, cursor: 'pointer', transition: '0.15s',
                   background: sport === s ? 'white' : 'transparent',
                   color: sport === s ? '#121212' : '#888',
                   boxShadow: sport === s ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
@@ -73,6 +78,21 @@ export default function TeamPicker({ value, onChange, max = 5 }: Props) {
                 </button>
               ))}
             </div>
+
+            {/* League sub-tabs (football only) */}
+            {sport === 'football' && !search && (
+              <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 2 }}>
+                {footballLeagues.map(l => (
+                  <button key={l} onClick={() => setLeague(l)} style={{
+                    flexShrink: 0, border: 'none', borderRadius: 8, padding: '5px 10px', fontWeight: 700, fontSize: 11, cursor: 'pointer', transition: '0.15s',
+                    background: league === l ? '#003DA6' : '#f0f0f0',
+                    color: league === l ? 'white' : '#666',
+                  }}>
+                    {FOOTBALL_LEAGUE_LABELS[l]}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <input
               value={search}
@@ -96,8 +116,8 @@ export default function TeamPicker({ value, onChange, max = 5 }: Props) {
                       cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.4 : 1,
                       transition: '0.15s',
                     }}>
-                      <img src={teamLogoUrl(team.sport, team.abbr)} alt={team.abbr} width={36} height={36} style={{ objectFit: 'contain' }} />
-                      <span style={{ fontSize: 9, fontWeight: 800, color: selected ? team.color : '#666', textAlign: 'center', lineHeight: 1.2 }}>{team.abbr}</span>
+                      <img src={teamLogoUrl(team)} alt={team.abbr} width={36} height={36} style={{ objectFit: 'contain' }} />
+                      <span style={{ fontSize: 9, fontWeight: 800, color: selected ? team.color : '#666', textAlign: 'center', lineHeight: 1.2 }}>{team.name.length > 12 ? team.abbr : team.name}</span>
                     </button>
                   )
                 })}

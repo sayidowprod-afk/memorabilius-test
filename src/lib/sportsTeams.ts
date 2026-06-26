@@ -1,16 +1,26 @@
-export type Sport = 'nba' | 'nfl' | 'mlb' | 'nhl'
+export type Sport = 'nba' | 'nfl' | 'mlb' | 'nhl' | 'football'
+export type FootballLeague = 'premier-league' | 'bundesliga' | 'serie-a' | 'laliga' | 'ligue-1'
 
 export interface SportsTeam {
-  id: string        // format "nba:LAL"
+  id: string        // format "nba:LAL" or "football:ARS"
   sport: Sport
   abbr: string
   name: string
   color: string
+  league?: FootballLeague
+  logoUrl?: string  // override ESPN CDN (used for football)
 }
 
-// ESPN CDN logo URL
-export const teamLogoUrl = (sport: Sport, abbr: string) =>
-  `https://a.espncdn.com/i/teamlogos/${sport}/500/${abbr.toLowerCase()}.png`
+// ESPN CDN logo URL — accepts a team object or (sport, abbr)
+export function teamLogoUrl(teamOrSport: SportsTeam | Sport, abbr?: string): string {
+  if (typeof teamOrSport === 'object') {
+    return teamOrSport.logoUrl
+      || `https://a.espncdn.com/i/teamlogos/${teamOrSport.sport}/500/${teamOrSport.abbr.toLowerCase()}.png`
+  }
+  return `https://a.espncdn.com/i/teamlogos/${teamOrSport}/500/${abbr!.toLowerCase()}.png`
+}
+
+const espnSoccer = (id: number) => `https://a.espncdn.com/i/teamlogos/soccer/500/${id}.png`
 
 export const SPORTS_TEAMS: SportsTeam[] = [
   // NBA
@@ -144,9 +154,123 @@ export const SPORTS_TEAMS: SportsTeam[] = [
   { id: 'nhl:VGK', sport: 'nhl', abbr: 'VGK', name: 'Vegas Golden Knights',     color: '#B4975A' },
   { id: 'nhl:WSH', sport: 'nhl', abbr: 'WSH', name: 'Washington Capitals',      color: '#CF0A2C' },
   { id: 'nhl:WPG', sport: 'nhl', abbr: 'WPG', name: 'Winnipeg Jets',            color: '#041E42' },
+
+  // PREMIER LEAGUE
+  { id: 'football:ARS', sport: 'football', abbr: 'ARS', name: 'Arsenal',              color: '#EF0107', league: 'premier-league', logoUrl: espnSoccer(359) },
+  { id: 'football:CHE', sport: 'football', abbr: 'CHE', name: 'Chelsea',              color: '#034694', league: 'premier-league', logoUrl: espnSoccer(363) },
+  { id: 'football:LIV', sport: 'football', abbr: 'LIV', name: 'Liverpool',            color: '#C8102E', league: 'premier-league', logoUrl: espnSoccer(364) },
+  { id: 'football:MCI', sport: 'football', abbr: 'MCI', name: 'Manchester City',      color: '#6CABDD', league: 'premier-league', logoUrl: espnSoccer(382) },
+  { id: 'football:MUN', sport: 'football', abbr: 'MUN', name: 'Manchester United',    color: '#DA291C', league: 'premier-league', logoUrl: espnSoccer(360) },
+  { id: 'football:TOT', sport: 'football', abbr: 'TOT', name: 'Tottenham Hotspur',    color: '#132257', league: 'premier-league', logoUrl: espnSoccer(367) },
+  { id: 'football:NEW', sport: 'football', abbr: 'NEW', name: 'Newcastle United',     color: '#241F20', league: 'premier-league', logoUrl: espnSoccer(361) },
+  { id: 'football:AVL', sport: 'football', abbr: 'AVL', name: 'Aston Villa',          color: '#95BFE5', league: 'premier-league', logoUrl: espnSoccer(362) },
+  { id: 'football:WHU', sport: 'football', abbr: 'WHU', name: 'West Ham United',      color: '#7A263A', league: 'premier-league', logoUrl: espnSoccer(371) },
+  { id: 'football:BHA', sport: 'football', abbr: 'BHA', name: 'Brighton',             color: '#0057B8', league: 'premier-league', logoUrl: espnSoccer(331) },
+  { id: 'football:BRE', sport: 'football', abbr: 'BRE', name: 'Brentford',            color: '#E30613', league: 'premier-league', logoUrl: espnSoccer(337) },
+  { id: 'football:FUL', sport: 'football', abbr: 'FUL', name: 'Fulham',              color: '#000000', league: 'premier-league', logoUrl: espnSoccer(370) },
+  { id: 'football:CRY', sport: 'football', abbr: 'CRY', name: 'Crystal Palace',       color: '#1B458F', league: 'premier-league', logoUrl: espnSoccer(384) },
+  { id: 'football:WOL', sport: 'football', abbr: 'WOL', name: 'Wolverhampton',        color: '#FDB913', league: 'premier-league', logoUrl: espnSoccer(380) },
+  { id: 'football:EVE', sport: 'football', abbr: 'EVE', name: 'Everton',              color: '#003399', league: 'premier-league', logoUrl: espnSoccer(368) },
+  { id: 'football:LEI', sport: 'football', abbr: 'LEI', name: 'Leicester City',       color: '#003090', league: 'premier-league', logoUrl: espnSoccer(375) },
+  { id: 'football:IPS', sport: 'football', abbr: 'IPS', name: 'Ipswich Town',         color: '#0044A9', league: 'premier-league', logoUrl: espnSoccer(373) },
+  { id: 'football:SOU', sport: 'football', abbr: 'SOU', name: 'Southampton',          color: '#D71920', league: 'premier-league', logoUrl: espnSoccer(376) },
+  { id: 'football:BOU', sport: 'football', abbr: 'BOU', name: 'Bournemouth',          color: '#DA291C', league: 'premier-league', logoUrl: espnSoccer(349) },
+  { id: 'football:NFO', sport: 'football', abbr: 'NFO', name: 'Nottingham Forest',    color: '#DD0000', league: 'premier-league', logoUrl: espnSoccer(393) },
+
+  // BUNDESLIGA
+  { id: 'football:FCB', sport: 'football', abbr: 'FCB', name: 'Bayern Munich',        color: '#DC052D', league: 'bundesliga', logoUrl: espnSoccer(132) },
+  { id: 'football:BVB', sport: 'football', abbr: 'BVB', name: 'Borussia Dortmund',   color: '#FDE100', league: 'bundesliga', logoUrl: espnSoccer(124) },
+  { id: 'football:B04', sport: 'football', abbr: 'B04', name: 'Bayer Leverkusen',     color: '#E32221', league: 'bundesliga', logoUrl: espnSoccer(131) },
+  { id: 'football:RBL', sport: 'football', abbr: 'RBL', name: 'RB Leipzig',           color: '#DD0741', league: 'bundesliga', logoUrl: espnSoccer(23826) },
+  { id: 'football:SGE', sport: 'football', abbr: 'SGE', name: 'Eintracht Frankfurt',  color: '#E1000F', league: 'bundesliga', logoUrl: espnSoccer(9823) },
+  { id: 'football:VFB', sport: 'football', abbr: 'VFB', name: 'VfB Stuttgart',        color: '#E32219', league: 'bundesliga', logoUrl: espnSoccer(133) },
+  { id: 'football:WOB', sport: 'football', abbr: 'WOB', name: 'Wolfsburg',            color: '#65B32E', league: 'bundesliga', logoUrl: espnSoccer(11) },
+  { id: 'football:HOF', sport: 'football', abbr: 'HOF', name: 'Hoffenheim',           color: '#1C63B7', league: 'bundesliga', logoUrl: espnSoccer(10189) },
+  { id: 'football:BMG', sport: 'football', abbr: 'BMG', name: 'Borussia M\'gladbach', color: '#000000', league: 'bundesliga', logoUrl: espnSoccer(126) },
+  { id: 'football:AUG', sport: 'football', abbr: 'AUG', name: 'Augsburg',             color: '#BA3733', league: 'bundesliga', logoUrl: espnSoccer(24051) },
+  { id: 'football:SVW', sport: 'football', abbr: 'SVW', name: 'Werder Bremen',        color: '#1D9053', league: 'bundesliga', logoUrl: espnSoccer(134) },
+  { id: 'football:SCF', sport: 'football', abbr: 'SCF', name: 'SC Freiburg',          color: '#E31E24', league: 'bundesliga', logoUrl: espnSoccer(7893) },
+  { id: 'football:FCU', sport: 'football', abbr: 'FCU', name: 'Union Berlin',         color: '#EB1923', league: 'bundesliga', logoUrl: espnSoccer(10214) },
+  { id: 'football:M05', sport: 'football', abbr: 'M05', name: 'Mainz 05',             color: '#C3161C', league: 'bundesliga', logoUrl: espnSoccer(11521) },
+  { id: 'football:FCH', sport: 'football', abbr: 'FCH', name: 'Heidenheim',           color: '#E63A23', league: 'bundesliga', logoUrl: espnSoccer(19548) },
+  { id: 'football:BOC', sport: 'football', abbr: 'BOC', name: 'VfL Bochum',           color: '#005CA9', league: 'bundesliga', logoUrl: espnSoccer(122) },
+  { id: 'football:STP', sport: 'football', abbr: 'STP', name: 'St. Pauli',            color: '#4B3226', league: 'bundesliga', logoUrl: espnSoccer(130) },
+  { id: 'football:KSV', sport: 'football', abbr: 'KSV', name: 'Holstein Kiel',        color: '#0057A8', league: 'bundesliga', logoUrl: espnSoccer(136) },
+
+  // SERIE A
+  { id: 'football:INT', sport: 'football', abbr: 'INT', name: 'Inter Milan',          color: '#010E80', league: 'serie-a', logoUrl: espnSoccer(110) },
+  { id: 'football:ACM', sport: 'football', abbr: 'ACM', name: 'AC Milan',             color: '#FB090B', league: 'serie-a', logoUrl: espnSoccer(103) },
+  { id: 'football:JUV', sport: 'football', abbr: 'JUV', name: 'Juventus',             color: '#000000', league: 'serie-a', logoUrl: espnSoccer(111) },
+  { id: 'football:NAP', sport: 'football', abbr: 'NAP', name: 'Napoli',               color: '#12A0C3', league: 'serie-a', logoUrl: espnSoccer(113) },
+  { id: 'football:ROM', sport: 'football', abbr: 'ROM', name: 'AS Roma',              color: '#8E1F2F', league: 'serie-a', logoUrl: espnSoccer(104) },
+  { id: 'football:LAZ', sport: 'football', abbr: 'LAZ', name: 'Lazio',               color: '#87D8F7', league: 'serie-a', logoUrl: espnSoccer(112) },
+  { id: 'football:ATA', sport: 'football', abbr: 'ATA', name: 'Atalanta',             color: '#1E3870', league: 'serie-a', logoUrl: espnSoccer(106) },
+  { id: 'football:FIO', sport: 'football', abbr: 'FIO', name: 'Fiorentina',           color: '#4E297B', league: 'serie-a', logoUrl: espnSoccer(109) },
+  { id: 'football:BOL', sport: 'football', abbr: 'BOL', name: 'Bologna',              color: '#D8172A', league: 'serie-a', logoUrl: espnSoccer(107) },
+  { id: 'football:TOR', sport: 'football', abbr: 'TOR', name: 'Torino',              color: '#8B1A2C', league: 'serie-a', logoUrl: espnSoccer(116) },
+  { id: 'football:UDI', sport: 'football', abbr: 'UDI', name: 'Udinese',             color: '#000000', league: 'serie-a', logoUrl: espnSoccer(115) },
+  { id: 'football:GEN', sport: 'football', abbr: 'GEN', name: 'Genoa',               color: '#C8102E', league: 'serie-a', logoUrl: espnSoccer(2725) },
+  { id: 'football:MON', sport: 'football', abbr: 'MON', name: 'Monza',               color: '#EB1923', league: 'serie-a', logoUrl: espnSoccer(10199) },
+  { id: 'football:LEC', sport: 'football', abbr: 'LEC', name: 'Lecce',               color: '#F0A500', league: 'serie-a', logoUrl: espnSoccer(2726) },
+  { id: 'football:CAG', sport: 'football', abbr: 'CAG', name: 'Cagliari',            color: '#004B9E', league: 'serie-a', logoUrl: espnSoccer(2729) },
+  { id: 'football:EMP', sport: 'football', abbr: 'EMP', name: 'Empoli',              color: '#0066B3', league: 'serie-a', logoUrl: espnSoccer(2724) },
+  { id: 'football:VER', sport: 'football', abbr: 'VER', name: 'Hellas Verona',        color: '#003DA6', league: 'serie-a', logoUrl: espnSoccer(118) },
+  { id: 'football:COM', sport: 'football', abbr: 'COM', name: 'Como',                color: '#004B9E', league: 'serie-a', logoUrl: espnSoccer(2728) },
+  { id: 'football:VEN', sport: 'football', abbr: 'VEN', name: 'Venezia',             color: '#000000', league: 'serie-a', logoUrl: espnSoccer(5900) },
+  { id: 'football:PAR', sport: 'football', abbr: 'PAR', name: 'Parma',               color: '#F5EB00', league: 'serie-a', logoUrl: espnSoccer(2730) },
+
+  // LA LIGA
+  { id: 'football:RMA', sport: 'football', abbr: 'RMA', name: 'Real Madrid',          color: '#FEBE10', league: 'laliga', logoUrl: espnSoccer(86) },
+  { id: 'football:BAR', sport: 'football', abbr: 'BAR', name: 'FC Barcelona',         color: '#A50044', league: 'laliga', logoUrl: espnSoccer(83) },
+  { id: 'football:ATM', sport: 'football', abbr: 'ATM', name: 'Atlético Madrid',      color: '#CB3524', league: 'laliga', logoUrl: espnSoccer(1068) },
+  { id: 'football:ATH', sport: 'football', abbr: 'ATH', name: 'Athletic Bilbao',      color: '#EE2523', league: 'laliga', logoUrl: espnSoccer(93) },
+  { id: 'football:RSO', sport: 'football', abbr: 'RSO', name: 'Real Sociedad',        color: '#0467AF', league: 'laliga', logoUrl: espnSoccer(89) },
+  { id: 'football:BET', sport: 'football', abbr: 'BET', name: 'Real Betis',           color: '#00A650', league: 'laliga', logoUrl: espnSoccer(85) },
+  { id: 'football:VIL', sport: 'football', abbr: 'VIL', name: 'Villarreal',           color: '#009EDE', league: 'laliga', logoUrl: espnSoccer(102) },
+  { id: 'football:VAL', sport: 'football', abbr: 'VAL', name: 'Valencia',             color: '#FF7900', league: 'laliga', logoUrl: espnSoccer(95) },
+  { id: 'football:SEV', sport: 'football', abbr: 'SEV', name: 'Sevilla',              color: '#CF0C2E', league: 'laliga', logoUrl: espnSoccer(88) },
+  { id: 'football:CEL', sport: 'football', abbr: 'CEL', name: 'Celta Vigo',           color: '#73C4E2', league: 'laliga', logoUrl: espnSoccer(3842) },
+  { id: 'football:GET', sport: 'football', abbr: 'GET', name: 'Getafe',               color: '#005EA8', league: 'laliga', logoUrl: espnSoccer(3839) },
+  { id: 'football:OSA', sport: 'football', abbr: 'OSA', name: 'Osasuna',              color: '#C41426', league: 'laliga', logoUrl: espnSoccer(3843) },
+  { id: 'football:RAY', sport: 'football', abbr: 'RAY', name: 'Rayo Vallecano',       color: '#CF0013', league: 'laliga', logoUrl: espnSoccer(3847) },
+  { id: 'football:ESP', sport: 'football', abbr: 'ESP', name: 'Espanyol',             color: '#0055A0', league: 'laliga', logoUrl: espnSoccer(3838) },
+  { id: 'football:MAL', sport: 'football', abbr: 'MAL', name: 'Mallorca',             color: '#CF0017', league: 'laliga', logoUrl: espnSoccer(3841) },
+  { id: 'football:LPA', sport: 'football', abbr: 'LPA', name: 'Las Palmas',           color: '#F5C400', league: 'laliga', logoUrl: espnSoccer(1930) },
+  { id: 'football:ALA', sport: 'football', abbr: 'ALA', name: 'Alavés',              color: '#1A59A3', league: 'laliga', logoUrl: espnSoccer(3844) },
+  { id: 'football:GIR', sport: 'football', abbr: 'GIR', name: 'Girona',              color: '#CD1315', league: 'laliga', logoUrl: espnSoccer(9812) },
+  { id: 'football:LEG', sport: 'football', abbr: 'LEG', name: 'Leganés',             color: '#003DA6', league: 'laliga', logoUrl: espnSoccer(2941) },
+  { id: 'football:VLL', sport: 'football', abbr: 'VLL', name: 'Real Valladolid',      color: '#6B2382', league: 'laliga', logoUrl: espnSoccer(3846) },
+
+  // LIGUE 1
+  { id: 'football:PSG', sport: 'football', abbr: 'PSG', name: 'Paris Saint-Germain', color: '#004170', league: 'ligue-1', logoUrl: espnSoccer(160) },
+  { id: 'football:ASM', sport: 'football', abbr: 'ASM', name: 'Monaco',              color: '#E3172D', league: 'ligue-1', logoUrl: espnSoccer(162) },
+  { id: 'football:OLY', sport: 'football', abbr: 'OLY', name: 'Olympique Lyon',      color: '#002B6E', league: 'ligue-1', logoUrl: espnSoccer(172) },
+  { id: 'football:OM',  sport: 'football', abbr: 'OM',  name: 'Olympique Marseille', color: '#2FAEE0', league: 'ligue-1', logoUrl: espnSoccer(161) },
+  { id: 'football:RCL', sport: 'football', abbr: 'RCL', name: 'RC Lens',             color: '#E4B118', league: 'ligue-1', logoUrl: espnSoccer(169) },
+  { id: 'football:LOS', sport: 'football', abbr: 'LOS', name: 'Lille',               color: '#CB1117', league: 'ligue-1', logoUrl: espnSoccer(170) },
+  { id: 'football:OGC', sport: 'football', abbr: 'OGC', name: 'Nice',                color: '#000000', league: 'ligue-1', logoUrl: espnSoccer(163) },
+  { id: 'football:SRF', sport: 'football', abbr: 'SRF', name: 'Rennes',              color: '#000000', league: 'ligue-1', logoUrl: espnSoccer(167) },
+  { id: 'football:RCS', sport: 'football', abbr: 'RCS', name: 'Strasbourg',          color: '#0055A5', league: 'ligue-1', logoUrl: espnSoccer(165) },
+  { id: 'football:MPH', sport: 'football', abbr: 'MPH', name: 'Montpellier',         color: '#003DA6', league: 'ligue-1', logoUrl: espnSoccer(171) },
+  { id: 'football:SDR', sport: 'football', abbr: 'SDR', name: 'Reims',               color: '#E21E26', league: 'ligue-1', logoUrl: espnSoccer(168) },
+  { id: 'football:TFC', sport: 'football', abbr: 'TFC', name: 'Toulouse',            color: '#6B2382', league: 'ligue-1', logoUrl: espnSoccer(174) },
+  { id: 'football:SB29',sport: 'football', abbr: 'BRE', name: 'Stade Brest',         color: '#E4171C', league: 'ligue-1', logoUrl: espnSoccer(3026) },
+  { id: 'football:HAC', sport: 'football', abbr: 'HAC', name: 'Le Havre',            color: '#009FE3', league: 'ligue-1', logoUrl: espnSoccer(3025) },
+  { id: 'football:ASE', sport: 'football', abbr: 'ASE', name: 'Saint-Étienne',       color: '#007F3D', league: 'ligue-1', logoUrl: espnSoccer(166) },
+  { id: 'football:FCN', sport: 'football', abbr: 'FCN', name: 'Nantes',              color: '#F5CE3E', league: 'ligue-1', logoUrl: espnSoccer(164) },
+  { id: 'football:ANG', sport: 'football', abbr: 'ANG', name: 'Angers',              color: '#000000', league: 'ligue-1', logoUrl: espnSoccer(3027) },
+  { id: 'football:AJA', sport: 'football', abbr: 'AJA', name: 'Auxerre',             color: '#002F6C', league: 'ligue-1', logoUrl: espnSoccer(3022) },
 ]
 
-export const SPORT_LABELS: Record<Sport, string> = { nba: '🏀 NBA', nfl: '🏈 NFL', mlb: '⚾ MLB', nhl: '🏒 NHL' }
+export const SPORT_LABELS: Record<Sport, string> = { nba: '🏀 NBA', nfl: '🏈 NFL', mlb: '⚾ MLB', nhl: '🏒 NHL', football: '⚽ Foot' }
+
+export const FOOTBALL_LEAGUE_LABELS: Record<FootballLeague, string> = {
+  'premier-league': '🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League',
+  'bundesliga':     '🇩🇪 Bundesliga',
+  'serie-a':        '🇮🇹 Serie A',
+  'laliga':         '🇪🇸 La Liga',
+  'ligue-1':        '🇫🇷 Ligue 1',
+}
 
 export function getTeamById(id: string): SportsTeam | null {
   return SPORTS_TEAMS.find(t => t.id === id) || null

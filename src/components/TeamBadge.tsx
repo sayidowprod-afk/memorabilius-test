@@ -11,14 +11,13 @@ export default function TeamBadge({ teamId, size = 28 }: Props) {
   if (!team) return null
   return (
     <img
-      src={teamLogoUrl(team.sport, team.abbr)}
+      src={teamLogoUrl(team)}
       alt={team.name}
       title={team.name}
       width={size}
       height={size}
       style={{ borderRadius: '50%', objectFit: 'contain', flexShrink: 0, display: 'block' }}
       onError={(e) => {
-        // Fallback: colored abbr badge
         const el = e.currentTarget
         el.style.display = 'none'
         const span = document.createElement('span')
