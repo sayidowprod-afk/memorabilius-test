@@ -343,7 +343,7 @@ export default function GalerieExport({ cards, profileName, avatarUrl, accent, l
     const csv = '﻿' + 'sep=,\r\n' + [headers, ...rows]
       .map(r => r.map(cell => `"${(cell || '').replace(/"/g, '""')}"`).join(','))
       .join('\r\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const blob = new Blob([new TextEncoder().encode(csv)], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url; a.download = `${profileName.replace(/\s+/g, '_')}_collection.csv`; a.click()
