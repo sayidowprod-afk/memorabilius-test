@@ -336,7 +336,7 @@ export default function Viewer3D({ popup, accent, onClose, getTags, userId, user
                       }
 
                       /* ── PLASTIC ZONES on front face ── */
-                      .slb-top { padding: 13px 15px 13px; position: relative; z-index: 1; }
+                      .slb-top { padding: 6px 13px 6px; position: relative; z-index: 1; }
                       .slb-mid { padding: 0 15px; position: relative; z-index: 1; }
                       .slb-bot {
                         padding: 11px 15px 15px; position: relative; z-index: 1;
@@ -414,48 +414,49 @@ export default function Viewer3D({ popup, accent, onClose, getTags, userId, user
                       /* ── GRADING INSERTS — paper labels, no plastic effect ── */
 
                       /* ── PSA — cadre rouge épais sur fond blanc, grade énorme ── */
+                      /* ── PSA — cadre rouge épais, fond blanc, proportions slab réel ── */
                       .psa2 {
-                        border: 6px solid #cc1122;
-                        border-radius: 3px; overflow: hidden;
+                        border: 5px solid #cc1122;
+                        border-radius: 2px; overflow: hidden;
                         background: #fff;
                         font-family: Arial, Helvetica, sans-serif;
-                        box-shadow: 0 2px 8px rgba(0,0,0,0.28);
+                        box-shadow: 0 1px 5px rgba(0,0,0,0.25);
                       }
                       .psa2-main {
-                        padding: 7px 10px 4px;
-                        display: flex; gap: 6px; align-items: flex-start;
+                        padding: 5px 9px 3px;
+                        display: flex; gap: 5px; align-items: flex-start;
                       }
                       .psa2-left {
                         flex: 1; min-width: 0;
-                        display: flex; flex-direction: column; gap: 2px;
+                        display: flex; flex-direction: column; gap: 1px;
                       }
-                      .psa2-set  { font-size: 8px; font-weight: 400; color: #111; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
-                      .psa2-name { font-size: 13px; font-weight: 900; color: #111; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
-                      .psa2-var  { font-size: 8px; color: #444; text-transform: uppercase; line-height: 1.3; }
+                      .psa2-set  { font-size: 7.5px; font-weight: 400; color: #111; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+                      .psa2-name { font-size: 11px; font-weight: 900; color: #111; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+                      .psa2-var  { font-size: 7px; color: #444; text-transform: uppercase; line-height: 1.3; }
                       .psa2-right {
                         display: flex; flex-direction: column;
                         align-items: flex-end; flex-shrink: 0;
                       }
-                      .psa2-gname { font-size: 12px; font-weight: 800; color: #111; letter-spacing: 0.3px; line-height: 1.2; }
-                      .psa2-gnum  { font-size: 48px; font-weight: 900; color: #111; line-height: 0.92; letter-spacing: -2px; }
-                      .psa2-cert  { font-size: 9px; font-weight: 600; color: #111; letter-spacing: 0.3px; line-height: 1.3; }
+                      .psa2-gname { font-size: 10px; font-weight: 800; color: #111; letter-spacing: 0.3px; line-height: 1.2; }
+                      .psa2-gnum  { font-size: 30px; font-weight: 900; color: #111; line-height: 0.95; letter-spacing: -1px; }
+                      .psa2-cert  { font-size: 8px; font-weight: 600; color: #111; letter-spacing: 0.3px; line-height: 1.3; }
                       .psa2-bot {
                         display: flex; align-items: center;
-                        padding: 2px 10px 6px; gap: 8px;
+                        padding: 1px 9px 5px; gap: 6px;
                       }
                       .psa2-bc {
                         flex: 1; font-family: monospace;
-                        font-size: 26px; letter-spacing: -4.5px;
+                        font-size: 18px; letter-spacing: -3.5px;
                         color: #111; line-height: 1; overflow: hidden;
                       }
                       .psa2-logo-box {
                         background: linear-gradient(145deg, #ddd, #c4c4c4);
                         border: 0.5px solid #aaa; border-radius: 2px;
-                        padding: 3px 7px; flex-shrink: 0;
-                        box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 1px 3px rgba(0,0,0,0.18);
+                        padding: 2px 5px; flex-shrink: 0;
+                        box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 1px 2px rgba(0,0,0,0.15);
                       }
-                      .psa2-logo-p  { font-size: 15px; font-weight: 900; font-style: italic; color: #cc1122; }
-                      .psa2-logo-sa { font-size: 15px; font-weight: 900; font-style: italic; color: #003DA6; }
+                      .psa2-logo-p  { font-size: 11px; font-weight: 900; font-style: italic; color: #cc1122; }
+                      .psa2-logo-sa { font-size: 11px; font-weight: 900; font-style: italic; color: #003DA6; }
 
                       /* ── BGS / BECKETT (crème, bande noire B à gauche, note sur droite) ── */
                       .bgs2 {
