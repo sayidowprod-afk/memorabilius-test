@@ -19,24 +19,24 @@ export async function GET(req: NextRequest) {
 
   const results: any[] = []
 
-  // Clés des cartes privées (card_key = image URL)
-  const { data: privees } = await supabase.from('cartes_privees').select('user_id, card_key')
+  // Clés des cartes privées (card_key = image URL) — limit élevée pour ne pas tronquer
+  const { data: privees } = await supabase
+    .from('cartes_privees')
+    .select('user_id, card_key')
+    .limit(50000)
   const privateSet = new Set((privees || []).map(p => `${p.user_id}::${p.card_key}`))
   const isPrivate = (userId: string, cardKey: string) => privateSet.has(`${userId}::${cardKey}`)
 
-  // Cartes manuelles (toutes les cartes publiques)
+  // Cartes manuelles — filtre SQL pour éviter la limite 1000 lignes
   const { data: manuelles } = await supabase
     .from('cartes_manuelles')
     .select('*')
+    .or(`nom.ilike.%${query}%,equipe.ilike.%${query}%,variation.ilike.%${query}%,marque.ilike.%${query}%`)
+    .limit(500)
 
   const profileMap = new Map(profiles.map(p => [p.id, p]))
 
   ;(manuelles || []).forEach(m => {
-    const name = (m.nom || '').toLowerCase()
-    const team = (m.equipe || '').toLowerCase()
-    const variant = (m.variation || '').toLowerCase()
-    const brand = (m.marque || '').toLowerCase()
-    if (!query || !(name.includes(query) || team.includes(query) || variant.includes(query) || brand.includes(query))) return
     const p = profileMap.get(m.user_id)
     if (!p) return
     if (isPrivate(m.user_id, m.image_recto)) return
