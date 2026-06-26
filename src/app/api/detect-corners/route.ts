@@ -6,8 +6,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// gemini-2.0-flash-lite : 2× moins cher que 2.5-flash, amplement suffisant pour localiser 4 coins
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent'
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
 
 const PROMPT = `You are a precise vision system. Locate the 4 outer corners of a physical trading card in this image.
 
@@ -48,6 +47,7 @@ export async function POST(req: NextRequest) {
         generationConfig: {
           temperature: 0,
           maxOutputTokens: 256,
+          thinkingConfig: { thinkingBudget: 0 }
         }
       })
     })
