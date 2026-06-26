@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ imageModels, total: data.models?.length })
 }
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent'
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent'
 
 const PROMPT = 'Recadre autour de la carte et supprime les reflets. Il me faut que la carte, pas de contour.'
 
