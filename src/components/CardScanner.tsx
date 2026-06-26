@@ -1219,18 +1219,21 @@ export default function CardScanner({ src, onResult, onFallback, onClose, frameR
       setTimeout(() => initCanvas(imgRef.current!), 0)
     }
     const adjustAiResult = () => {
+      const url = aiPreview
       const img = new window.Image()
       img.onload = () => {
         origImgRef.current = img
         imgRef.current = img
-        URL.revokeObjectURL(aiPreview)
+        skipAI.current = true
         setAiPreview(null)
         setAiBlob(null)
-        skipAI.current = true
         setStatus('detecting')
-        setTimeout(() => initCanvas(img), 0)
+        setTimeout(() => {
+          initCanvas(img)
+          URL.revokeObjectURL(url)
+        }, 50)
       }
-      img.src = aiPreview
+      img.src = url
     }
     return (
       <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.96)', zIndex: 999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '12px 16px 20px' }}>

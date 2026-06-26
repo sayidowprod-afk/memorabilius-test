@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent'
 
-const PROMPT = 'Recadre autour de la carte et supprime les reflets. Il me faut que la carte, pas de contour, pas de fond noir.'
+const PROMPT = 'Recadre à ras la carte à collectionner. La carte doit occuper toute l\'image, sans marge blanche, sans fond noir, sans padding. Supprime les reflets et brillances sur la carte.'
 
 export async function POST(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
