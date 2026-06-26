@@ -1,4 +1,3 @@
-import webpush from 'web-push'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseAdmin = createClient(
@@ -16,6 +15,9 @@ export async function sendPushToUser(
     .eq('user_id', userId)
 
   if (!subs?.length) return
+
+  // Dynamic import avoids Turbopack trying to bundle this Node-only package at build time
+  const webpush = (await import('web-push')).default
 
   webpush.setVapidDetails(
     `mailto:${process.env.VAPID_MAILTO || 'contact@memorabilius.fr'}`,
