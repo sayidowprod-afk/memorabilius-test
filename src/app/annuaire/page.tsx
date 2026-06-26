@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { useLang } from '@/lib/LangContext'
-import { SPORTS_TEAMS, getSpeciality } from '@/lib/sportsTeams'
+import { SPORTS_TEAMS, getSpeciality, getTeamById } from '@/lib/sportsTeams'
 import TeamBadge from '@/components/TeamBadge'
 
 interface Stats { total: number; rc: number; auto: number; num: number; patch: number }
@@ -150,6 +150,39 @@ function AnnuaireContent() {
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
+      <style>{`
+        .sticker-badge-sm {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: default;
+          line-height: 1;
+          filter: drop-shadow(0 0 0 white) drop-shadow(0 0 2px white) drop-shadow(0 0 3px white);
+          transition: transform 0.15s;
+        }
+        .sticker-badge-sm:hover { transform: scale(1.2); }
+        .sticker-badge-sm::after {
+          content: attr(data-label);
+          position: absolute;
+          bottom: calc(100% + 6px);
+          left: 50%;
+          transform: translateX(-50%);
+          background: rgba(0,0,0,0.82);
+          color: white;
+          font-size: 11px;
+          font-weight: 700;
+          padding: 3px 8px;
+          border-radius: 6px;
+          white-space: nowrap;
+          pointer-events: none;
+          opacity: 0;
+          transition: opacity 0.15s;
+          z-index: 20;
+          font-family: inherit;
+        }
+        .sticker-badge-sm:hover::after { opacity: 1; }
+      `}</style>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
         <h1 style={{ fontWeight: 900, fontSize: 28, margin: 0 }}>
           {teamName ? `${lang === 'fr' ? 'Team' : 'Team'} : ${teamName}` : t('directory_title')}
@@ -212,11 +245,15 @@ function AnnuaireContent() {
                           const teams = c.favorite_teams || []
                           const spec = getSpeciality(c.stats)
                           return (
-                            <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-                              {teams.slice(0, 3).map(id => <TeamBadge key={id} teamId={id} size={20} />)}
+                            <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                              {teams.slice(0, 3).map(id => (
+                                <span key={id} className="sticker-badge-sm" data-label={getTeamById(id)?.name ?? id} style={{ fontSize: 18 }}>
+                                  <TeamBadge teamId={id} size={18} />
+                                </span>
+                              ))}
                               {spec.map((s, i) => (
-                                <span key={i} style={{ fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 4, background: s.color + '18', color: s.color, border: `1px solid ${s.color}33` }}>
-                                  {s.label}
+                                <span key={i} className="sticker-badge-sm" data-label={s.label.replace(/^\S+\s*/, '')} style={{ fontSize: 18 }}>
+                                  {s.label.match(/^\S+/)?.[0] ?? '⭐'}
                                 </span>
                               ))}
                             </div>
