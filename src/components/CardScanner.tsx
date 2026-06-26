@@ -900,12 +900,17 @@ export default function CardScanner({ src, onResult, onFallback, onClose, frameR
             const blob = await (await fetch(`data:image/png;base64,${croppedB64}`)).blob()
             onResult(blob)
             return
+          } else {
+            console.warn('[crop-card] réponse ok mais pas de imageBase64')
           }
+        } else {
+          const errText = await res.text()
+          console.warn('[crop-card] erreur API', res.status, errText)
         }
       } finally {
         clearTimeout(timeoutId)
       }
-    } catch { /* fallback vers détection de coins */ }
+    } catch (e) { console.warn('[crop-card] exception, fallback coins', e) }
 
     // ── Fallback: détection de coins ─────────────────────────────────────────
     let detectedCorners: Pt[] | null = null
