@@ -58,6 +58,7 @@ export default function Viewer3D({ popup, accent, onClose, onNext, onPrev, getTa
   const lastTap = useRef(0)
   const cardRef = useRef<HTMLDivElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const idleRef = useRef<HTMLDivElement>(null)
   const rafRef = useRef<number>(0)
   const [showVideo, setShowVideo] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -127,10 +128,10 @@ export default function Viewer3D({ popup, accent, onClose, onNext, onPrev, getTa
   }, [applyTransform])
 
   const pauseSlbAnim = useCallback(() => {
-    slbWrapRef.current?.style.setProperty('animation-play-state', 'paused')
+    idleRef.current?.style.setProperty('animation-play-state', 'paused')
   }, [])
   const resumeSlbAnim = useCallback(() => {
-    setTimeout(() => slbWrapRef.current?.style.setProperty('animation-play-state', 'running'), 500)
+    setTimeout(() => idleRef.current?.style.setProperty('animation-play-state', 'running'), 500)
   }, [])
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
@@ -314,7 +315,15 @@ export default function Viewer3D({ popup, accent, onClose, onNext, onPrev, getTa
             </div>
           )}
 
+          <style>{`
+            .card-idle { transform-style: preserve-3d; animation: card-idle 4s ease-in-out infinite; }
+            @keyframes card-idle {
+              0%, 100% { transform: rotateY(-4deg) rotateX(1.5deg); }
+              50%       { transform: rotateY(4deg)  rotateX(1.5deg); }
+            }
+          `}</style>
           <div ref={wrapRef} style={{ willChange: 'transform' }}>
+            <div ref={idleRef} className="card-idle">
             {slabMode && gradeInfo ? (
               /* ── SLAB VIEW ── */
               (() => {
@@ -336,11 +345,6 @@ export default function Viewer3D({ popup, accent, onClose, onNext, onPrev, getTa
                         position: relative;
                         transform-style: preserve-3d;
                         width: 252px;
-                        animation: slb-idle 4s ease-in-out infinite;
-                      }
-                      @keyframes slb-idle {
-                        0%, 100% { transform: rotateY(-4deg) rotateX(1.5deg); }
-                        50%       { transform: rotateY(4deg)  rotateX(1.5deg); }
                       }
                       @media(max-width:1200px){.slb-wrap{width:214px;}}
                       @media(max-width:600px){.slb-wrap{width:162px;}}
@@ -708,6 +712,7 @@ export default function Viewer3D({ popup, accent, onClose, onNext, onPrev, getTa
                 </div>
               </div>
             )}
+            </div>{/* /card-idle */}
           </div>
           <p className="viewer-hint" style={{ position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)', fontSize: 10, color: '#bbb', whiteSpace: 'nowrap', pointerEvents: 'none' }}>
             Glisser · Scroll pour zoomer · Double-clic pour reset
