@@ -37,8 +37,8 @@ function CompletionBar({ pct }: { pct: number }) {
   )
 }
 
-function seasonLabel(year: number) {
-  return `${year}-${String(year + 1).slice(2)}`
+function seasonLabel(year: number, sport: 'nba' | 'nfl' = 'nba') {
+  return sport === 'nfl' ? String(year) : `${year}-${String(year + 1).slice(2)}`
 }
 
 export default function SetlistPage() {
@@ -47,6 +47,7 @@ export default function SetlistPage() {
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
   const [authReady, setAuthReady] = useState(false)
+  const [activeSport, setActiveSport] = useState<'nba' | 'nfl'>('nba')
   const [activeSeason, setActiveSeason] = useState<number | null>(null)
   const [activeDecade, setActiveDecade] = useState<number | null>(null)
   const [syncing, setSyncing] = useState(false)
@@ -121,7 +122,7 @@ export default function SetlistPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unmatchedCards, getDismissed, saveDismissed, saveUnmatched])
 
-  const SETS_CACHE_KEY = userId ? `setlist_sets_v2_${userId}` : null
+  const SETS_CACHE_KEY = userId ? `setlist_sets_v2_${activeSport}_${userId}` : null
 
   // Charge les sets depuis Supabase et met à jour le cache
   const fetchAndCacheSets = useCallback(async (silent = false) => {
@@ -132,7 +133,7 @@ export default function SetlistPage() {
       const { data: page } = await supabase
         .from('card_sets')
         .select('id, tcdb_id, name, year, brand, sport, total_cards')
-        .eq('sport', 'nba')
+        .eq('sport', activeSport)
         .order('year', { ascending: false })
         .range(from, from + 999)
       if (!page?.length) break
@@ -186,7 +187,7 @@ export default function SetlistPage() {
     if (SETS_CACHE_KEY) {
       try { localStorage.setItem(SETS_CACHE_KEY, JSON.stringify({ sets: enriched, ts: Date.now() })) } catch {}
     }
-  }, [userId, SETS_CACHE_KEY])
+  }, [userId, SETS_CACHE_KEY, activeSport])
 
   const loadSets = useCallback(async () => {
     // 1. Charger le cache instantanément si disponible
@@ -211,8 +212,8 @@ export default function SetlistPage() {
     await fetchAndCacheSets(false)
   }, [SETS_CACHE_KEY, fetchAndCacheSets])
 
-  // N'appelle loadSets qu'une fois l'auth résolue — évite le flash owned=0
-  useEffect(() => { if (authReady) loadSets() }, [loadSets, authReady])
+  // Recharge quand l'auth est prête ou quand le sport change
+  useEffect(() => { if (authReady) loadSets() }, [loadSets, authReady, activeSport])
 
   const syncAll = async () => {
     if (!userId) return
@@ -512,10 +513,31 @@ export default function SetlistPage() {
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 20px' }}>
       <div style={{ marginBottom: 28, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
         <div>
-          <h1 style={{ fontWeight: 900, fontSize: 32, marginBottom: 4 }}>Setlist NBA</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+            <h1 style={{ fontWeight: 900, fontSize: 32, margin: 0 }}>Setlist</h1>
+            {(['nba', 'nfl'] as const).map(sp => (
+              <button key={sp} onClick={() => {
+                if (sp === activeSport) return
+                setActiveSport(sp)
+                setActiveSeason(null)
+                setActiveDecade(null)
+                setSets([])
+                setLoading(true)
+              }} style={{
+                padding: '6px 18px', borderRadius: 20, border: '2px solid',
+                borderColor: activeSport === sp ? (sp === 'nba' ? '#003DA6' : '#1a5c1a') : '#e0e0e0',
+                background: activeSport === sp ? (sp === 'nba' ? '#003DA6' : '#1a5c1a') : 'white',
+                color: activeSport === sp ? 'white' : '#666',
+                fontWeight: 900, fontSize: 15, cursor: activeSport === sp ? 'default' : 'pointer',
+                transition: 'all 0.15s',
+              }}>
+                {sp === 'nba' ? '🏀 NBA' : '🏈 NFL'}
+              </button>
+            ))}
+          </div>
           <p style={{ color: '#888', fontSize: 15 }}>{loading ? '...' : `${sets.length} ${t('setlist_collections_available')}`}</p>
         </div>
-        {userId && (
+        {userId && activeSport === 'nba' && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
             <button
               onClick={syncAll}
@@ -788,7 +810,7 @@ export default function SetlistPage() {
                   minWidth: 80,
                 }}>
                   <span style={{ fontSize: 15, fontWeight: 900, color: isActive ? 'white' : '#111' }}>
-                    {seasonLabel(year)}
+                    {seasonLabel(year, activeSport)}
                   </span>
                   <span style={{ fontSize: 11, color: isActive ? 'rgba(255,255,255,0.7)' : '#aaa', fontWeight: 600 }}>
                     {ssets.length} sets
@@ -809,7 +831,7 @@ export default function SetlistPage() {
       {activeSeason && !loading && (
         <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
           <div>
-            <span style={{ fontWeight: 900, fontSize: 20, color: '#111' }}>{t('setlist_season')} {seasonLabel(activeSeason)}</span>
+            <span style={{ fontWeight: 900, fontSize: 20, color: '#111' }}>{t('setlist_season')} {seasonLabel(activeSeason, activeSport)}</span>
             <span style={{ color: '#aaa', fontSize: 14, marginLeft: 10 }}>{seasonSets.length} collections · {totalCards.toLocaleString()} {t('setlist_cards')}</span>
           </div>
           {userId && totalCards > 0 && (

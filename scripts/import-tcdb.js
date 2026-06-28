@@ -33,10 +33,10 @@ async function retry(fn, attempts = 4, delay = 2000) {
 
 const ax = axios.create()
 
-async function upsertSet(set, year, brand, totalCards) {
+async function upsertSet(set, year, brand, totalCards, sport) {
   const { data } = await ax.post(
     `${BASE}/card_sets?on_conflict=tcdb_id&select=id`,
-    { tcdb_id: set.tcdb_id, name: set.name, year, brand, sport: 'nba', total_cards: totalCards },
+    { tcdb_id: set.tcdb_id, name: set.name, year, brand, sport, total_cards: totalCards },
     { headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=representation' } }
   )
   return Array.isArray(data) ? data[0] : data
@@ -56,14 +56,16 @@ async function main() {
   const tmpFile = process.argv[2]
   if (!tmpFile || !fs.existsSync(tmpFile)) { console.error('❌ Fichier JSON requis'); process.exit(1) }
 
-  const { year, sets } = JSON.parse(fs.readFileSync(tmpFile, 'utf8'))
-  console.log(`📥 Import ${sets.length} sets — saison ${year}-${String(year + 1).slice(2)}\n`)
+  const { year, sets, sport: jsonSport } = JSON.parse(fs.readFileSync(tmpFile, 'utf8'))
+  const sport = jsonSport || 'nba'
+  const seasonLabel = sport === 'nfl' ? String(year) : `${year}-${String(year + 1).slice(2)}`
+  console.log(`📥 Import ${sets.length} sets — saison ${seasonLabel} (${sport.toUpperCase()})\n`)
 
   let ok = 0, err = 0
   for (const { set, unique, brand } of sets) {
     console.log(`💾 ${set.name} — ${unique.length} cartes`)
     try {
-      const setData = await retry(() => upsertSet(set, year, brand, unique.length))
+      const setData = await retry(() => upsertSet(set, year, brand, unique.length, sport))
       await retry(() => deleteEntries(setData.id))
 
       for (let i = 0; i < unique.length; i += 500) {
