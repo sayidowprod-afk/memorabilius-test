@@ -77,7 +77,7 @@ async function fetchSoldItems(
       'OPERATION-NAME': 'findCompletedItems',
       'SECURITY-APPNAME': appId,
       'RESPONSE-DATA-FORMAT': 'JSON',
-      'GLOBAL-ID': 'EBAY-FR',
+      'GLOBAL-ID': 'EBAY-US',
       'keywords': keywords,
       'itemFilter(0).name': 'SoldItemsOnly',
       'itemFilter(0).value': 'true',
@@ -163,7 +163,7 @@ export async function GET(req: NextRequest) {
 
   const headers = {
     'Authorization': `Bearer ${token}`,
-    'X-EBAY-C-MARKETPLACE-ID': 'EBAY_FR',
+    'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
     'Content-Type': 'application/json',
   }
 
