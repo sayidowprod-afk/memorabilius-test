@@ -171,10 +171,8 @@ export async function GET(req: NextRequest) {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 22000)
 
-    // Annonces actives (Browse API) + ventes conclues (Finding API) en parallèle
-    const [soldItems] = await Promise.all([
-      fetchSoldItems(keywords, mustTerms, mustSetWord, isGraded, appId),
-    ])
+    // Lancer les ventes conclues en background — ne pas awaiter avant Browse API
+    const soldPromise = fetchSoldItems(keywords, mustTerms, mustSetWord, isGraded, appId)
 
     let rawItems: any[] = []
 
@@ -216,6 +214,9 @@ export async function GET(req: NextRequest) {
     }
 
     clearTimeout(timeout)
+
+    // Collecter les ventes conclues (tournaient en parallèle)
+    const soldItems = await soldPromise
 
     const items = processItems(rawItems, mustTerms, mustSetWord, isGraded)
     const prices = items.map(i => i.price)
