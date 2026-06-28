@@ -261,6 +261,7 @@ export const SPORTS_TEAMS: SportsTeam[] = [
   { id: 'football:FCN', sport: 'football', abbr: 'FCN', name: 'Nantes',              color: '#F5CE3E', league: 'ligue-1', logoUrl: fdo(525) },
   { id: 'football:ANG', sport: 'football', abbr: 'ANG', name: 'Angers',              color: '#000000', league: 'ligue-1', logoUrl: fdo(544) },
   { id: 'football:AJA', sport: 'football', abbr: 'AJA', name: 'Auxerre',             color: '#002F6C', league: 'ligue-1', logoUrl: fdo(541) },
+  { id: 'football:GDB', sport: 'football', abbr: 'GDB', name: 'Girondins de Bordeaux', color: '#003399', league: 'ligue-1', logoUrl: fdo(526) },
 ]
 
 export const SPORT_LABELS: Record<Sport, string> = { nba: '🏀 NBA', nfl: '🏈 NFL', mlb: '⚾ MLB', nhl: '🏒 NHL', football: '⚽ Foot' }
