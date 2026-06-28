@@ -513,28 +513,7 @@ export default function SetlistPage() {
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 20px' }}>
       <div style={{ marginBottom: 28, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
-            <h1 style={{ fontWeight: 900, fontSize: 32, margin: 0 }}>Setlist</h1>
-            {(['nba', 'nfl'] as const).map(sp => (
-              <button key={sp} onClick={() => {
-                if (sp === activeSport) return
-                setActiveSport(sp)
-                setActiveSeason(null)
-                setActiveDecade(null)
-                setSets([])
-                setLoading(true)
-              }} style={{
-                padding: '6px 18px', borderRadius: 20, border: '2px solid',
-                borderColor: activeSport === sp ? (sp === 'nba' ? '#003DA6' : '#1a5c1a') : '#e0e0e0',
-                background: activeSport === sp ? (sp === 'nba' ? '#003DA6' : '#1a5c1a') : 'white',
-                color: activeSport === sp ? 'white' : '#666',
-                fontWeight: 900, fontSize: 15, cursor: activeSport === sp ? 'default' : 'pointer',
-                transition: 'all 0.15s',
-              }}>
-                {sp === 'nba' ? '🏀 NBA' : '🏈 NFL'}
-              </button>
-            ))}
-          </div>
+          <h1 style={{ fontWeight: 900, fontSize: 32, marginBottom: 4 }}>Setlist</h1>
           <p style={{ color: '#888', fontSize: 15 }}>{loading ? '...' : `${sets.length} ${t('setlist_collections_available')}`}</p>
         </div>
         {userId && activeSport === 'nba' && (
@@ -762,6 +741,36 @@ export default function SetlistPage() {
           </div>
         </div>
       )}
+
+      {/* Sélecteur de sport */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        {(['nba', 'nfl'] as const).map(sp => {
+          const accent = sp === 'nba' ? '#003DA6' : '#1a5c1a'
+          const isActive = activeSport === sp
+          return (
+            <button key={sp} onClick={() => {
+              if (isActive) return
+              setActiveSport(sp)
+              setActiveSeason(null)
+              setActiveDecade(null)
+              setSets([])
+              setLoading(true)
+            }} style={{
+              padding: '10px 22px', borderRadius: 12, border: '2px solid',
+              borderColor: isActive ? accent : '#e0e0e0',
+              background: isActive ? accent : 'white',
+              cursor: isActive ? 'default' : 'pointer',
+              transition: 'all 0.15s',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+              minWidth: 80,
+            }}>
+              <span style={{ fontSize: 15, fontWeight: 900, color: isActive ? 'white' : '#111' }}>
+                {sp === 'nba' ? '🏀 NBA' : '🏈 NFL'}
+              </span>
+            </button>
+          )
+        })}
+      </div>
 
       {/* Navigation décennie → saison */}
       {!loading && (
