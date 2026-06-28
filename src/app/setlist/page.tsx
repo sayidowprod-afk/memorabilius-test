@@ -37,8 +37,10 @@ function CompletionBar({ pct }: { pct: number }) {
   )
 }
 
-function seasonLabel(year: number, sport: 'nba' | 'nfl' = 'nba') {
-  return sport === 'nfl' ? String(year) : `${year}-${String(year + 1).slice(2)}`
+function seasonLabel(year: number, sport = 'nba') {
+  return ['nfl', 'baseball', 'pokemon', 'mtg'].includes(sport)
+    ? String(year)
+    : `${year}-${String(year + 1).slice(2)}`
 }
 
 export default function SetlistPage() {
@@ -47,7 +49,7 @@ export default function SetlistPage() {
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
   const [authReady, setAuthReady] = useState(false)
-  const [activeSport, setActiveSport] = useState<'nba' | 'nfl'>('nba')
+  const [activeSport, setActiveSport] = useState<'nba' | 'nfl' | 'baseball' | 'hockey' | 'pokemon' | 'mtg'>('nba')
   const [activeSeason, setActiveSeason] = useState<number | null>(null)
   const [activeDecade, setActiveDecade] = useState<number | null>(null)
   const [syncing, setSyncing] = useState(false)
@@ -744,9 +746,10 @@ export default function SetlistPage() {
       )}
 
       {/* Sélecteur de sport */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        {(['nba', 'nfl'] as const).map(sp => {
-          const accent = sp === 'nba' ? '#003DA6' : '#1a5c1a'
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+        {([ 'nba', 'nfl', 'baseball', 'hockey', 'pokemon', 'mtg' ] as const).map(sp => {
+          const accent = sp === 'nba' ? '#003DA6' : sp === 'nfl' ? '#1a5c1a' : sp === 'baseball' ? '#c0392b' : sp === 'hockey' ? '#1a3a5c' : sp === 'pokemon' ? '#e6b800' : '#6b21a8'
+          const label  = sp === 'nba' ? '🏀 NBA' : sp === 'nfl' ? '🏈 NFL' : sp === 'baseball' ? '⚾ Baseball' : sp === 'hockey' ? '🏒 Hockey' : sp === 'pokemon' ? '🎴 Pokémon' : '🧙 MTG'
           const isActive = activeSport === sp
           return (
             <button key={sp} onClick={() => {
@@ -770,7 +773,7 @@ export default function SetlistPage() {
               minWidth: 80,
             }}>
               <span style={{ fontSize: 15, fontWeight: 900, color: isActive ? 'white' : '#111' }}>
-                {sp === 'nba' ? '🏀 NBA' : '🏈 NFL'}
+                {label}
               </span>
             </button>
           )
