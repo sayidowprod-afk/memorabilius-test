@@ -74,8 +74,9 @@ export default function SetlistPage() {
   // Restaurer la liste des cartes non placées + total synced depuis le stockage local
   useEffect(() => {
     if (!userId) return
+    setSyncDone(false); setUnmatchedCards([]); setTotalSynced(null); setNewMatchCount(0)
     try {
-      const raw = localStorage.getItem(`setlist_unmatched_${userId}`)
+      const raw = localStorage.getItem(`setlist_unmatched_${activeSport}_${userId}`)
       if (raw) {
         const parsed = JSON.parse(raw)
         if (Array.isArray(parsed?.cards)) {
@@ -85,30 +86,30 @@ export default function SetlistPage() {
       }
     } catch {}
     try {
-      const stored = localStorage.getItem(`setlist_synced_total_${userId}`)
+      const stored = localStorage.getItem(`setlist_synced_total_${activeSport}_${userId}`)
       if (stored) setTotalSynced(Number(stored))
     } catch {}
-  }, [userId])
+  }, [userId, activeSport])
 
   const saveUnmatched = useCallback((cards: UnmatchedCard[]) => {
     if (!userId) return
     try {
-      localStorage.setItem(`setlist_unmatched_${userId}`, JSON.stringify({ cards, syncedAt: Date.now() }))
+      localStorage.setItem(`setlist_unmatched_${activeSport}_${userId}`, JSON.stringify({ cards, syncedAt: Date.now() }))
     } catch {}
-  }, [userId])
+  }, [userId, activeSport])
 
   const cardFingerprint = (c: Pick<UnmatchedCard, 'nom' | 'annee' | 'collection' | 'variation'>) =>
     `${c.nom}|${c.annee}|${c.collection}|${c.variation || ''}`
 
   const getDismissed = useCallback((): Set<string> => {
     if (!userId) return new Set()
-    try { return new Set(JSON.parse(localStorage.getItem(`setlist_dismissed_${userId}`) || '[]')) } catch { return new Set() }
-  }, [userId])
+    try { return new Set(JSON.parse(localStorage.getItem(`setlist_dismissed_${activeSport}_${userId}`) || '[]')) } catch { return new Set() }
+  }, [userId, activeSport])
 
   const saveDismissed = useCallback((s: Set<string>) => {
     if (!userId) return
-    try { localStorage.setItem(`setlist_dismissed_${userId}`, JSON.stringify([...s])) } catch {}
-  }, [userId])
+    try { localStorage.setItem(`setlist_dismissed_${activeSport}_${userId}`, JSON.stringify([...s])) } catch {}
+  }, [userId, activeSport])
 
   const dismissCard = useCallback(async (idx: number) => {
     const card = unmatchedCards[idx]
@@ -282,7 +283,7 @@ export default function SetlistPage() {
     // 2. Tous les sets (métadonnées) — paginé pour dépasser la limite max_rows=1000
     const allSetsData: { id: number; name: string; year: number | null; brand: string | null }[] = []
     for (let from = 0; ; from += 1000) {
-      const { data: page } = await supabase.from('card_sets').select('id, name, year, brand').eq('sport', 'nba').range(from, from + 999)
+      const { data: page } = await supabase.from('card_sets').select('id, name, year, brand').eq('sport', activeSport).range(from, from + 999)
       if (!page?.length) break
       allSetsData.push(...page)
       if (page.length < 1000) break
@@ -468,7 +469,7 @@ export default function SetlistPage() {
     const syncedTotal = matchedGalleryIdx.size
     setTotalSynced(syncedTotal)
     if (userId) {
-      try { localStorage.setItem(`setlist_synced_total_${userId}`, String(syncedTotal)) } catch {}
+      try { localStorage.setItem(`setlist_synced_total_${activeSport}_${userId}`, String(syncedTotal)) } catch {}
     }
 
     setSyncProgress(100)
@@ -516,7 +517,7 @@ export default function SetlistPage() {
           <h1 style={{ fontWeight: 900, fontSize: 32, marginBottom: 4 }}>Setlist</h1>
           <p style={{ color: '#888', fontSize: 15 }}>{loading ? '...' : `${sets.length} ${t('setlist_collections_available')}`}</p>
         </div>
-        {userId && activeSport === 'nba' && (
+        {userId && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
             <button
               onClick={syncAll}
@@ -755,6 +756,10 @@ export default function SetlistPage() {
               setActiveDecade(null)
               setSets([])
               setLoading(true)
+              setSyncDone(false)
+              setUnmatchedCards([])
+              setTotalSynced(null)
+              setNewMatchCount(0)
             }} style={{
               padding: '10px 22px', borderRadius: 12, border: '2px solid',
               borderColor: isActive ? accent : '#e0e0e0',
