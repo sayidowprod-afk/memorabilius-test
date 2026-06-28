@@ -18,7 +18,7 @@ interface Props {
   img?: string
 }
 
-function median(prices: number[]) {
+function medianOf(prices: number[]) {
   if (!prices.length) return 0
   const s = [...prices].sort((a, b) => a - b)
   const m = Math.floor(s.length / 2)
@@ -27,8 +27,7 @@ function median(prices: number[]) {
 
 function fmtDate(iso: string) {
   if (!iso) return ''
-  const d = new Date(iso)
-  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+  return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 }
 
 export default function CardValueModule({ cardName, set, year, num, variant, rc, auto, patch, grade, accent, img }: Props) {
@@ -37,10 +36,11 @@ export default function CardValueModule({ cardName, set, year, num, variant, rc,
   const [loading, setLoading] = useState(true)
 
   const printRun = num?.match(/\/\d+/) ? num.match(/\/\d+/)![0] : num
-  const ebaySearchUrl = `https://www.ebay.fr/sch/i.html?_nkw=€{encodeURIComponent([cardName, variant, set, year, printRun, rc && 'RC', auto && 'AUTO', patch && 'PATCH', grade].filter(Boolean).join(' '))}&LH_Sold=1&LH_Complete=1`
+  const ebaySearchUrl = `https://www.ebay.fr/sch/i.html?_nkw=${encodeURIComponent([cardName, variant, set, year, printRun, rc && 'RC', auto && 'AUTO', patch && 'PATCH', grade].filter(Boolean).join(' '))}&LH_Sold=1&LH_Complete=1`
 
   useEffect(() => {
     if (!cardName) { setLoading(false); return }
+
     const params = new URLSearchParams({ name: cardName })
     if (set)     params.set('set', set)
     if (year)    params.set('year', year)
@@ -52,37 +52,44 @@ export default function CardValueModule({ cardName, set, year, num, variant, rc,
     if (grade)   params.set('grade', grade)
     if (img)     params.set('img', img)
 
+    let cancelled = false
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 20000)
 
-    fetch(`/api/ebay-sold?€{params}`, { signal: controller.signal })
+    // Annonces actives — chemin critique, même logique qu'avant
+    fetch(`/api/ebay-sold?${params.toString()}`, { signal: controller.signal })
       .then(r => r.json())
       .then(json => {
-        clearTimeout(timeout)
-        const activeItems: ActiveListing[] = (json.items || []).map((i: any) => ({
+        if (cancelled) return
+        setActive((json.items || []).map((i: any) => ({
           price: Math.round(i.price * 100) / 100,
           title: i.title || '',
           url: i.url || '',
           img: i.img || '',
-        }))
-        const soldItems: SoldListing[] = (json.sold || []).map((i: any) => ({
+        })))
+        setLoading(false)
+      })
+      .catch(() => { if (!cancelled) setLoading(false) })
+
+    // Ventes conclues — endpoint séparé, ne bloque pas l'affichage actif
+    fetch(`/api/ebay-completed?${params.toString()}`)
+      .then(r => r.json())
+      .then(json => {
+        if (cancelled) return
+        setSold((json.sold || []).map((i: any) => ({
           price: Math.round(i.price * 100) / 100,
           title: i.title || '',
           url: i.url || '',
           img: i.img || '',
           soldDate: i.soldDate || '',
-        }))
-        setActive(activeItems)
-        setSold(soldItems)
-        setLoading(false)
+        })))
       })
-      .catch(() => { clearTimeout(timeout); setLoading(false) })
+      .catch(() => {})
 
-    return () => { clearTimeout(timeout); controller.abort() }
+    return () => { cancelled = true; controller.abort() }
   }, [cardName, set, year, num, variant, rc, auto, patch, grade, img])
 
-  const soldMedian   = Math.round(median(sold.map(i => i.price)) * 100) / 100
-  const activeMedian = Math.round(median(active.map(i => i.price)) * 100) / 100
+  const soldMedian   = Math.round(medianOf(sold.map(i => i.price)) * 100) / 100
+  const activeMedian = Math.round(medianOf(active.map(i => i.price)) * 100) / 100
 
   const ebayLink = (
     <a href={ebaySearchUrl} target="_blank" rel="noopener noreferrer"
@@ -112,7 +119,7 @@ export default function CardValueModule({ cardName, set, year, num, variant, rc,
 
       {loading && (
         <div style={{ height: 4, background: '#f0f0f0', borderRadius: 2, overflow: 'hidden', marginBottom: 10 }}>
-          <div style={{ height: '100%', background: `linear-gradient(90deg,€{accent}33,€{accent},€{accent}33)`,
+          <div style={{ height: '100%', background: `linear-gradient(90deg,${accent}33,${accent},${accent}33)`,
             backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} />
         </div>
       )}
@@ -161,10 +168,10 @@ export default function CardValueModule({ cardName, set, year, num, variant, rc,
             {active.map((item, i) => (
               <a key={i} href={item.url} target="_blank" rel="noopener noreferrer"
                 style={{ textDecoration: 'none', flexShrink: 0, width: 70 }}>
-                <div style={{ borderRadius: 6, overflow: 'hidden', border: `1.5px solid €{accent}44`,
+                <div style={{ borderRadius: 6, overflow: 'hidden', border: `1.5px solid ${accent}44`,
                   background: 'white', transition: '0.15s' }}
                   onMouseEnter={e => (e.currentTarget.style.borderColor = accent)}
-                  onMouseLeave={e => (e.currentTarget.style.borderColor = `€{accent}44`)}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = `${accent}44`)}
                 >
                   {item.img
                     ? <img src={item.img} alt="" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', display: 'block', background: '#f5f5f5' }} />

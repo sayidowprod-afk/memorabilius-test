@@ -169,10 +169,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 22000)
-
-    // Lancer les ventes conclues en background — ne pas awaiter avant Browse API
-    const soldPromise = fetchSoldItems(keywords, mustTerms, mustSetWord, isGraded, appId)
+    const timeout = setTimeout(() => controller.abort(), 20000)
 
     let rawItems: any[] = []
 
@@ -215,24 +212,17 @@ export async function GET(req: NextRequest) {
 
     clearTimeout(timeout)
 
-    // Collecter les ventes conclues (tournaient en parallèle)
-    const soldItems = await soldPromise
-
     const items = processItems(rawItems, mustTerms, mustSetWord, isGraded)
     const prices = items.map(i => i.price)
-    const soldPrices = soldItems.map(i => i.price)
 
     return NextResponse.json({
       items,
-      sold: soldItems,
       count: items.length,
       median: median(prices),
       min: prices.length ? Math.min(...prices) : 0,
       max: prices.length ? Math.max(...prices) : 0,
-      soldMedian: median(soldPrices),
-      soldCount: soldItems.length,
     })
   } catch {
-    return NextResponse.json({ items: [], sold: [] })
+    return NextResponse.json({ items: [] })
   }
 }
