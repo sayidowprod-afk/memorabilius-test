@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import dynamic from 'next/dynamic'
 import OnlineIndicator from '@/components/OnlineIndicator'
 import GalerieExport from '@/components/GalerieExport'
+import CollectionStats from '@/components/CollectionStats'
 import PublicWishlist from '@/components/PublicWishlist'
 import GalerieComments from '@/components/GalerieComments'
 import {
@@ -117,6 +118,7 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
   const [grailPickerOpen, setGrailPickerOpen] = useState(false)
   const [addedCards, setAddedCards] = useState<Set<string>>(new Set())
   const [showBackToTop, setShowBackToTop] = useState(false)
+  const [showStats, setShowStats] = useState(false)
   const loaderRef = useRef<HTMLDivElement>(null)
 
   const isOwner = currentUser === userId
@@ -615,6 +617,17 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
                   />
                 )}
 
+                {!editMode && loaded && (
+                  <button onClick={() => setShowStats(s => !s)} style={{
+                    background: showStats ? accent : '#f0f0f0',
+                    color: showStats ? 'white' : '#333',
+                    border: 'none', borderRadius: 8, padding: '10px 16px',
+                    fontWeight: 700, fontSize: 13, cursor: 'pointer', flex: '1 1 auto', textAlign: 'center', minWidth: 100,
+                    transition: '0.2s',
+                  }}>
+                    📊 Stats
+                  </button>
+                )}
                 {isOwner && !editMode && (
                   <a href={`/galerie/${userId}/ajouter`} style={{
                     background: '#003DA6', color: 'white',
@@ -629,6 +642,11 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
             </div>
           )}
         </div>
+
+        {/* Stats de collection */}
+        {showStats && loaded && (
+          <CollectionStats cards={cards} accent={accent} />
+        )}
 
         {/* Grail Wall */}
         {(isOwner || grailCards.length > 0) && (() => {

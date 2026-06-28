@@ -804,6 +804,40 @@ export default function Viewer3D({ popup, accent, onClose, onNext, onPrev, getTa
             img={popup.f}
           />
 
+          {/* PSA Population Report */}
+          {popup.g?.toUpperCase().startsWith('PSA') && (() => {
+            const psaGrade = popup.g?.match(/\d+(?:\.\d+)?/)?.[0] || ''
+            const q = encodeURIComponent([popup.n, popup.y, popup.br, popup.s].filter(Boolean).join(' '))
+            const psaPopUrl  = `https://www.psacard.com/pop/?q=${q}`
+            const psaCertUrl = `https://www.psacard.com/certlookup`
+            return (
+              <div style={{ borderTop: '1px solid #eee', paddingTop: 12, marginTop: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 10, fontWeight: 800, color: '#bbb', textTransform: 'uppercase', letterSpacing: 1, marginRight: 4 }}>PSA</span>
+                <a href={psaPopUrl} target="_blank" rel="noopener noreferrer" style={{
+                  fontSize: 11, fontWeight: 700, color: '#c0392b', textDecoration: 'none',
+                  border: '1.5px solid #c0392b33', borderRadius: 20, padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: 4, transition: '0.15s',
+                }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#c0392b'; e.currentTarget.style.color = 'white' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#c0392b' }}
+                >
+                  Population Report ↗
+                </a>
+                <a href={psaCertUrl} target="_blank" rel="noopener noreferrer" style={{
+                  fontSize: 11, fontWeight: 700, color: '#888', textDecoration: 'none',
+                  border: '1.5px solid #e0e0e0', borderRadius: 20, padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: 4, transition: '0.15s',
+                }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = '#bbb')}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = '#e0e0e0')}
+                >
+                  Cert Lookup ↗
+                </a>
+                {psaGrade && (
+                  <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, color: '#aaa' }}>Note {psaGrade}</span>
+                )}
+              </div>
+            )
+          })()}
+
           {popup.n && (
             <SameCardCollectors
               cardName={popup.n}
