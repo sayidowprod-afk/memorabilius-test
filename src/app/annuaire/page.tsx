@@ -229,11 +229,14 @@ function AnnuaireContent() {
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
-          animation: holo-text 4s linear infinite;
+          animation: holo-text 10s linear infinite;
         }
         @keyframes holo-text {
           0%   { background-position: 0% 50%; }
           100% { background-position: 300% 50%; }
+        }
+        @media (max-width: 600px) {
+          .holo-name { animation: none; background-position: 30% 50%; }
         }
       `}</style>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
