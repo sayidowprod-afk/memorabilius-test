@@ -129,21 +129,25 @@ export async function GET(req: NextRequest) {
     .slice(0, 20)
     .map(p => ({ name: p.name, isRc: p.isRc, sports: [...p.sports] }))
 
-  // Batch photo: first community card image for each player (by last name)
+  // Photo: cherche la première image de carte pour chaque joueur
   if (players.length > 0) {
-    const lastNames = players.map(p => p.name.split(' ').slice(-1)[0]).filter(Boolean)
-    const orFilter = lastNames.map(n => `nom.ilike.%${n}%`).join(',')
+    // Une seule requête: cartes dont le nom contient le query (les résultats sont déjà filtrés par ce query)
     const { data: photos } = await supabase
       .from('cartes_manuelles')
       .select('nom, image_recto')
       .not('image_recto', 'is', null)
-      .or(orFilter)
-      .limit(200)
+      .ilike('nom', `%${query}%`)
+      .order('created_at', { ascending: false })
+      .limit(100)
 
     const photosData = photos || []
     players = players.map(p => {
       const lastName = p.name.split(' ').slice(-1)[0].toLowerCase()
-      const match = photosData.find(ph => ph.nom?.toLowerCase().includes(lastName))
+      const firstName = p.name.split(' ')[0].toLowerCase()
+      const match = photosData.find(ph => {
+        const nom = ph.nom?.toLowerCase() || ''
+        return nom.includes(lastName) || nom.includes(firstName)
+      })
       return { ...p, photo: match?.image_recto || null }
     })
   }

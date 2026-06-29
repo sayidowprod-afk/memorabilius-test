@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { fetchCsvCardsForProfiles } from '@/lib/csvCards'
 
 export const revalidate = 3600
 
@@ -22,16 +23,29 @@ function seasonLabel(year: number, sport = 'nba') {
 
 async function fetchPlayer(slug: string) {
   const playerName = slugToName(slug)
+  const lastName = playerName.split(' ').slice(-1)[0]
 
-  // Cherche les entries pour ce joueur — la requête .ilike est case-insensitive
-  const { data: entries } = await supabase
-    .from('card_set_entries')
-    .select('set_id, variation, is_rc, card_sets(id, name, year, brand, sport)')
-    .ilike('player_name', playerName)
+  const [entriesRes, manuRes, profilesRes] = await Promise.all([
+    supabase
+      .from('card_set_entries')
+      .select('set_id, variation, is_rc, card_sets(id, name, year, brand, sport)')
+      .ilike('player_name', playerName),
+    supabase
+      .from('cartes_manuelles')
+      .select('id, nom, annee, marque, collection, variation, image_recto, is_horizontal, user_id, profiles(display_name, avatar_url, couleur_bordure)')
+      .ilike('nom', `%${lastName}%`)
+      .not('image_recto', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(48),
+    supabase
+      .from('profiles')
+      .select('id, display_name, avatar_url, lien_csv, couleur_bordure')
+      .not('lien_csv', 'is', null),
+  ])
 
   // Dédupliquer par set
   const setsMap = new Map<number, any>()
-  for (const e of entries || []) {
+  for (const e of entriesRes.data || []) {
     const cs = (e as any).card_sets
     if (!cs) continue
     if (!setsMap.has(cs.id)) setsMap.set(cs.id, { ...cs, isRc: false, variations: [] })
@@ -41,17 +55,50 @@ async function fetchPlayer(slug: string) {
   }
   const sets = [...setsMap.values()].sort((a, b) => (b.year || 0) - (a.year || 0))
 
-  // Cartes de la communauté — recherche par nom de famille (dernier mot)
-  const lastName = playerName.split(' ').slice(-1)[0]
-  const { data: communityCards } = await supabase
-    .from('cartes_manuelles')
-    .select('id, nom, annee, marque, collection, variation, image_recto, is_horizontal, user_id, profiles(display_name, avatar_url)')
-    .ilike('nom', `%${lastName}%`)
-    .not('image_recto', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(24)
+  // Cartes manuelles de la communauté
+  const manuellesCards = (manuRes.data || []).map((m: any) => ({
+    id: m.id,
+    img: m.image_recto,
+    nom: m.nom,
+    annee: m.annee,
+    marque: m.marque,
+    is_horizontal: m.is_horizontal,
+    user_id: m.user_id,
+    display_name: m.profiles?.display_name,
+    avatar_url: m.profiles?.avatar_url,
+    accent: m.profiles?.couleur_bordure || '#003DA6',
+    source: 'manuel' as const,
+  }))
 
-  return { playerName, sets, communityCards: communityCards || [], rcYear: sets.find((s: any) => s.isRc)?.year }
+  // Cartes CSV de la communauté
+  const csvAll = await fetchCsvCardsForProfiles(profilesRes.data || [])
+  const lowerLast = lastName.toLowerCase()
+  const csvCards = csvAll
+    .filter(c => c.name.toLowerCase().includes(lowerLast))
+    .slice(0, 48)
+    .map(c => ({
+      id: `csv-${c.user_id}-${c.img}`,
+      img: c.img,
+      nom: c.name,
+      annee: c.year,
+      marque: c.brand,
+      is_horizontal: false,
+      user_id: c.user_id,
+      display_name: c.display_name,
+      avatar_url: c.avatar_url,
+      accent: c.accent,
+      source: 'csv' as const,
+    }))
+
+  // Dédupliquer manuelles + CSV par img URL, limiter à 48
+  const seen = new Set<string>()
+  const communityCards = [...manuellesCards, ...csvCards].filter(c => {
+    if (seen.has(c.img)) return false
+    seen.add(c.img)
+    return true
+  }).slice(0, 48)
+
+  return { playerName, sets, communityCards, rcYear: sets.find((s: any) => s.isRc)?.year }
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -124,7 +171,7 @@ export default async function JoueurPage({ params }: { params: Promise<{ slug: s
                 <div style={{ borderRadius: 10, overflow: 'hidden', background: 'white', border: '1px solid #eee', transition: '0.15s' }}>
                   <div style={{ aspectRatio: '2.5/3.5', overflow: 'hidden', position: 'relative' }}>
                     <img
-                      src={card.image_recto}
+                      src={card.img}
                       alt={card.nom}
                       style={card.is_horizontal ? {
                         position: 'absolute', width: '140%', height: '71.43%',
@@ -139,9 +186,9 @@ export default async function JoueurPage({ params }: { params: Promise<{ slug: s
                     </div>
                     <div style={{ fontSize: 10, color: '#bbb', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
                       <img
-                        src={(card.profiles as any)?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent((card.profiles as any)?.display_name || 'U')}&background=003DA6&color=fff&size=20`}
+                        src={card.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(card.display_name || 'U')}&background=003DA6&color=fff&size=20`}
                         style={{ width: 12, height: 12, borderRadius: '50%' }} alt="" />
-                      {(card.profiles as any)?.display_name}
+                      {card.display_name}
                     </div>
                   </div>
                 </div>

@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { SPORTS_TEAMS, teamLogoUrl, SportsTeam } from '@/lib/sportsTeams'
 import { teamSlug, playerSlug } from '@/lib/playerSlug'
+import { fetchCsvCardsForProfiles } from '@/lib/csvCards'
 
 export const revalidate = 3600
 
@@ -25,16 +26,30 @@ async function fetchTeamData(slug: string) {
   const team = findTeam(slug)
   if (!team) return { team: null, sets: [], communityCards: [], players: [] }
 
-  // Sets where this team appears
-  const { data: entries } = await supabase
-    .from('card_set_entries')
-    .select('set_id, player_name, is_rc, card_sets(id, name, year, brand, sport)')
-    .ilike('team', `%${team.name.split(' ').slice(-1)[0]}%`) // match by last word (e.g. "76ers", "Lakers")
+  const teamLastWord = team.name.split(' ').slice(-1)[0]
 
-  // Deduplicate sets and collect players
+  const [entriesRes, manuRes, profilesRes] = await Promise.all([
+    supabase
+      .from('card_set_entries')
+      .select('set_id, player_name, is_rc, card_sets(id, name, year, brand, sport)')
+      .ilike('team', `%${teamLastWord}%`),
+    supabase
+      .from('cartes_manuelles')
+      .select('id, nom, annee, marque, image_recto, is_horizontal, user_id, profiles(display_name, avatar_url, couleur_bordure)')
+      .ilike('equipe', `%${teamLastWord}%`)
+      .not('image_recto', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(48),
+    supabase
+      .from('profiles')
+      .select('id, display_name, avatar_url, lien_csv, couleur_bordure')
+      .not('lien_csv', 'is', null),
+  ])
+
+  // Sets + players from card_set_entries
   const setsMap = new Map<number, any>()
   const playersMap = new Map<string, { name: string; isRc: boolean }>()
-  for (const e of entries || []) {
+  for (const e of entriesRes.data || []) {
     const cs = (e as any).card_sets
     if (!cs) continue
     if (!setsMap.has(cs.id)) setsMap.set(cs.id, { ...cs })
@@ -46,17 +61,48 @@ async function fetchTeamData(slug: string) {
   const sets = [...setsMap.values()].sort((a, b) => (b.year || 0) - (a.year || 0))
   const players = [...playersMap.values()].slice(0, 30)
 
-  // Community cards for this team
-  const teamLastWord = team.name.split(' ').slice(-1)[0]
-  const { data: communityCards } = await supabase
-    .from('cartes_manuelles')
-    .select('id, nom, annee, marque, image_recto, user_id, profiles(display_name, avatar_url)')
-    .ilike('equipe', `%${teamLastWord}%`)
-    .not('image_recto', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(24)
+  // Cartes manuelles
+  const manuellesCards = (manuRes.data || []).map((m: any) => ({
+    id: m.id,
+    img: m.image_recto,
+    nom: m.nom,
+    annee: m.annee,
+    marque: m.marque,
+    is_horizontal: m.is_horizontal,
+    user_id: m.user_id,
+    display_name: m.profiles?.display_name,
+    avatar_url: m.profiles?.avatar_url,
+    accent: m.profiles?.couleur_bordure || '#003DA6',
+  }))
 
-  return { team, sets, communityCards: communityCards || [], players }
+  // Cartes CSV
+  const csvAll = await fetchCsvCardsForProfiles(profilesRes.data || [])
+  const lowerTeam = teamLastWord.toLowerCase()
+  const csvCards = csvAll
+    .filter(c => c.team.toLowerCase().includes(lowerTeam))
+    .slice(0, 48)
+    .map(c => ({
+      id: `csv-${c.user_id}-${c.img}`,
+      img: c.img,
+      nom: c.name,
+      annee: c.year,
+      marque: c.brand,
+      is_horizontal: false,
+      user_id: c.user_id,
+      display_name: c.display_name,
+      avatar_url: c.avatar_url,
+      accent: c.accent,
+    }))
+
+  // Fusionner + dédupliquer par img
+  const seen = new Set<string>()
+  const communityCards = [...manuellesCards, ...csvCards].filter(c => {
+    if (seen.has(c.img)) return false
+    seen.add(c.img)
+    return true
+  }).slice(0, 48)
+
+  return { team, sets, communityCards, players }
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -133,12 +179,15 @@ export default async function EquipePage({ params }: { params: Promise<{ slug: s
             {communityCards.map((card: any) => (
               <Link key={card.id} href={`/galerie/${card.user_id}`} style={{ textDecoration: 'none' }}>
                 <div style={{ borderRadius: 10, overflow: 'hidden', background: 'white', border: '1px solid #eee' }}>
-                  <div style={{ aspectRatio: '2.5/3.5', overflow: 'hidden' }}>
-                    <img src={card.image_recto} alt={card.nom} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  <div style={{ aspectRatio: '2.5/3.5', overflow: 'hidden', position: 'relative' }}>
+                    <img src={card.img} alt={card.nom} style={card.is_horizontal ? {
+                      position: 'absolute', width: '140%', height: '71.43%',
+                      left: '-20%', top: '14.286%', transform: 'rotate(90deg)', objectFit: 'cover',
+                    } : { width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                   </div>
                   <div style={{ padding: '8px 10px' }}>
                     <div style={{ fontSize: 11, fontWeight: 800, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.nom}</div>
-                    <div style={{ fontSize: 10, color: '#999', marginTop: 2 }}>{(card.profiles as any)?.display_name}</div>
+                    <div style={{ fontSize: 10, color: '#999', marginTop: 2 }}>{card.display_name}</div>
                   </div>
                 </div>
               </Link>
