@@ -83,42 +83,35 @@ export async function fetchEspnHeadshots(
   sport = 'nba'
 ): Promise<Map<string, string>> {
   if (sport === 'nba') {
-    // NBA: essaie le CDN NBA d'abord (couvre actifs + retraités), ESPN en complément
-    const [nbaMap, espnMap] = await Promise.all([
-      // on appelle getNbaPlayerMap() puis on filtre par query pour ne pas tout parcourir
-      (async () => {
-        const map = await getNbaPlayerMap()
-        const result = new Map<string, string>()
-        const q = query.toLowerCase()
-        for (const [name, id] of map) {
-          if (name.includes(q) || q.includes(name.split(' ')[0])) {
-            result.set(name, `https://cdn.nba.com/headshots/nba/latest/1040x760/${id}.png`)
-          }
-        }
-        return result
-      })(),
-      fetchEspnMap(query, sport),
-    ])
-    // merge: NBA CDN prioritaire
-    const merged = new Map(espnMap)
-    for (const [k, v] of nbaMap) merged.set(k, v)
-    return merged
+    // ESPN d'abord — headshots corrects pour les joueurs actuels
+    const espnMap = await fetchEspnMap(query, sport)
+    if (espnMap.size > 0) return espnMap
+
+    // Fallback NBA CDN pour les joueurs retraités absents d'ESPN
+    const map = await getNbaPlayerMap()
+    const result = new Map<string, string>()
+    const q = query.toLowerCase()
+    for (const [name, id] of map) {
+      if (name.includes(q)) {
+        result.set(name, `https://cdn.nba.com/headshots/nba/latest/1040x760/${id}.png`)
+      }
+    }
+    return result
   }
   return fetchEspnMap(query, sport)
 }
 
 export async function fetchEspnHeadshot(name: string, sport = 'nba'): Promise<string | null> {
+  // ESPN d'abord (headshots propres pour joueurs actuels)
+  const espnMap = await fetchEspnMap(name, sport)
+  const lower = name.toLowerCase()
+  const espnHit = espnMap.get(lower) ?? null
+  if (espnHit) return espnHit
+
+  // Fallback NBA CDN pour les retraités (Jordan, Kobe…)
   if (sport === 'nba') {
     const nba = await fetchNbaHeadshot(name)
     if (nba) return nba
   }
-  const map = await fetchEspnMap(name, sport)
-  const lower = name.toLowerCase()
-  // Exact match d'abord, puis commence-par, puis contient
-  return (
-    map.get(lower) ??
-    [...map.entries()].find(([k]) => k === lower)?.[1] ??
-    [...map.entries()].find(([k]) => k.startsWith(lower) || lower.startsWith(k))?.[1] ??
-    null
-  )
+  return null
 }
