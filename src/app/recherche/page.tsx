@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useLang } from '@/lib/LangContext'
+import { playerSlug } from '@/lib/playerSlug'
 
 export default function Recherche() {
   const searchParams = useSearchParams()
@@ -10,6 +11,7 @@ export default function Recherche() {
   const [query, setQuery] = useState(searchParams.get('q') || '')
   const [cards, setCards] = useState<any[]>([])
   const [users, setUsers] = useState<any[]>([])
+  const [players, setPlayers] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
   const [visibleCount, setVisibleCount] = useState(40)
@@ -52,8 +54,9 @@ export default function Recherche() {
       const data = await r.json()
       setCards(data.cards || [])
       setUsers(data.users || [])
+      setPlayers(data.players || [])
       setVisibleCount(40)
-    } catch { setCards([]); setUsers([]) }
+    } catch { setCards([]); setUsers([]); setPlayers([]) }
     setLoading(false)
   }
 
@@ -122,11 +125,39 @@ export default function Recherche() {
       </div>
 
       {/* Résultats */}
-      {searched && !loading && cards.length === 0 && users.length === 0 && (
+      {searched && !loading && cards.length === 0 && users.length === 0 && players.length === 0 && (
         <div style={{ textAlign: 'center', padding: '60px 20px', color: '#bbb' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>🃏</div>
           <p style={{ fontSize: 18, fontWeight: 700 }}>Aucun résultat pour "{query}"</p>
           <p style={{ fontSize: 14, marginTop: 8 }}>{t('search_none_sub')}</p>
+        </div>
+      )}
+
+      {/* Section joueurs */}
+      {players.length > 0 && (
+        <div style={{ marginBottom: 36 }}>
+          <h2 style={{ fontWeight: 800, fontSize: 16, marginBottom: 14, color: '#555' }}>
+            Joueurs ({players.length})
+          </h2>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {players.map((p, i) => (
+              <Link key={i} href={`/joueur/${playerSlug(p.name)}`} style={{ textDecoration: 'none' }}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 7,
+                  background: 'white', border: '2px solid #003DA6',
+                  borderRadius: 50, padding: '6px 16px 6px 12px',
+                  transition: '0.2s', cursor: 'pointer',
+                }}
+                  onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-2px)')}
+                  onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
+                >
+                  <span style={{ fontSize: 18 }}>🏀</span>
+                  <span style={{ fontWeight: 800, fontSize: 14, color: '#121212' }}>{p.name}</span>
+                  {p.isRc && <span style={{ fontSize: 9, background: '#e67e22', color: 'white', padding: '2px 5px', borderRadius: 3, fontWeight: 700 }}>RC</span>}
+                </div>
+              </Link>
+            ))}
+          </div>
         </div>
       )}
 

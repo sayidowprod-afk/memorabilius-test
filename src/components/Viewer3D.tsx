@@ -1,6 +1,8 @@
 'use client'
 import { useRef, useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useLang } from '@/lib/LangContext'
+import { playerSlug } from '@/lib/playerSlug'
 import { useTheme } from '@/lib/ThemeContext'
 import CardVideoExport from '@/components/CardVideoExport'
 import CardValueModule from '@/components/CardValueModule'
@@ -724,7 +726,9 @@ export default function Viewer3D({ popup, accent, onClose, onNext, onPrev, getTa
 
         <div className="viewer-info">
           <div style={{ color: accent, fontWeight: 900, fontSize: 10, textTransform: 'uppercase', marginBottom: 2 }}>{popup.t}</div>
-          <h2 style={{ fontSize: '1.4rem', fontWeight: 900, margin: '3px 0' }}>{popup.n}</h2>
+          <Link href={`/joueur/${playerSlug(popup.n)}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 900, margin: '3px 0', cursor: 'pointer' }}>{popup.n}</h2>
+          </Link>
           <div style={{ fontSize: '0.9rem', color: accent, fontWeight: 700, marginBottom: 8, fontStyle: 'italic' }}>{popup.v}</div>
           {getTags(popup)}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, borderTop: `1px solid ${borderColor}`, marginTop: 10, paddingTop: 10 }}>

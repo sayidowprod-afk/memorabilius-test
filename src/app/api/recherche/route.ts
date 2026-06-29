@@ -107,11 +107,33 @@ export async function GET(req: NextRequest) {
     .filter(p => p.display_name?.toLowerCase().includes(query))
     .map(p => ({ id: p.id, display_name: p.display_name, avatar_url: p.avatar_url, accent: p.couleur_bordure || '#003DA6' }))
 
+  // Joueurs (card_set_entries — dédupliqués par nom)
+  const { data: playerEntries } = await supabase
+    .from('card_set_entries')
+    .select('player_name, is_rc, card_sets(sport)')
+    .ilike('player_name', `%${query}%`)
+    .limit(200)
+
+  const playersMap = new Map<string, { name: string; isRc: boolean; sports: Set<string> }>()
+  for (const e of playerEntries || []) {
+    const name = e.player_name
+    if (!name) continue
+    const sport = (e as any).card_sets?.sport || 'nba'
+    if (!playersMap.has(name)) playersMap.set(name, { name, isRc: false, sports: new Set() })
+    const p = playersMap.get(name)!
+    if (e.is_rc) p.isRc = true
+    p.sports.add(sport)
+  }
+  const players = [...playersMap.values()]
+    .sort((a, b) => a.name.toLowerCase().startsWith(query) ? -1 : b.name.toLowerCase().startsWith(query) ? 1 : 0)
+    .slice(0, 10)
+    .map(p => ({ name: p.name, isRc: p.isRc, sports: [...p.sports] }))
+
   results.sort((a, b) => {
     const aExact = a.name.toLowerCase().startsWith(query) ? 0 : 1
     const bExact = b.name.toLowerCase().startsWith(query) ? 0 : 1
     return aExact - bExact
   })
 
-  return NextResponse.json({ cards: results, users })
+  return NextResponse.json({ cards: results, users, players })
 }
