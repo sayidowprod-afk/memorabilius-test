@@ -131,6 +131,8 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
 
   const [scanning, setScanning] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
+  type DupCard = { id: string; nom: string; annee: number | null; marque: string | null; image_recto: string | null }
+  const [dupWarning, setDupWarning] = useState<{ cards: DupCard[]; userId: string } | null>(null)
   const rectoBase64Ref = useRef<string | null>(null)
 
   const uploadBlob = async (blob: Blob, side: 'recto' | 'verso' | 'il' | 'ir') => {
@@ -313,16 +315,9 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
     }, 'image/jpeg', 0.88)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!form.nom) { alert(lang === 'fr' ? 'Le nom est obligatoire' : 'Name is required'); return }
-    setSaving(true)
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user || user.id !== userId) { router.push('/connexion'); return }
-
+  const doInsert = async (uid: string) => {
     const { error } = await supabase.from('cartes_manuelles').insert({
-      user_id: user.id, nom: form.nom, equipe: form.equipe || null, annee: form.annee || null,
+      user_id: uid, nom: form.nom, equipe: form.equipe || null, annee: form.annee || null,
       marque: form.marque || null, collection: form.collection || null, variation: form.variation || null, grade: form.grade,
       num: form.num || null, card_number: form.card_number || null,
       rc: form.rc, auto: form.auto, patch: form.patch, booklet: form.booklet, is_horizontal: form.is_horizontal,
@@ -331,25 +326,44 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
       image_interieur_droite: form.image_interieur_droite || null,
       collection_tag: form.collection_tag || null,
     })
-
     if (error) { alert('Erreur : ' + error.message); setSaving(false); return }
-
-    // Incrémenter le classement mensuel immédiatement (sans attendre la prochaine synchro CSV)
-    fetch('/api/card-added', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id }) }).catch(() => {})
-
-    // Notifier les users qui ont cette carte dans leur wishlist
+    fetch('/api/card-added', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: uid }) }).catch(() => {})
     supabase.auth.getSession().then(({ data: { session } }) => {
       fetch('/api/wishlist-notify', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({
           card: { nom: form.nom, annee: form.annee, marque: form.marque, collection: form.collection, variation: form.variation, num: form.num, rc: form.rc, auto: form.auto, patch: form.patch },
-          cardUserId: user.id,
+          cardUserId: uid,
         }),
       })
     })
-
     router.push(`/galerie/${userId}`)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!form.nom) { alert(lang === 'fr' ? 'Le nom est obligatoire' : 'Name is required'); return }
+    setSaving(true)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user || user.id !== userId) { router.push('/connexion'); return }
+
+    // Vérifier les doublons potentiels (même nom + même année ou même marque)
+    const { data: dups } = await supabase
+      .from('cartes_manuelles')
+      .select('id, nom, annee, marque, image_recto')
+      .eq('user_id', user.id)
+      .ilike('nom', form.nom.trim())
+      .limit(5)
+
+    if (dups && dups.length > 0) {
+      setDupWarning({ cards: dups as DupCard[], userId: user.id })
+      setSaving(false)
+      return
+    }
+
+    await doInsert(user.id)
   }
 
   const ImageUploader = ({ side, label, preview, uploading, aspect }: { side: 'recto' | 'verso' | 'il' | 'ir', label: string, preview: string | null, uploading: boolean, aspect?: string }) => {
@@ -532,6 +546,55 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
           </button>
         </div>
       </form>
+
+      {/* Modal doublon */}
+      {dupWarning && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+        }}>
+          <div style={{
+            background: 'white', borderRadius: 16, padding: '28px 24px', maxWidth: 420, width: '100%',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+          }}>
+            <div style={{ fontSize: 28, marginBottom: 8, textAlign: 'center' }}>⚠️</div>
+            <h3 style={{ fontSize: 17, fontWeight: 900, color: '#111', margin: '0 0 6px', textAlign: 'center' }}>
+              {lang === 'fr' ? 'Carte déjà dans ta galerie ?' : 'Card already in your gallery?'}
+            </h3>
+            <p style={{ fontSize: 13, color: '#666', margin: '0 0 16px', textAlign: 'center' }}>
+              {lang === 'fr'
+                ? `Tu as déjà ${dupWarning.cards.length} carte${dupWarning.cards.length > 1 ? 's' : ''} avec ce nom.`
+                : `You already have ${dupWarning.cards.length} card${dupWarning.cards.length > 1 ? 's' : ''} with this name.`}
+            </p>
+            {/* Aperçu des doublons */}
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 20, flexWrap: 'wrap' }}>
+              {dupWarning.cards.slice(0, 4).map(c => (
+                <div key={c.id} style={{ textAlign: 'center' }}>
+                  {c.image_recto
+                    ? <img src={c.image_recto} alt={c.nom} style={{ width: 72, height: 100, objectFit: 'cover', borderRadius: 6, display: 'block' }} />
+                    : <div style={{ width: 72, height: 100, background: '#f0f0f0', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>🃏</div>
+                  }
+                  <div style={{ fontSize: 10, color: '#999', marginTop: 4, maxWidth: 72, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {c.annee}{c.marque ? ` · ${c.marque}` : ''}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => { setDupWarning(null) }}
+                style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: '2px solid #e0e0e0', background: 'white', fontWeight: 700, fontSize: 14, cursor: 'pointer', color: '#333' }}>
+                {lang === 'fr' ? 'Annuler' : 'Cancel'}
+              </button>
+              <button
+                onClick={async () => { setDupWarning(null); setSaving(true); await doInsert(dupWarning.userId) }}
+                style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: 'none', background: '#003DA6', color: 'white', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>
+                {lang === 'fr' ? 'Ajouter quand même' : 'Add anyway'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {cameraModal && (
         <CameraCapture
