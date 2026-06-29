@@ -5,7 +5,7 @@ import { useLang } from '@/lib/LangContext'
 interface Card {
   img: string; name: string; variant: string; year: string
   brand: string; rc: boolean; auto: boolean; patch: boolean
-  num: string; collector: string; userId: string
+  num: string; collector: string; userId: string; isHorizontal: boolean
 }
 
 export default function PepitesSection({ cards }: { cards: Card[] }) {
@@ -17,8 +17,9 @@ export default function PepitesSection({ cards }: { cards: Card[] }) {
     <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 20, marginBottom: 60 }}>
       {cards.map((card, i) => (
         <Link key={i} href={`/galerie/${card.userId}`} style={{ background: 'white', borderRadius: 12, overflow: 'hidden', border: '1px solid #eee', textDecoration: 'none', display: 'block', transition: '0.3s' }}>
-          <div style={{ aspectRatio: '2.5/3.5', overflow: 'hidden' }}>
-            <img src={card.img} alt={card.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading={i === 0 ? 'eager' : 'lazy'} fetchPriority={i === 0 ? 'high' : 'auto'} />
+          <div style={{ aspectRatio: '2.5/3.5', overflow: 'hidden', position: 'relative' }}>
+            <img src={card.img} alt={card.name} loading={i === 0 ? 'eager' : 'lazy'} fetchPriority={i === 0 ? 'high' : 'auto'}
+              style={card.isHorizontal ? { position: 'absolute', width: '140%', height: '71.43%', left: '-20%', top: '14.286%', transform: 'rotate(90deg)', objectFit: 'cover' } : { width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
           <div style={{ padding: '10px 12px' }}>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>

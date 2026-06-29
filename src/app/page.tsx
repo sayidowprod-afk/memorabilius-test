@@ -10,14 +10,14 @@ export const revalidate = 300
 interface Card {
   img: string; name: string; variant: string; year: string
   brand: string; rc: boolean; auto: boolean; patch: boolean
-  num: string; collector: string; userId: string
+  num: string; collector: string; userId: string; isHorizontal: boolean
 }
 
 async function fetchPepites(): Promise<Card[]> {
   const [{ data: manuelles }, { data: profiles }] = await Promise.all([
     supabase
       .from('cartes_manuelles')
-      .select('image_recto, nom, variation, annee, marque, rc, auto, patch, num, user_id')
+      .select('image_recto, nom, variation, annee, marque, rc, auto, patch, num, user_id, is_horizontal')
       .not('image_recto', 'is', null)
       .order('created_at', { ascending: false })
       .limit(200),
@@ -45,6 +45,7 @@ async function fetchPepites(): Promise<Card[]> {
     num: m.num || '',
     collector: profileMap.get(m.user_id) as string,
     userId: m.user_id,
+    isHorizontal: m.is_horizontal || false,
   }))
 
   // Passe 1 : max 1 carte par utilisateur pour la diversité
