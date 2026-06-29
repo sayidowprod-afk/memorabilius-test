@@ -18,7 +18,7 @@ async function getNbaPlayerMap(): Promise<Map<string, number>> {
           'x-nba-stats-origin': 'stats',
           'x-nba-stats-token': 'true',
         },
-        signal: AbortSignal.timeout(6000),
+        signal: AbortSignal.timeout(2500),
         next: { revalidate: 86400 },
       } as RequestInit
     )

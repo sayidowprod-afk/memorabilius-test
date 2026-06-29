@@ -26,6 +26,7 @@ async function fetchPlayer(slug: string) {
   const playerName = slugToName(slug)
   const lowerFull = playerName.toLowerCase()
 
+  // 1re vague : données structurées + profils CSV en parallèle
   const [entriesRes, manuRes, profilesRes] = await Promise.all([
     supabase
       .from('card_set_entries')
@@ -33,7 +34,7 @@ async function fetchPlayer(slug: string) {
       .ilike('player_name', playerName),
     supabase
       .from('cartes_manuelles')
-      .select('id, nom, annee, marque, collection, variation, image_recto, is_horizontal, user_id, profiles(display_name, avatar_url, couleur_bordure)')
+      .select('id, nom, annee, rc, marque, collection, variation, image_recto, is_horizontal, user_id, profiles(display_name, avatar_url, couleur_bordure)')
       .ilike('nom', `%${playerName}%`)
       .not('image_recto', 'is', null)
       .order('created_at', { ascending: false })
@@ -44,7 +45,7 @@ async function fetchPlayer(slug: string) {
       .not('lien_csv', 'is', null),
   ])
 
-  // Dédupliquer par set
+  // Sets
   const setsMap = new Map<number, any>()
   for (const e of entriesRes.data || []) {
     const cs = (e as any).card_sets
@@ -55,8 +56,20 @@ async function fetchPlayer(slug: string) {
     if (e.variation && !s.variations.includes(e.variation)) s.variations.push(e.variation)
   }
   const sets = [...setsMap.values()].sort((a, b) => (b.year || 0) - (a.year || 0))
+  const primarySport = sets[0]?.sport || 'nba'
 
-  // Cartes manuelles de la communauté
+  // RC year : depuis sets d'abord, sinon depuis cartes_manuelles
+  const rcFromSets = sets.find((s: any) => s.isRc)?.year as number | undefined
+  const rcFromManuelles = (manuRes.data || []).find((m: any) => m.rc)?.annee as number | undefined
+  const rcYear = rcFromSets || rcFromManuelles
+
+  // 2e vague : CSV + headshot en parallèle (indépendants l'un de l'autre)
+  const [csvAll, headshot] = await Promise.all([
+    fetchCsvCardsForProfiles(profilesRes.data || []),
+    fetchEspnHeadshot(playerName, primarySport),
+  ])
+
+  // Cartes manuelles
   const manuellesCards = (manuRes.data || []).map((m: any) => ({
     id: m.id,
     img: m.image_recto,
@@ -71,8 +84,7 @@ async function fetchPlayer(slug: string) {
     source: 'manuel' as const,
   }))
 
-  // Cartes CSV de la communauté — filtre par nom complet
-  const csvAll = await fetchCsvCardsForProfiles(profilesRes.data || [])
+  // Cartes CSV — filtre par nom complet
   const csvCards = csvAll
     .filter(c => c.name.toLowerCase().includes(lowerFull))
     .map(c => ({
@@ -89,7 +101,7 @@ async function fetchPlayer(slug: string) {
       source: 'csv' as const,
     }))
 
-  // Dédupliquer manuelles + CSV par img URL
+  // Fusionner + dédupliquer par img URL
   const seen = new Set<string>()
   const communityCards = [...manuellesCards, ...csvCards].filter(c => {
     if (seen.has(c.img)) return false
@@ -97,10 +109,7 @@ async function fetchPlayer(slug: string) {
     return true
   })
 
-  const primarySport = sets[0]?.sport || 'nba'
-  const headshot = await fetchEspnHeadshot(playerName, primarySport)
-
-  return { playerName, sets, communityCards, rcYear: sets.find((s: any) => s.isRc)?.year, headshot }
+  return { playerName, sets, communityCards, rcYear, headshot }
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
