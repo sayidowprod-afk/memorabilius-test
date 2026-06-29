@@ -726,7 +726,10 @@ export default function Viewer3D({ popup, accent, onClose, onNext, onPrev, getTa
 
         <div className="viewer-info">
           <div style={{ color: accent, fontWeight: 900, fontSize: 10, textTransform: 'uppercase', marginBottom: 2 }}>{popup.t}</div>
-          <Link href={`/joueur/${playerSlug(popup.n)}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+          <Link href={`/joueur/${playerSlug(popup.n)}`} style={{ textDecoration: 'none', color: 'inherit' }}
+            onMouseEnter={e => (e.currentTarget.querySelector('h2')!.style.textDecoration = 'underline')}
+            onMouseLeave={e => (e.currentTarget.querySelector('h2')!.style.textDecoration = 'none')}
+          >
             <h2 style={{ fontSize: '1.4rem', fontWeight: 900, margin: '3px 0', cursor: 'pointer' }}>{popup.n}</h2>
           </Link>
           <div style={{ fontSize: '0.9rem', color: accent, fontWeight: 700, marginBottom: 8, fontStyle: 'italic' }}>{popup.v}</div>
