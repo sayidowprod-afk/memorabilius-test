@@ -260,15 +260,15 @@ export default function Viewer3D({ popup, accent, onClose, onNext, onPrev, getTa
         .viewer-zone { flex: 1.2; position: relative; overflow: hidden; background: ${zoneBg}; display: flex; align-items: center; justify-content: center; perspective: 2000px; cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none; }
         .viewer-info { flex: 0.8; padding: 30px; display: flex; flex-direction: column; justify-content: center; background: ${infoBg}; overflow-y: auto; color: ${textColor}; }
         .viewer-card { width: 560px; height: 784px; }
-        .viewer-card--horizontal { width: min(784px, 88%) !important; height: auto !important; aspect-ratio: 3.5/2.5 !important; }
-        @media (max-width: 1200px) { .viewer-card { width: 420px; height: 588px; } .viewer-card--horizontal { width: min(588px, 88%) !important; } }
+        .viewer-card--horizontal { width: min(784px, 88%) !important; height: calc(min(784px, 88%) * 2.5 / 3.5) !important; }
+        @media (max-width: 1200px) { .viewer-card { width: 420px; height: 588px; } .viewer-card--horizontal { width: min(560px, 88%) !important; height: calc(min(560px, 88%) * 2.5 / 3.5) !important; } }
         @media (max-width: 600px) {
           .viewer-layout { flex-direction: column; }
           .viewer-zone { flex: 0 0 65% !important; width: 100% !important; }
           .viewer-info { flex: 1 !important; width: 100% !important; padding: 10px 14px !important; justify-content: flex-start !important; }
           .viewer-info h2 { font-size: 1rem !important; margin: 2px 0 !important; }
           .viewer-card { width: 240px !important; height: 336px !important; }
-          .viewer-card--horizontal { width: min(260px, 88%) !important; }
+          .viewer-card--horizontal { width: min(260px, 88%) !important; height: calc(min(260px, 88%) * 2.5 / 3.5) !important; }
           .viewer-hint { display: none !important; }
         }
       `}</style>
