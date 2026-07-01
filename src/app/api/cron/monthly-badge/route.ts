@@ -53,6 +53,7 @@ export async function GET(req: NextRequest) {
   await supabase.from('badges').insert({
     user_id: winnerId,
     type: 'collectionneur_du_mois',
+    label: 'Collectionneur du mois',
     mois: monthLabel,
     description: `${cardCount} cartes ajoutées en ${monthLabel}`,
   })
@@ -61,7 +62,8 @@ export async function GET(req: NextRequest) {
   await supabase.from('notifications').insert({
     user_id: winnerId,
     type: 'badge',
-    contenu: `🏆 Tu es le Collectionneur du mois de ${monthLabel} ! Tu as ajouté ${cardCount} cartes.`,
+    message: `🏆 Tu es le Collectionneur du mois de ${monthLabel} ! Tu as ajouté ${cardCount} cartes.`,
+    lien: `/galerie/${winnerId}`,
     lu: false,
   })
 
