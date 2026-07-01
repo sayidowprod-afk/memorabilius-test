@@ -169,15 +169,17 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
           else { setLoaded(true); return }
         }
 
-        // Charger les tags CSV d'abord, puis le profil + CSV
-        const { data: tagsData } = await supabase.from('carte_tags').select('card_key, collection_tag').eq('user_id', resolvedId)
+        // Tags CSV et profil sont indépendants → en parallèle (le profil a
+        // juste besoin de tagsMap une fois résolu, pas besoin d'attendre en série)
+        const [{ data: tagsData }, { data: profileData }] = await Promise.all([
+          supabase.from('carte_tags').select('card_key, collection_tag').eq('user_id', resolvedId),
+          supabase.from('profiles').select('*').eq('id', resolvedId).single(),
+        ])
         const tagsMap = new Map((tagsData || []).map((r: any) => [r.card_key, r.collection_tag]))
         setCsvTags(tagsMap)
 
-        supabase.from('profiles').select('*').eq('id', resolvedId).single().then(({ data }) => {
-          if (data) { setProfile(data); loadCSV(data.lien_csv ?? null, tagsMap, data.gallery_order || []) }
-          else setLoaded(true)
-        })
+        if (profileData) { setProfile(profileData); loadCSV(profileData.lien_csv ?? null, tagsMap, profileData.gallery_order || []) }
+        else setLoaded(true)
         supabase.from('badges').select('mois').eq('user_id', resolvedId).eq('type', 'collectionneur_du_mois').order('mois', { ascending: false }).limit(6).then(({ data }) => {
           if (data) setMonthlyBadges(data.map((b: any) => b.mois))
         })

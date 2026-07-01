@@ -16,32 +16,30 @@ export async function POST(req: NextRequest) {
 
     const stats = { total: 0, rc: 0, auto: 0, num: 0, patch: 0 }
 
-    // Cartes CSV
-    if (csvUrl) {
-      const r = await fetch(csvUrl, { cache: 'no-store' })
-      if (r.ok) {
-        const text = await r.text()
-        const lines = text.split(/\r?\n/).slice(4)
-        lines.forEach(line => {
-          const c = line.split(',')
-          if (!c[0] || !c[0].includes('http')) return
-          stats.total++
-          if (c[10]?.toLowerCase().includes('oui')) stats.rc++
-          if (c[9]?.toLowerCase().includes('oui')) stats.auto++
-          if (c[11]?.toLowerCase().includes('oui')) stats.patch++
-          if (c[8]?.trim()) stats.num++
-        })
-      }
+    // CSV, cartes manuelles et ancien total sont indépendants → en parallèle
+    const [csvText, manuellesRes, prevRes] = await Promise.all([
+      csvUrl
+        ? fetch(csvUrl, { cache: 'no-store' }).then(r => r.ok ? r.text() : null).catch(() => null)
+        : Promise.resolve(null),
+      supabase.from('cartes_manuelles').select('rc, auto, patch, num').eq('user_id', userId),
+      supabase.from('profiles').select('stats_total').eq('id', userId).single(),
+    ])
+
+    if (csvText) {
+      const lines = csvText.split(/\r?\n/).slice(4)
+      lines.forEach(line => {
+        const c = line.split(',')
+        if (!c[0] || !c[0].includes('http')) return
+        stats.total++
+        if (c[10]?.toLowerCase().includes('oui')) stats.rc++
+        if (c[9]?.toLowerCase().includes('oui')) stats.auto++
+        if (c[11]?.toLowerCase().includes('oui')) stats.patch++
+        if (c[8]?.trim()) stats.num++
+      })
     }
 
-    // Cartes manuelles
-    const { data: manuelles } = await supabase
-      .from('cartes_manuelles')
-      .select('rc, auto, patch, num')
-      .eq('user_id', userId)
-
-    if (manuelles) {
-      manuelles.forEach((m: any) => {
+    if (manuellesRes.data) {
+      manuellesRes.data.forEach((m: any) => {
         stats.total++
         if (m.rc) stats.rc++
         if (m.auto) stats.auto++
@@ -50,9 +48,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Lire l'ancien total avant d'écraser (pour calculer le delta mensuel)
-    const { data: prev } = await supabase.from('profiles').select('stats_total').eq('id', userId).single()
-    const prevTotal = prev?.stats_total || 0
+    const prevTotal = prevRes.data?.stats_total || 0
     const delta = Math.max(0, stats.total - prevTotal)
 
     await supabase.from('profiles').update({
