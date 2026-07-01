@@ -55,7 +55,13 @@ function MemoLinkPreview({ url }: { url: string }) {
       if (parsed.type === 'carte') {
         const { data: c } = await supabase.from('cartes_manuelles').select('nom, image_recto, annee, marque')
           .eq('user_id', parsed.userId).eq('image_recto', parsed.card).maybeSingle()
-        if (!cancelled) setData(c ? { title: c.nom, subtitle: [c.annee, c.marque].filter(Boolean).join(' · '), img: c.image_recto, icon: '🃏' } : null)
+        if (cancelled) return
+        // Si la fiche n'existe plus en DB (supprimée/modifiée depuis le partage du
+        // lien), on affiche quand même la miniature de l'image (le fichier peut
+        // encore exister) plutôt qu'un lien nu sans aucun aperçu
+        setData(c
+          ? { title: c.nom, subtitle: [c.annee, c.marque].filter(Boolean).join(' · '), img: c.image_recto, icon: '🃏' }
+          : { title: 'Carte', subtitle: undefined, img: parsed.card, icon: '🃏' })
       } else if (parsed.type === 'galerie') {
         const { data: p } = await supabase.from('profiles').select('display_name, avatar_url').eq('id', parsed.userId).single()
         if (!cancelled) setData(p ? { title: p.display_name, subtitle: 'Collectionneur', img: p.avatar_url, icon: '👤', round: true } : null)
