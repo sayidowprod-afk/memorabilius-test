@@ -129,3 +129,87 @@ export async function fetchEspnHeadshot(name: string, sport = 'nba'): Promise<st
   }
   return null
 }
+
+// ── Bio ESPN (date de naissance, lieu, historique d'équipes) ──────────────────
+const LEAGUE_MAP: Record<string, string> = { nba: 'nba', nfl: 'nfl', nhl: 'nhl', mlb: 'mlb' }
+
+export interface EspnPlayerBio {
+  birthDate: string | null
+  birthPlace: string | null
+  teams: string[]
+}
+
+async function findEspnAthleteId(name: string, sport: string): Promise<string | null> {
+  const espnSport = SPORT_MAP[sport] || 'basketball'
+  try {
+    const url = `https://site.api.espn.com/apis/search/v2?query=${encodeURIComponent(name)}&limit=20&type=player&sport=${espnSport}`
+    const r = await fetch(url, { signal: AbortSignal.timeout(3000), next: { revalidate: 86400 } } as RequestInit)
+    if (!r.ok) return null
+    const data = await r.json()
+    const target = norm(name)
+    for (const section of data.results ?? []) {
+      for (const a of section.contents ?? []) {
+        if (a.displayName && norm(a.displayName) === target && a.uid) {
+          const m = /a:(\d+)/.exec(a.uid)
+          if (m) return m[1]
+        }
+      }
+    }
+  } catch { /* ESPN unavailable */ }
+  return null
+}
+
+export async function fetchEspnPlayerBio(name: string, sport = 'nba'): Promise<EspnPlayerBio | null> {
+  const league = LEAGUE_MAP[sport] || 'nba'
+  const espnSport = SPORT_MAP[sport] || 'basketball'
+  const id = await findEspnAthleteId(name, sport)
+  if (!id) return null
+
+  let birthDate: string | null = null
+  let birthPlace: string | null = null
+  try {
+    const r = await fetch(
+      `https://sports.core.api.espn.com/v2/sports/${espnSport}/leagues/${league}/athletes/${id}?lang=en&region=us`,
+      { signal: AbortSignal.timeout(3000), next: { revalidate: 86400 } } as RequestInit
+    )
+    if (r.ok) {
+      const data = await r.json()
+      birthDate = data.dateOfBirth ? String(data.dateOfBirth).slice(0, 10) : null
+      const bp = data.birthPlace
+      birthPlace = bp ? [bp.city, bp.state || bp.country].filter(Boolean).join(', ') : null
+    }
+  } catch { /* ESPN unavailable */ }
+
+  let teams: string[] = []
+  try {
+    const r = await fetch(
+      `https://sports.core.api.espn.com/v2/sports/${espnSport}/leagues/${league}/athletes/${id}/statisticslog?lang=en&region=us`,
+      { signal: AbortSignal.timeout(3000), next: { revalidate: 86400 } } as RequestInit
+    )
+    if (r.ok) {
+      const data = await r.json()
+      const teamIds = new Set<string>()
+      for (const entry of data.entries ?? []) {
+        for (const s of entry.statistics ?? []) {
+          const ref: string | undefined = s?.team?.$ref
+          const m = ref ? /\/teams\/(\d+)/.exec(ref) : null
+          if (m) teamIds.add(m[1])
+        }
+      }
+      const names = await Promise.all([...teamIds].map(async tid => {
+        try {
+          const tr = await fetch(
+            `https://sports.core.api.espn.com/v2/sports/${espnSport}/leagues/${league}/teams/${tid}?lang=en&region=us`,
+            { signal: AbortSignal.timeout(2500), next: { revalidate: 86400 } } as RequestInit
+          )
+          if (!tr.ok) return null
+          const td = await tr.json()
+          return td.displayName as string | undefined
+        } catch { return null }
+      }))
+      teams = names.filter((n): n is string => !!n)
+    }
+  } catch { /* ESPN unavailable */ }
+
+  return { birthDate, birthPlace, teams }
+}

@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { fetchCsvCardsForProfiles } from '@/lib/csvCards'
-import { fetchEspnHeadshot } from '@/lib/espnHeadshot'
+import { fetchEspnHeadshot, fetchEspnPlayerBio } from '@/lib/espnHeadshot'
 import { normalizeName } from '@/lib/playerSlug'
 
 export const revalidate = 3600
@@ -30,19 +30,24 @@ async function fetchPlayer(slug: string) {
   // On élargit la recherche par prénom (généralement sans accent) puis on filtre
   // précisément côté JS avec normalizeName() (insensible accents/casse/ponctuation).
   const normTarget = normalizeName(playerName)
-  const firstName = playerName.split(' ')[0]
+  const nameParts = playerName.split(' ')
+  const firstName = nameParts[0]
+  const lastName = nameParts[nameParts.length - 1]
 
   // 1re vague : données structurées + profils CSV en parallèle
+  // Pré-filtre SQL sur prénom ET nom (pas juste le prénom, sinon collisions genre "Michael X")
   const [entriesRes, manuRes, profilesRes] = await Promise.all([
     supabase
       .from('card_set_entries')
       .select('set_id, variation, is_rc, player_name, card_sets(id, name, year, brand, sport)')
       .ilike('player_name', `${firstName}%`)
+      .ilike('player_name', `%${lastName}%`)
       .limit(3000),
     supabase
       .from('cartes_manuelles')
       .select('id, nom, annee, rc, marque, collection, variation, image_recto, is_horizontal, user_id, profiles(display_name, avatar_url, couleur_bordure)')
       .ilike('nom', `%${firstName}%`)
+      .ilike('nom', `%${lastName}%`)
       .not('image_recto', 'is', null)
       .order('created_at', { ascending: false })
       .limit(5000),
@@ -74,10 +79,11 @@ async function fetchPlayer(slug: string) {
   const rcFromManuelles = matchedManu.find((m: any) => m.rc)?.annee as number | undefined
   const rcYear = rcFromSets || rcFromManuelles
 
-  // 2e vague : CSV + headshot en parallèle (indépendants l'un de l'autre)
-  const [csvAll, headshot] = await Promise.all([
+  // 2e vague : CSV + headshot + bio en parallèle (indépendants l'un de l'autre)
+  const [csvAll, headshot, bio] = await Promise.all([
     fetchCsvCardsForProfiles(profilesRes.data || []),
     fetchEspnHeadshot(playerName, primarySport),
+    fetchEspnPlayerBio(playerName, primarySport),
   ])
 
   // Cartes manuelles
@@ -120,7 +126,7 @@ async function fetchPlayer(slug: string) {
     return true
   })
 
-  return { playerName, sets, communityCards, rcYear, headshot }
+  return { playerName, sets, communityCards, rcYear, headshot, bio }
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -142,7 +148,7 @@ const ACCENT = '#003DA6'
 
 export default async function JoueurPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const { playerName, sets, communityCards, rcYear, headshot } = await fetchPlayer(slug)
+  const { playerName, sets, communityCards, rcYear, headshot, bio } = await fetchPlayer(slug)
 
   const sports = [...new Set(sets.map((s: any) => s.sport as string))]
 
@@ -187,6 +193,19 @@ export default async function JoueurPage({ params }: { params: Promise<{ slug: s
               </span>
             )}
           </div>
+          {bio && (bio.birthDate || bio.teams.length > 0) && (
+            <div style={{ marginTop: 10, fontSize: 12.5, color: '#777', display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {bio.birthDate && (
+                <span>
+                  🎂 {new Date(bio.birthDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  {bio.birthPlace ? ` · ${bio.birthPlace}` : ''}
+                </span>
+              )}
+              {bio.teams.length > 0 && (
+                <span>🏟️ {bio.teams.join(' · ')}</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
