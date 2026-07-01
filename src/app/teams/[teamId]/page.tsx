@@ -11,8 +11,14 @@ const ACCENT = '#003DA6'
 const EMOJIS = ['👍', '❤️', '🔥', '😂', '😮', '🏀', '💎', '🐐']
 
 // ── Liens dans le chat : détection URL + aperçu riche pour les liens Memorabilius ──
-const URL_REGEX = /(https?:\/\/[^\s]+)/g
+// Capture les URLs complètes (http/https) ET les liens memorabilius.fr tapés/collés
+// sans protocole (ex: "memorabilius.fr/teams/3" ou "www.memorabilius.fr/...")
+const URL_REGEX = /(https?:\/\/[^\s]+|(?:www\.)?memorabilius\.fr\/\S+)/gi
 const SITE_HOSTS = ['memorabilius.fr', 'www.memorabilius.fr']
+
+function withProtocol(url: string): string {
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`
+}
 
 type ParsedMemoLink =
   | { type: 'carte'; userId: string; card: string }
@@ -22,9 +28,9 @@ type ParsedMemoLink =
   | { type: 'setlist'; id: string }
   | { type: 'teams'; id: string }
 
-function parseMemorabiliusLink(url: string): ParsedMemoLink | null {
+function parseMemorabiliusLink(rawUrl: string): ParsedMemoLink | null {
   try {
-    const u = new URL(url)
+    const u = new URL(withProtocol(rawUrl))
     if (!SITE_HOSTS.includes(u.hostname) && !u.hostname.endsWith('.vercel.app') && u.hostname !== 'localhost') return null
     const parts = u.pathname.split('/').filter(Boolean)
     if (parts[0] === 'galerie' && parts[1]) {
@@ -75,10 +81,10 @@ function MemoLinkPreview({ url }: { url: string }) {
   }, [url])
 
   if (!parsed) {
-    return <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline', wordBreak: 'break-all' }}>{url}</a>
+    return <a href={withProtocol(url)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline', wordBreak: 'break-all' }}>{url}</a>
   }
   if (data === undefined) return <span style={{ opacity: 0.6 }}>{url}</span>
-  if (data === null) return <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline', wordBreak: 'break-all' }}>{url}</a>
+  if (data === null) return <a href={withProtocol(url)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline', wordBreak: 'break-all' }}>{url}</a>
 
   const href = parsed.type === 'carte' ? `/galerie/${parsed.userId}?card=${encodeURIComponent(parsed.card)}`
     : parsed.type === 'galerie' ? `/galerie/${parsed.userId}`
@@ -103,13 +109,13 @@ function MemoLinkPreview({ url }: { url: string }) {
 }
 
 function LinkifiedText({ text }: { text: string }) {
-  // Regex globale : ne pas réutiliser .test() dessus (lastIndex partagé, résultats
-  // alternants faux) — split() suffit, on vérifie ensuite chaque part isolément
+  // split() avec un groupe capturant alterne texte normal / match : les indices
+  // impairs sont toujours les URLs capturées (plus fiable qu'un second regex.test)
   const parts = text.split(URL_REGEX)
   return (
     <>
       {parts.map((part, i) =>
-        /^https?:\/\//.test(part)
+        i % 2 === 1
           ? <MemoLinkPreview key={i} url={part} />
           : <span key={i}>{part}</span>
       )}
