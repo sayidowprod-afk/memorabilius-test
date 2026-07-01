@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { fetchCsvCardsForProfiles } from '@/lib/csvCards'
 import { fetchEspnHeadshot } from '@/lib/espnHeadshot'
+import { normalizeName } from '@/lib/playerSlug'
 
 export const revalidate = 3600
 
@@ -24,18 +25,24 @@ function seasonLabel(year: number, sport = 'nba') {
 
 async function fetchPlayer(slug: string) {
   const playerName = slugToName(slug)
-  const lowerFull = playerName.toLowerCase()
+  // playerSlug() enlève les accents pour l'URL ; slugToName() ne peut pas les reconstituer
+  // → on ne peut pas faire de ilike exact contre la DB (qui garde les accents).
+  // On élargit la recherche par prénom (généralement sans accent) puis on filtre
+  // précisément côté JS avec normalizeName() (insensible accents/casse/ponctuation).
+  const normTarget = normalizeName(playerName)
+  const firstName = playerName.split(' ')[0]
 
   // 1re vague : données structurées + profils CSV en parallèle
   const [entriesRes, manuRes, profilesRes] = await Promise.all([
     supabase
       .from('card_set_entries')
-      .select('set_id, variation, is_rc, card_sets(id, name, year, brand, sport)')
-      .ilike('player_name', playerName),
+      .select('set_id, variation, is_rc, player_name, card_sets(id, name, year, brand, sport)')
+      .ilike('player_name', `${firstName}%`)
+      .limit(3000),
     supabase
       .from('cartes_manuelles')
       .select('id, nom, annee, rc, marque, collection, variation, image_recto, is_horizontal, user_id, profiles(display_name, avatar_url, couleur_bordure)')
-      .ilike('nom', `%${playerName}%`)
+      .ilike('nom', `%${firstName}%`)
       .not('image_recto', 'is', null)
       .order('created_at', { ascending: false })
       .limit(5000),
@@ -45,9 +52,13 @@ async function fetchPlayer(slug: string) {
       .not('lien_csv', 'is', null),
   ])
 
+  // Filtrage précis insensible aux accents (le ilike ci-dessus n'est qu'un pré-filtre large)
+  const matchedEntries = (entriesRes.data || []).filter((e: any) => normalizeName(e.player_name || '') === normTarget)
+  const matchedManu = (manuRes.data || []).filter((m: any) => normalizeName(m.nom || '').includes(normTarget))
+
   // Sets
   const setsMap = new Map<number, any>()
-  for (const e of entriesRes.data || []) {
+  for (const e of matchedEntries) {
     const cs = (e as any).card_sets
     if (!cs) continue
     if (!setsMap.has(cs.id)) setsMap.set(cs.id, { ...cs, isRc: false, variations: [] })
@@ -60,7 +71,7 @@ async function fetchPlayer(slug: string) {
 
   // RC year : depuis sets d'abord, sinon depuis cartes_manuelles
   const rcFromSets = sets.find((s: any) => s.isRc)?.year as number | undefined
-  const rcFromManuelles = (manuRes.data || []).find((m: any) => m.rc)?.annee as number | undefined
+  const rcFromManuelles = matchedManu.find((m: any) => m.rc)?.annee as number | undefined
   const rcYear = rcFromSets || rcFromManuelles
 
   // 2e vague : CSV + headshot en parallèle (indépendants l'un de l'autre)
@@ -70,7 +81,7 @@ async function fetchPlayer(slug: string) {
   ])
 
   // Cartes manuelles
-  const manuellesCards = (manuRes.data || []).map((m: any) => ({
+  const manuellesCards = matchedManu.map((m: any) => ({
     id: m.id,
     img: m.image_recto,
     nom: m.nom,
@@ -84,9 +95,9 @@ async function fetchPlayer(slug: string) {
     source: 'manuel' as const,
   }))
 
-  // Cartes CSV — filtre par nom complet
+  // Cartes CSV — filtre par nom complet, insensible aux accents
   const csvCards = csvAll
-    .filter(c => c.name.toLowerCase().includes(lowerFull))
+    .filter(c => normalizeName(c.name).includes(normTarget))
     .map(c => ({
       id: `csv-${c.user_id}-${c.img}`,
       img: c.img,
