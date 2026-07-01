@@ -1,4 +1,4 @@
-export type CardFormatId = 'standard' | 'horizontal' | 'slab' | 'mini' | 'oversized' | 'square' | 'panorama'
+export type CardFormatId = 'standard' | 'horizontal' | 'slab' | 'mini' | 'oversized' | 'square' | 'panorama' | 'japanese' | 'tobacco'
 
 export interface CardFormatDef {
   id: CardFormatId
@@ -17,6 +17,8 @@ export const CARD_FORMATS: CardFormatDef[] = [
   { id: 'oversized',  label: 'Oversized',   icon: '📐', cropRatio: 2.5/3.5, displayRatio: '2.5/3.5', isSlab: false },
   { id: 'square',     label: 'Carré',       icon: '⬛', cropRatio: 1,        displayRatio: '1/1',     isSlab: false },
   { id: 'panorama',   label: 'Panorama',    icon: '🖼️', cropRatio: 4/3,      displayRatio: '4/3',     isSlab: false },
+  { id: 'japanese',   label: 'Japonaise',   icon: '🎴', cropRatio: 2.125/3.25, displayRatio: '2.125/3.25', isSlab: false },
+  { id: 'tobacco',    label: 'Tobacco',     icon: '🚬', cropRatio: 1.4375/2.625, displayRatio: '1.4375/2.625', isSlab: false },
 ]
 
 export function getFormat(id: string | null | undefined): CardFormatDef {
