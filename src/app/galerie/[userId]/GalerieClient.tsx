@@ -8,6 +8,7 @@ import GalerieExport from '@/components/GalerieExport'
 import CollectionStats from '@/components/CollectionStats'
 import PublicWishlist from '@/components/PublicWishlist'
 import GalerieComments from '@/components/GalerieComments'
+import BinderLibrary from '@/components/BinderLibrary'
 import {
   DndContext, closestCenter, PointerSensor, TouchSensor,
   useSensor, useSensors, type DragEndEvent
@@ -140,7 +141,7 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
   const [privateCards, setPrivateCards] = useState<Set<string>>(new Set())
   const [cardValues, setCardValues] = useState<Map<string, number>>(new Map())
   const [editMode, setEditMode] = useState(false)
-  const [activeTab, setActiveTab] = useState<'collection' | 'wishlist' | 'comments'>('collection')
+  const [activeTab, setActiveTab] = useState<'collection' | 'wishlist' | 'comments' | 'library'>('collection')
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [selectedCards, setSelectedCards] = useState<Set<string>>(new Set())
   const [shareCopied, setShareCopied] = useState(false)
@@ -832,7 +833,7 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
 
         {/* Onglets Collection / Wishlist / Commentaires */}
         <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: '#f0f0f0', borderRadius: 10, padding: 4, width: 'fit-content' }}>
-          {(['collection', 'wishlist', 'comments'] as const).map(tab => (
+          {(['collection', 'wishlist', 'comments', 'library'] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} style={{
               padding: '8px 20px', border: 'none', borderRadius: 8, cursor: 'pointer',
               fontWeight: 800, fontSize: 13,
@@ -841,13 +842,14 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
               boxShadow: activeTab === tab ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
               transition: '0.15s',
             }}>
-              {tab === 'collection' ? '🃏 Collection' : tab === 'wishlist' ? '🎯 Wishlist' : '💬 Commentaires'}
+              {tab === 'collection' ? '🃏 Collection' : tab === 'wishlist' ? '🎯 Wishlist' : tab === 'comments' ? '💬 Commentaires' : '📔 Ma bibliothèque'}
             </button>
           ))}
         </div>
 
         {activeTab === 'wishlist' && <PublicWishlist userId={userId} accent={accent} isOwner={isOwner} />}
         {activeTab === 'comments' && <GalerieComments galerieUserId={userId} accent={accent} isOwner={isOwner} />}
+        {activeTab === 'library' && <BinderLibrary userId={userId} isOwner={isOwner} accent={accent} />}
 
         {activeTab === 'collection' && <>
         {/* Filtres de recherche */}

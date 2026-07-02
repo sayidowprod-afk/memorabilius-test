@@ -1,5 +1,6 @@
 'use client'
 import { useState, use, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
@@ -8,8 +9,10 @@ import CardScanner from '@/components/CardScanner'
 import CameraCapture from '@/components/CameraCapture'
 import CollectionTagSelect from '@/components/CollectionTagSelect'
 import { CARD_FORMATS, getFormat } from '@/lib/cardFormats'
+import BinderLibrary from '@/components/BinderLibrary'
 
 const CARD_RATIO = 2.5 / 3.5
+const ACCENT = '#003DA6'
 
 export default function AjouterCarte({ params }: { params: Promise<{ userId: string }> }) {
   const { userId } = use(params)
@@ -136,6 +139,9 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
   type DupCard = { id: string; nom: string; annee: number | null; marque: string | null; num: string | null; image_recto: string | null }
   const [dupWarning, setDupWarning] = useState<{ cards: DupCard[]; userId: string } | null>(null)
   const rectoBase64Ref = useRef<string | null>(null)
+  // Après l'insertion : propose de ranger la carte dans un classeur de la bibliothèque
+  const [binderPrompt, setBinderPrompt] = useState<{ userId: string; img: string; nom: string } | null>(null)
+  const [showBinderPicker, setShowBinderPicker] = useState(false)
 
   const uploadBlob = async (blob: Blob, side: 'recto' | 'verso' | 'il' | 'ir') => {
     if (side === 'recto') setUploadingRecto(true)
@@ -342,7 +348,12 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
         }),
       })
     })
-    router.push(`/galerie/${userId}`)
+    setSaving(false)
+    if (form.image_recto) {
+      setBinderPrompt({ userId: uid, img: form.image_recto, nom: form.nom })
+    } else {
+      router.push(`/galerie/${userId}`)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -624,6 +635,51 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
             </div>
           </div>
         </div>
+      )}
+
+      {/* Proposition de rangement en bibliothèque, juste après l'ajout de la carte
+          (portal : évite le piège "contain:layout" sur main > *:first-child qui casse
+          position:fixed, voir globals.css et le fix appliqué à trades/page.tsx) */}
+      {binderPrompt && !showBinderPicker && createPortal(
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: 'white', borderRadius: 16, padding: '28px 24px', maxWidth: 360, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', textAlign: 'center' }}>
+            <img src={binderPrompt.img} alt="" style={{ width: 90, borderRadius: 8, margin: '0 auto 14px', display: 'block' }} />
+            <h3 style={{ fontSize: 16, fontWeight: 900, color: '#111', margin: '0 0 6px' }}>
+              {lang === 'fr' ? 'Carte ajoutée !' : 'Card added!'}
+            </h3>
+            <p style={{ fontSize: 13, color: '#666', margin: '0 0 18px' }}>
+              {lang === 'fr' ? 'La ranger dans un classeur de ta bibliothèque ?' : 'File it into a binder in your library?'}
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => router.push(`/galerie/${userId}`)}
+                style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: '2px solid #e0e0e0', background: 'white', fontWeight: 700, fontSize: 14, cursor: 'pointer', color: '#333' }}>
+                {lang === 'fr' ? 'Non merci' : 'No thanks'}
+              </button>
+              <button
+                onClick={() => setShowBinderPicker(true)}
+                style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: 'none', background: ACCENT, color: 'white', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>
+                {lang === 'fr' ? '📔 Ranger' : '📔 File it'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {binderPrompt && showBinderPicker && createPortal(
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: '#fafafa', borderRadius: 16, padding: 20, width: '100%', maxWidth: 700, maxHeight: '86vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
+            <BinderLibrary
+              userId={binderPrompt.userId}
+              isOwner={true}
+              accent={ACCENT}
+              pendingCard={{ key: binderPrompt.img, img: binderPrompt.img, nom: binderPrompt.nom }}
+              onPlaced={() => router.push(`/galerie/${userId}`)}
+            />
+          </div>
+        </div>,
+        document.body
       )}
 
       {cameraModal && (
