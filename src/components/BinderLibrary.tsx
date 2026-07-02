@@ -59,6 +59,7 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
   const [pageIndex, setPageIndex] = useState(1) // page gauche du double-feuillet (impaire : 1, 3, 5…)
   const [isOpen, setIsOpen] = useState(false)   // classeur ouvert (pages) ou fermé (couverture)
   const [pickerTarget, setPickerTarget] = useState<{ page: number; idx: number } | null>(null)
+  const [multiPicker, setMultiPicker] = useState(false)
   const [justInserted, setJustInserted] = useState<string | null>(null)
   const [viewerSlot, setViewerSlot] = useState<Slot | null>(null)
   // Glisser-déplacer d'une carte d'une pochette à une autre
@@ -96,7 +97,10 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
   // Face avant = page qui part, face arrière (pré-retournée) = page qui arrive.
   const [flip, setFlip] = useState<{ dir: 'next' | 'prev'; angle: number; anim: boolean } | null>(null)
   const dragRef = useRef<{ dir: 'next' | 'prev'; startX: number; active: boolean; angle: number; pointerId: number; el: HTMLElement } | null>(null)
-  const justDraggedRef = useRef(false) // true si le geste en cours a été un glissé → annule le clic qui suit
+  // Fenêtre pendant laquelle les clics de pochette sont ignorés (juste après un glissé).
+  // Plus fiable qu'un booléen : couvre le clic « fantôme » qui arrive après un feuilletage.
+  const suppressClickUntil = useRef(0)
+  const clickSuppressed = () => Date.now() < suppressClickUntil.current
   const spreadRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { loadBinders() }, [userId])
@@ -195,6 +199,36 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
     setBinders(prev => prev.map(b => b.id === selected.id ? { ...b, page_count: newCount } : b))
   }
 
+  // Ajoute plusieurs cartes d'un coup dans les premières pochettes vides (crée des pages si besoin)
+  const placeMany = async (cards: PickableCard[]) => {
+    if (!selected || !cards.length) return
+    const remaining = [...cards]
+    const inserts: any[] = []
+    const localAdds = new Map<string, Slot>()
+    let page = 1
+    let pageCount = selected.page_count
+    while (remaining.length) {
+      if (page > pageCount) pageCount++ // nouvelle page vide
+      for (let idx = 0; idx < selected.layout && remaining.length; idx++) {
+        const k = slotKey(page, idx)
+        if (slots.has(k) || localAdds.has(k)) continue
+        const card = remaining.shift()!
+        const row = { binder_id: selected.id, page_number: page, slot_index: idx, card_key: card.key, img: card.img, nom: card.nom }
+        inserts.push(row)
+        localAdds.set(k, { page_number: page, slot_index: idx, card_key: card.key, img: card.img, nom: card.nom })
+      }
+      page++
+    }
+    if (pageCount !== selected.page_count) {
+      await supabase.from('binders').update({ page_count: pageCount }).eq('id', selected.id)
+      setSelected(s => s ? { ...s, page_count: pageCount } : s)
+      setBinders(prev => prev.map(b => b.id === selected.id ? { ...b, page_count: pageCount } : b))
+    }
+    const { error } = await supabase.from('binder_slots').insert(inserts)
+    if (error) { alert('Erreur : ' + error.message); openBinder(selected); return }
+    setSlots(prev => { const m = new Map(prev); for (const [k, v] of localAdds) m.set(k, v); return m })
+  }
+
   // Déplace une carte d'une pochette vers une autre (échange si la cible est occupée)
   const moveSlot = async (fromPage: number, fromIdx: number, toPage: number, toIdx: number) => {
     if (!selected) return
@@ -233,7 +267,7 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
     if (!c.active) {
       if (Math.hypot(e.clientX - c.startX, e.clientY - c.startY) < 8) return
       c.active = true
-      justDraggedRef.current = true
+      suppressClickUntil.current = Date.now() + 100000
       try { c.el.setPointerCapture(c.pointerId) } catch {}
     }
     e.stopPropagation()
@@ -244,6 +278,7 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
     cardDragRef.current = null
     if (!c) return
     if (!c.active) return
+    suppressClickUntil.current = Date.now() + 400
     setCardDrag(null)
     const target = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest('[data-pocket]') as HTMLElement | null
     if (target) {
@@ -285,7 +320,6 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
     if (!selected || flip) return
     if (dir === 'next' && !canNext) return
     if (dir === 'prev' && !canPrev) return
-    justDraggedRef.current = false // nouvelle interaction : le clic redevient possible
     dragRef.current = { dir, startX: e.clientX, active: false, angle: 0, pointerId: e.pointerId, el: e.currentTarget as HTMLElement }
   }
 
@@ -296,7 +330,7 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
     if (!d.active) {
       if (Math.abs(dx) < 8) return
       d.active = true
-      justDraggedRef.current = true // un glissé a eu lieu → on annulera le clic qui suit
+      suppressClickUntil.current = Date.now() + 100000 // pendant le glissé
       try { d.el.setPointerCapture(d.pointerId) } catch {}
       setFlip({ dir: d.dir, angle: 0, anim: false })
     }
@@ -311,7 +345,8 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
     if (!d) return
     dragRef.current = null
     if (!d.active) return
-    if (Math.abs(d.angle) > 55) finishFlip(d.dir) // seuil plus permissif
+    suppressClickUntil.current = Date.now() + 400 // fenêtre après le glissé pour ignorer le clic fantôme
+    if (Math.abs(d.angle) > 55) finishFlip(d.dir)
     else cancelFlip()
   }
 
@@ -358,7 +393,7 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
                 onPointerMove={cardPointerMove}
                 onPointerUp={cardPointerUp}
                 onClick={() => {
-                  if (justDraggedRef.current) { justDraggedRef.current = false; return }
+                  if (clickSuppressed()) return
                   if (!onOpenCard || !onOpenCard(slot.img)) setViewerSlot(slot)
                 }}
                 title={isOwner ? 'Glisser pour déplacer · cliquer pour ouvrir' : (slot.nom || '')}
@@ -385,7 +420,7 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
             <div key={idx} data-pocket data-page={page} data-idx={idx}
               onClick={async () => {
                 if (!isOwner) return
-                if (justDraggedRef.current) { justDraggedRef.current = false; return }
+                if (clickSuppressed()) return
                 if (pendingCard) { await placeCard(page, idx, pendingCard); onPlaced?.() }
                 else setPickerTarget({ page, idx })
               }}
@@ -583,6 +618,7 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
           <span style={{ fontWeight: 900, fontSize: 15 }}>{selected.name}</span>
           {isOwner && !pendingCard && (
             <>
+              <button onClick={() => setMultiPicker(true)} style={{ background: 'none', border: 'none', color: accent, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>＋ Ajouter des cartes</button>
               <button onClick={() => openEditForm(selected)} style={{ background: 'none', border: 'none', color: accent, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>✏️ Modifier</button>
               <button onClick={() => deleteBinder(selected.id)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: 12 }}>🗑️</button>
             </>
@@ -709,6 +745,16 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
           excludeKeys={new Set([...slots.values()].map(s => s.card_key))}
           onClose={() => setPickerTarget(null)}
           onSelect={card => placeCard(pickerTarget.page, pickerTarget.idx, card)}
+        />
+      )}
+
+      {multiPicker && (
+        <CardPicker
+          userId={userId}
+          multi
+          excludeKeys={new Set([...slots.values()].map(s => s.card_key))}
+          onClose={() => setMultiPicker(false)}
+          onSelectMany={async cards => { await placeMany(cards); setMultiPicker(false) }}
         />
       )}
 

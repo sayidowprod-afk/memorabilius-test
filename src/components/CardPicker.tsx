@@ -27,11 +27,14 @@ const TAGS = [
 ] as const
 
 // Sélecteur de carte parmi la collection du user (manuelles + CSV), dédupliquées par image.
-export default function CardPicker({ userId, onSelect, onClose, excludeKeys }: {
+// Mode simple : onSelect(carte). Mode multi : sélection multiple → onSelectMany(cartes[]).
+export default function CardPicker({ userId, onSelect, onSelectMany, onClose, excludeKeys, multi }: {
   userId: string
-  onSelect: (card: PickableCard) => void
+  onSelect?: (card: PickableCard) => void
+  onSelectMany?: (cards: PickableCard[]) => void
   onClose: () => void
   excludeKeys?: Set<string>
+  multi?: boolean
 }) {
   const [cards, setCards] = useState<PickableCard[]>([])
   const [loading, setLoading] = useState(true)
@@ -40,6 +43,8 @@ export default function CardPicker({ userId, onSelect, onClose, excludeKeys }: {
   const [fYear, setFYear] = useState('')
   const [fBrand, setFBrand] = useState('')
   const [fTags, setFTags] = useState({ rc: false, auto: false, patch: false, num: false })
+  const [picked, setPicked] = useState<PickableCard[]>([])
+  const pickedKeys = new Set(picked.map(p => p.key))
 
   useEffect(() => {
     (async () => {
@@ -96,7 +101,7 @@ export default function CardPicker({ userId, onSelect, onClose, excludeKeys }: {
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: 'white', borderRadius: 16, padding: 20, width: '100%', maxWidth: 600, maxHeight: '86vh', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h3 style={{ margin: 0, fontWeight: 900, fontSize: 16 }}>🃏 Choisir une carte</h3>
+          <h3 style={{ margin: 0, fontWeight: 900, fontSize: 16 }}>🃏 {multi ? 'Choisir des cartes' : 'Choisir une carte'}</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#999' }}>✕</button>
         </div>
 
@@ -141,25 +146,43 @@ export default function CardPicker({ userId, onSelect, onClose, excludeKeys }: {
             <p style={{ gridColumn: '1/-1', textAlign: 'center', color: '#999', padding: 20 }}>Chargement...</p>
           ) : filtered.length === 0 ? (
             <p style={{ gridColumn: '1/-1', textAlign: 'center', color: '#999', padding: 20 }}>Aucune carte trouvée</p>
-          ) : filtered.map(c => (
-            <div key={c.key} onClick={() => onSelect(c)} style={{ cursor: 'pointer', borderRadius: 8, overflow: 'hidden', border: '1px solid #eee', transition: '0.15s', position: 'relative' }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = ACCENT)}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = '#eee')}
-            >
-              <div style={{ aspectRatio: '2.5/3.5', overflow: 'hidden' }}>
-                <img src={c.img} alt={c.nom} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-              </div>
-              {(c.rc || c.auto || c.patch) && (
-                <div style={{ position: 'absolute', top: 3, left: 3, display: 'flex', gap: 2 }}>
-                  {c.rc && <span style={{ fontSize: 7, fontWeight: 900, color: 'white', background: '#e67e22', borderRadius: 2, padding: '1px 3px' }}>RC</span>}
-                  {c.auto && <span style={{ fontSize: 7, fontWeight: 900, color: 'white', background: '#2e7d32', borderRadius: 2, padding: '1px 3px' }}>AU</span>}
-                  {c.patch && <span style={{ fontSize: 7, fontWeight: 900, color: 'white', background: '#1976d2', borderRadius: 2, padding: '1px 3px' }}>PA</span>}
+          ) : filtered.map(c => {
+            const sel = pickedKeys.has(c.key)
+            return (
+              <div key={c.key}
+                onClick={() => {
+                  if (multi) setPicked(prev => sel ? prev.filter(p => p.key !== c.key) : [...prev, c])
+                  else onSelect?.(c)
+                }}
+                style={{ cursor: 'pointer', borderRadius: 8, overflow: 'hidden', border: sel ? `2px solid ${ACCENT}` : '1px solid #eee', transition: '0.15s', position: 'relative' }}
+                onMouseEnter={e => { if (!sel) e.currentTarget.style.borderColor = ACCENT }}
+                onMouseLeave={e => { if (!sel) e.currentTarget.style.borderColor = '#eee' }}
+              >
+                <div style={{ aspectRatio: '2.5/3.5', overflow: 'hidden' }}>
+                  <img src={c.img} alt={c.nom} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                 </div>
-              )}
-              <div style={{ padding: '4px 6px', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.nom}</div>
-            </div>
-          ))}
+                {(c.rc || c.auto || c.patch) && (
+                  <div style={{ position: 'absolute', top: 3, left: 3, display: 'flex', gap: 2 }}>
+                    {c.rc && <span style={{ fontSize: 7, fontWeight: 900, color: 'white', background: '#e67e22', borderRadius: 2, padding: '1px 3px' }}>RC</span>}
+                    {c.auto && <span style={{ fontSize: 7, fontWeight: 900, color: 'white', background: '#2e7d32', borderRadius: 2, padding: '1px 3px' }}>AU</span>}
+                    {c.patch && <span style={{ fontSize: 7, fontWeight: 900, color: 'white', background: '#1976d2', borderRadius: 2, padding: '1px 3px' }}>PA</span>}
+                  </div>
+                )}
+                {multi && sel && (
+                  <div style={{ position: 'absolute', top: 3, right: 3, width: 20, height: 20, borderRadius: '50%', background: ACCENT, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900 }}>✓</div>
+                )}
+                <div style={{ padding: '4px 6px', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.nom}</div>
+              </div>
+            )
+          })}
         </div>
+
+        {multi && (
+          <button onClick={() => { if (picked.length) onSelectMany?.(picked) }} disabled={!picked.length}
+            className="btn-main btn-primary" style={{ opacity: picked.length ? 1 : 0.5 }}>
+            Ajouter {picked.length > 0 ? `(${picked.length})` : ''}
+          </button>
+        )}
       </div>
     </div>,
     document.body
