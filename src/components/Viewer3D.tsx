@@ -823,7 +823,8 @@ export default function Viewer3D({ popup, accent, onClose, onNext, onPrev, getTa
           {popup.g?.toUpperCase().startsWith('PSA') && (() => {
             const psaGrade = popup.g?.match(/\d+(?:\.\d+)?/)?.[0] || ''
             const q = encodeURIComponent([popup.n, popup.y, popup.br, popup.s].filter(Boolean).join(' '))
-            const psaPopUrl  = `https://www.psacard.com/pop/?q=${q}`
+            // Recherche PSA du site (résultats spécifiques à la carte : pop, APR, sets)
+            const psaPopUrl  = `https://www.psacard.com/search?q=${q}`
             const psaCertUrl = `https://www.psacard.com/certlookup`
             return (
               <div style={{ borderTop: '1px solid #eee', paddingTop: 12, marginTop: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
