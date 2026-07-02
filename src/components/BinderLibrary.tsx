@@ -55,7 +55,8 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Binder | null>(null)
   const [slots, setSlots] = useState<Map<string, Slot>>(new Map())
-  const [pageIndex, setPageIndex] = useState(0)
+  const [pageIndex, setPageIndex] = useState(1) // page gauche du double-feuillet (impaire : 1, 3, 5…)
+  const [isOpen, setIsOpen] = useState(false)   // classeur ouvert (pages) ou fermé (couverture)
   const [pickerTarget, setPickerTarget] = useState<{ page: number; idx: number } | null>(null)
   const [justInserted, setJustInserted] = useState<string | null>(null)
   const [viewerSlot, setViewerSlot] = useState<Slot | null>(null)
@@ -103,7 +104,8 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
 
   const openBinder = async (binder: Binder) => {
     setSelected(binder)
-    setPageIndex(0)
+    setPageIndex(1)
+    setIsOpen(false)
     const { data } = await supabase.from('binder_slots').select('*').eq('binder_id', binder.id)
     const map = new Map<string, Slot>()
     for (const s of data || []) map.set(slotKey(s.page_number, s.slot_index), s)
@@ -188,16 +190,15 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
     setBinders(prev => prev.map(b => b.id === selected.id ? { ...b, page_count: newCount } : b))
   }
 
-  // Bornes de navigation (page 0 = couverture avant, page_count+1 = couverture arrière)
-  const coverBack = selected ? selected.page_count + 1 : 0
-  const canNext = selected ? pageIndex < selected.page_count : false
-  const canPrev = pageIndex > 0
+  // Bornes de navigation : pages 1..page_count en double-feuillets [g, g+1]
+  const canNext = selected ? pageIndex + 2 <= selected.page_count : false
+  const canPrev = pageIndex > 1
 
   // Termine le feuilletage : rotation continue jusqu'à ±180° puis validation
   const finishFlip = (dir: 'next' | 'prev') => {
     setFlip(s => ({ dir, angle: dir === 'next' ? -180 : 180, anim: true, ...(s ? {} : {}) }))
     setTimeout(() => {
-      setPageIndex(p => dir === 'next' ? p + 2 : Math.max(0, p - 2))
+      setPageIndex(p => dir === 'next' ? p + 2 : Math.max(1, p - 2))
       setFlip(null)
     }, FLIP_MS)
   }
@@ -247,52 +248,44 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
     else cancelFlip()
   }
 
-  // ── Rendu d'une page : couverture avant/arrière ou grille de pochettes ──
-  const renderCover = (kind: 'front' | 'back') => {
-    const b = selected!
-    const col = b.color || accent
+  // Bande de reliure perforée (façon pochette Ultra Pro), sur le bord intérieur
+  const BindingStrip = () => {
     const small = pageW < 180
+    const hole = (oval: boolean) => (
+      <div style={{
+        width: small ? 6 : 8, height: oval ? (small ? 14 : 18) : (small ? 6 : 8),
+        borderRadius: oval ? (small ? 3 : 4) : '50%',
+        background: 'radial-gradient(circle at 40% 35%, #cfd6dd, #aeb7c0)',
+        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.35)',
+      }} />
+    )
     return (
-      <div style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', overflow: 'hidden' }}>
-        {b.cover_img
-          ? <img src={b.cover_img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          : <div style={{ width: '100%', height: '100%', background: col }} />}
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.08) 35%, rgba(0,0,0,0.55))' }} />
-        <div style={{ position: 'absolute', left: 12, right: 12, bottom: '13%', textAlign: 'center' }}>
-          <div style={{ display: 'inline-block', maxWidth: '92%', background: 'rgba(255,255,255,0.95)', color: '#111', borderRadius: 6, padding: small ? '6px 10px' : '10px 14px', boxShadow: '0 2px 10px rgba(0,0,0,0.3)' }}>
-            <div style={{ fontWeight: 900, fontSize: small ? 13 : 17, lineHeight: 1.15, wordBreak: 'break-word' }}>{b.name}</div>
-            {b.subtitle && <div style={{ fontSize: small ? 10 : 12, color: '#666', marginTop: 2 }}>{b.subtitle}</div>}
-          </div>
-        </div>
-        <div style={{ position: 'absolute', top: 10, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.75)', fontSize: 9, letterSpacing: '0.18em', fontWeight: 700 }}>
-          {kind === 'front' ? 'MEMORABILIUS' : ''}
-        </div>
-        <PlasticSheen />
+      <div style={{
+        width: small ? 14 : 18, flexShrink: 0, alignSelf: 'stretch',
+        background: 'linear-gradient(90deg, rgba(255,255,255,0.75), rgba(228,236,244,0.55))',
+        display: 'flex', flexDirection: 'column', justifyContent: 'space-around', alignItems: 'center',
+        padding: '10px 0',
+      }}>
+        {hole(true)}{hole(false)}{hole(true)}
       </div>
     )
   }
 
-  const renderPage = (num: number) => {
-    if (!selected) return null
-    if (num === 0 || num === coverBack) return renderCover(num === 0 ? 'front' : 'back')
-    return renderPocketGrid(num)
-  }
-
-  const renderPocketGrid = (page: number) => {
+  const renderPocketGrid = (page: number, side: 'left' | 'right') => {
     if (!selected) return null
     if (page < 1 || page > selected.page_count) return <div style={{ visibility: 'hidden' }} />
     const n = selected.layout
     const cols = COLS[n] || 3
     const small = pageW < 180
-    return (
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: small ? 4 : 7, height: '100%', paddingTop: small ? 6 : 14 }}>
+    const grid = (
+      <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: small ? 5 : 8, alignContent: 'center', padding: small ? '6px 4px' : '10px 6px' }}>
         {Array.from({ length: n }).map((_, idx) => {
           const k = slotKey(page, idx)
           const slot = slots.get(k)
           if (slot) {
             return (
               <div key={idx} className={`binder-slot-card${justInserted === k ? ' binder-slot-card-enter' : ''}`}
-                style={{ aspectRatio: '2.5/3.5', overflow: 'hidden' }}
+                style={{ aspectRatio: '2.5/3.5', overflow: 'hidden', boxShadow: '0 0 0 1px rgba(150,165,180,0.4)' }}
                 onClick={() => { if (!onOpenCard || !onOpenCard(slot.img)) setViewerSlot(slot) }}
                 title={slot.nom || ''}
               >
@@ -313,6 +306,7 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
               </div>
             )
           }
+          // Pochette plastique vide : cellule translucide avec soudure
           return (
             <div key={idx}
               onClick={async () => {
@@ -321,9 +315,10 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
                 else setPickerTarget({ page, idx })
               }}
               style={{
-                aspectRatio: '2.5/3.5', background: '#fafafa',
-                border: '1px dashed #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: isOwner ? 'pointer' : 'default', color: '#bbb', fontSize: 18,
+                aspectRatio: '2.5/3.5', background: 'rgba(255,255,255,0.35)',
+                boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.8), 0 0 0 1px rgba(150,165,180,0.45)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: isOwner ? 'pointer' : 'default', color: 'rgba(90,110,130,0.5)', fontSize: 18,
               }}
             >
               {isOwner ? '+' : ''}
@@ -332,12 +327,20 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
         })}
       </div>
     )
+    return (
+      <div style={{ display: 'flex', flexDirection: side === 'left' ? 'row' : 'row-reverse', height: '100%', width: '100%' }}>
+        {grid}
+        <BindingStrip />
+      </div>
+    )
   }
 
+  // Page = feuille plastique transparente (Ultra Pro) : léger voile bleuté + brillance
   const pageShellStyle = (side: 'left' | 'right'): React.CSSProperties => ({
-    width: pageW, height: pageH, background: 'white',
-    border: '1px solid #e5e5e5', boxSizing: 'border-box', padding: pageW < 180 ? 8 : 12,
-    borderRadius: side === 'left' ? '10px 0 0 10px' : '0 10px 10px 0',
+    width: pageW, height: pageH, boxSizing: 'border-box',
+    background: 'linear-gradient(135deg, #f0f4f8 0%, #e4ebf2 55%, #eef3f8 100%)',
+    borderTop: '1px solid rgba(255,255,255,0.7)', borderBottom: '1px solid rgba(150,165,180,0.3)',
+    borderRadius: side === 'left' ? '4px 2px 2px 4px' : '2px 4px 4px 2px',
     position: 'relative', overflow: 'hidden',
   })
 
@@ -490,11 +493,10 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
   // Ombrage de la feuille qui tourne : nul à plat, max de profil (90°), nul retourné (180°)
   const shadowOpacity = flip ? Math.sin(Math.min(Math.abs(flip.angle), 180) * Math.PI / 180) * 0.7 : 0
 
-  const spreadLabel = () => {
-    const L = pageIndex, R = pageIndex + 1
-    const part = (num: number) => num === 0 ? 'Couv.' : num === coverBack ? 'Dos' : (num >= 1 && num <= selected.page_count) ? String(num) : ''
-    return [part(L), part(R)].filter(Boolean).join(' – ')
-  }
+  const wing = Math.max(10, Math.round(pageW * 0.05))
+  const coverColor = selected.color || accent
+  const coverW = Math.round(pageW * 1.12)
+  const coverH = Math.round(pageH * 1.04)
 
   return (
     <div>
@@ -520,70 +522,110 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
         </div>
       )}
 
-      <div ref={stageRef} style={{ background: 'linear-gradient(180deg, #e9e7e2, #dedbd3)', borderRadius: 16, padding: '34px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div ref={spreadRef} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerLeave={endDrag}
-          style={{ display: 'flex', position: 'relative', perspective: 2200, touchAction: 'pan-y', filter: 'drop-shadow(0 14px 26px rgba(0,0,0,0.22))' }}>
-          {/* Page gauche (statique) — révèle la page dessous pendant un "prev" */}
-          <div style={pageShellStyle('left')} onPointerDown={beginDrag('prev')}>
-            {renderPage(flippingLeft ? pageIndex - 2 : pageIndex)}
-          </div>
-
-          {/* Page droite (statique) — révèle la page dessous pendant un "next" */}
-          <div style={pageShellStyle('right')} onPointerDown={beginDrag('next')}>
-            {renderPage(flippingRight ? pageIndex + 3 : pageIndex + 1)}
-          </div>
-
-          {/* Feuille qui tourne — deux faces, rotation continue 0 → ±180° */}
-          {flip && (
-            <div style={{
-              position: 'absolute', top: 0,
-              left: flip.dir === 'next' ? pageW : 0,
-              width: pageW, height: pageH,
-              transformStyle: 'preserve-3d',
-              transformOrigin: flip.dir === 'next' ? 'left center' : 'right center',
-              transform: `rotateY(${flip.angle}deg)`,
-              transition: flip.anim ? `transform ${FLIP_MS}ms cubic-bezier(0.33,0,0.30,1)` : 'none',
-              zIndex: 30,
-            }}>
-              {/* Face avant : la page qui part */}
-              <div style={{ ...pageShellStyle(flip.dir === 'next' ? 'right' : 'left'), position: 'absolute', inset: 0, width: '100%', height: '100%', backfaceVisibility: 'hidden' }}>
-                {renderPage(flip.dir === 'next' ? pageIndex + 1 : pageIndex)}
-                <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'rgba(0,0,0,0.28)', opacity: shadowOpacity }} />
-              </div>
-              {/* Face arrière : la page qui arrive (pré-retournée pour lire à l'endroit) */}
-              <div style={{ ...pageShellStyle(flip.dir === 'next' ? 'left' : 'right'), position: 'absolute', inset: 0, width: '100%', height: '100%', backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
-                {renderPage(flip.dir === 'next' ? pageIndex + 2 : pageIndex - 1)}
-                <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'rgba(0,0,0,0.28)', opacity: shadowOpacity }} />
-              </div>
+      <div ref={stageRef} style={{ background: 'linear-gradient(180deg, #e9e7e2, #dedbd3)', borderRadius: 16, padding: '34px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: coverH + 40 }}>
+        {!isOpen ? (
+          /* ── Classeur fermé : on voit la couverture ── */
+          <div onClick={() => setIsOpen(true)} title="Ouvrir le classeur" style={{
+            width: coverW, height: coverH, cursor: 'pointer', position: 'relative', display: 'flex',
+            borderRadius: '6px 10px 10px 6px', overflow: 'hidden',
+            boxShadow: '0 14px 30px rgba(0,0,0,0.3)', transition: 'transform 0.15s',
+          }}
+            onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-4px)')}
+            onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
+          >
+            {/* tranche/reliure à gauche */}
+            <div style={{ width: 20, flexShrink: 0, background: `linear-gradient(90deg, rgba(0,0,0,0.35), ${coverColor})`, display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', alignItems: 'center' }}>
+              {[0, 1, 2].map(i => <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,0.5)' }} />)}
             </div>
-          )}
-
-          {/* Anneaux du classeur, centrés sur la reliure */}
-          <div style={{ position: 'absolute', left: pageW - 8, top: 0, bottom: 0, width: 16, zIndex: 15, display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', alignItems: 'center', pointerEvents: 'none' }}>
-            {[0, 1, 2].map(i => (
-              <div key={i} style={{ width: pageW < 200 ? 12 : 16, height: pageW < 200 ? 12 : 16, borderRadius: '50%', border: '2.5px solid #a9a9a9', background: 'linear-gradient(135deg, #fff, #d9d9d9)', boxShadow: '0 1px 2px rgba(0,0,0,0.3)' }} />
-            ))}
+            {/* plat de couverture */}
+            <div style={{ flex: 1, position: 'relative', background: coverColor }}>
+              {selected.cover_img && <img src={selected.cover_img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.06) 35%, rgba(0,0,0,0.5))' }} />
+              <div style={{ position: 'absolute', top: 14, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.8)', fontSize: 10, letterSpacing: '0.2em', fontWeight: 700 }}>MEMORABILIUS</div>
+              <div style={{ position: 'absolute', left: 16, right: 16, bottom: '14%', textAlign: 'center' }}>
+                <div style={{ display: 'inline-block', maxWidth: '90%', background: 'rgba(255,255,255,0.96)', color: '#111', borderRadius: 8, padding: '12px 16px', boxShadow: '0 3px 12px rgba(0,0,0,0.35)' }}>
+                  <div style={{ fontWeight: 900, fontSize: 19, lineHeight: 1.15, wordBreak: 'break-word' }}>{selected.name}</div>
+                  {selected.subtitle && <div style={{ fontSize: 13, color: '#666', marginTop: 3 }}>{selected.subtitle}</div>}
+                </div>
+              </div>
+              <PlasticSheen />
+            </div>
           </div>
-        </div>
+        ) : (
+          /* ── Classeur ouvert : deux feuilles plastique + rabats de couverture ── */
+          <div ref={spreadRef} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerLeave={endDrag}
+            style={{ display: 'flex', position: 'relative', perspective: 2200, touchAction: 'pan-y', filter: 'drop-shadow(0 14px 26px rgba(0,0,0,0.22))' }}>
+            {/* rabats de couverture (le classeur ouvert à plat) */}
+            <div style={{ position: 'absolute', left: -wing, top: -6, bottom: -6, width: wing + 8, background: `linear-gradient(90deg, ${coverColor}, rgba(0,0,0,0.25))`, borderRadius: '8px 0 0 8px', zIndex: 1 }} />
+            <div style={{ position: 'absolute', left: 2 * pageW - 8, top: -6, bottom: -6, width: wing + 8, background: `linear-gradient(90deg, rgba(0,0,0,0.25), ${coverColor})`, borderRadius: '0 8px 8px 0', zIndex: 1 }} />
+
+            <div style={{ ...pageShellStyle('left'), zIndex: 2 }} onPointerDown={beginDrag('prev')}>
+              {renderPocketGrid(flippingLeft ? pageIndex - 2 : pageIndex, 'left')}
+            </div>
+            <div style={{ ...pageShellStyle('right'), zIndex: 2 }} onPointerDown={beginDrag('next')}>
+              {renderPocketGrid(flippingRight ? pageIndex + 3 : pageIndex + 1, 'right')}
+            </div>
+
+            {/* creux central */}
+            <div style={{ position: 'absolute', left: pageW - 3, top: 0, bottom: 0, width: 6, background: 'linear-gradient(90deg, rgba(0,0,0,0.14), transparent, rgba(0,0,0,0.14))', zIndex: 14, pointerEvents: 'none' }} />
+
+            {/* Feuille qui tourne — deux faces, rotation continue 0 → ±180° */}
+            {flip && (
+              <div style={{
+                position: 'absolute', top: 0,
+                left: flip.dir === 'next' ? pageW : 0,
+                width: pageW, height: pageH,
+                transformStyle: 'preserve-3d',
+                transformOrigin: flip.dir === 'next' ? 'left center' : 'right center',
+                transform: `rotateY(${flip.angle}deg)`,
+                transition: flip.anim ? `transform ${FLIP_MS}ms cubic-bezier(0.33,0,0.30,1)` : 'none',
+                zIndex: 30,
+              }}>
+                <div style={{ ...pageShellStyle(flip.dir === 'next' ? 'right' : 'left'), position: 'absolute', inset: 0, width: '100%', height: '100%', backfaceVisibility: 'hidden' }}>
+                  {renderPocketGrid(flip.dir === 'next' ? pageIndex + 1 : pageIndex, flip.dir === 'next' ? 'right' : 'left')}
+                  <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'rgba(0,0,0,0.28)', opacity: shadowOpacity }} />
+                </div>
+                <div style={{ ...pageShellStyle(flip.dir === 'next' ? 'left' : 'right'), position: 'absolute', inset: 0, width: '100%', height: '100%', backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
+                  {renderPocketGrid(flip.dir === 'next' ? pageIndex + 2 : pageIndex - 1, flip.dir === 'next' ? 'left' : 'right')}
+                  <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'rgba(0,0,0,0.28)', opacity: shadowOpacity }} />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-        <button onClick={() => clickFlip('prev')} disabled={!canPrev || !!flip} className="btn-main btn-secondary"
-          style={{ padding: '8px 14px', fontSize: 13, opacity: !canPrev ? 0.4 : 1 }} aria-label="Page précédente">
-          ←<span className="binder-nav-label"> Page précédente</span>
-        </button>
-        <span style={{ fontSize: 12, color: '#999', whiteSpace: 'nowrap' }}>{spreadLabel()}</span>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {isOwner && pageIndex >= selected.page_count && (
-            <button onClick={addPage} className="btn-main btn-secondary" style={{ padding: '8px 12px', fontSize: 12 }} aria-label="Ajouter une page">
-              +<span className="binder-nav-label"> Ajouter une page</span>
+        {!isOpen ? (
+          <>
+            <span />
+            <button onClick={() => setIsOpen(true)} className="btn-main btn-primary" style={{ padding: '8px 18px', fontSize: 13 }}>📖 Ouvrir le classeur</button>
+            <span />
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => canPrev ? clickFlip('prev') : setIsOpen(false)}
+              disabled={!!flip} className="btn-main btn-secondary"
+              style={{ padding: '8px 14px', fontSize: 13 }} aria-label={canPrev ? 'Page précédente' : 'Fermer'}>
+              ←<span className="binder-nav-label"> {canPrev ? 'Page précédente' : 'Fermer'}</span>
             </button>
-          )}
-          <button onClick={() => clickFlip('next')} disabled={!canNext || !!flip} className="btn-main btn-primary"
-            style={{ padding: '8px 14px', fontSize: 13, opacity: !canNext ? 0.4 : 1 }} aria-label="Page suivante">
-            <span className="binder-nav-label">Page suivante </span>→
-          </button>
-        </div>
+            <span style={{ fontSize: 12, color: '#999', whiteSpace: 'nowrap' }}>
+              Pages {pageIndex}–{Math.min(pageIndex + 1, selected.page_count)} / {selected.page_count}
+            </span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {isOwner && !canNext && (
+                <button onClick={addPage} className="btn-main btn-secondary" style={{ padding: '8px 12px', fontSize: 12 }} aria-label="Ajouter une page">
+                  +<span className="binder-nav-label"> Ajouter une page</span>
+                </button>
+              )}
+              <button onClick={() => clickFlip('next')} disabled={!canNext || !!flip} className="btn-main btn-primary"
+                style={{ padding: '8px 14px', fontSize: 13, opacity: !canNext ? 0.4 : 1 }} aria-label="Page suivante">
+                <span className="binder-nav-label">Page suivante </span>→
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {pickerTarget && (
