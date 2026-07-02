@@ -92,6 +92,7 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
   // Face avant = page qui part, face arrière (pré-retournée) = page qui arrive.
   const [flip, setFlip] = useState<{ dir: 'next' | 'prev'; angle: number; anim: boolean } | null>(null)
   const dragRef = useRef<{ dir: 'next' | 'prev'; startX: number; active: boolean; angle: number; pointerId: number; el: HTMLElement } | null>(null)
+  const justDraggedRef = useRef(false) // true si le geste en cours a été un glissé → annule le clic qui suit
   const spreadRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { loadBinders() }, [userId])
@@ -221,6 +222,7 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
     if (!selected || flip) return
     if (dir === 'next' && !canNext) return
     if (dir === 'prev' && !canPrev) return
+    justDraggedRef.current = false // nouvelle interaction : le clic redevient possible
     dragRef.current = { dir, startX: e.clientX, active: false, angle: 0, pointerId: e.pointerId, el: e.currentTarget as HTMLElement }
   }
 
@@ -229,12 +231,14 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
     if (!d) return
     const dx = e.clientX - d.startX
     if (!d.active) {
-      if (Math.abs(dx) < 6) return
+      if (Math.abs(dx) < 8) return
       d.active = true
+      justDraggedRef.current = true // un glissé a eu lieu → on annulera le clic qui suit
       try { d.el.setPointerCapture(d.pointerId) } catch {}
       setFlip({ dir: d.dir, angle: 0, anim: false })
     }
-    const progress = Math.max(0, Math.min(1, (d.dir === 'next' ? -dx : dx) / pageW))
+    // Glissé plus réactif : une demi-largeur de page suffit pour un tour complet
+    const progress = Math.max(0, Math.min(1, (d.dir === 'next' ? -dx : dx) / (pageW * 0.6)))
     d.angle = (d.dir === 'next' ? -180 : 180) * progress
     setFlip(s => s && { ...s, angle: d.angle })
   }
@@ -244,7 +248,7 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
     if (!d) return
     dragRef.current = null
     if (!d.active) return
-    if (Math.abs(d.angle) > 90) finishFlip(d.dir)
+    if (Math.abs(d.angle) > 55) finishFlip(d.dir) // seuil plus permissif
     else cancelFlip()
   }
 
@@ -286,7 +290,10 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
             return (
               <div key={idx} className={`binder-slot-card${justInserted === k ? ' binder-slot-card-enter' : ''}`}
                 style={{ aspectRatio: '2.5/3.5', overflow: 'hidden', boxShadow: '0 0 0 1px rgba(150,165,180,0.4)' }}
-                onClick={() => { if (!onOpenCard || !onOpenCard(slot.img)) setViewerSlot(slot) }}
+                onClick={() => {
+                  if (justDraggedRef.current) { justDraggedRef.current = false; return }
+                  if (!onOpenCard || !onOpenCard(slot.img)) setViewerSlot(slot)
+                }}
                 title={slot.nom || ''}
               >
                 <img src={slot.img} alt={slot.nom || ''} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
@@ -311,6 +318,7 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
             <div key={idx}
               onClick={async () => {
                 if (!isOwner) return
+                if (justDraggedRef.current) { justDraggedRef.current = false; return }
                 if (pendingCard) { await placeCard(page, idx, pendingCard); onPlaced?.() }
                 else setPickerTarget({ page, idx })
               }}
