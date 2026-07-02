@@ -43,12 +43,16 @@ function PlasticSheen() {
   )
 }
 
-export default function BinderLibrary({ userId, isOwner, accent, pendingCard, onPlaced }: {
+export default function BinderLibrary({ userId, isOwner, accent, pendingCard, onPlaced, onOpenCard }: {
   userId: string; isOwner: boolean; accent: string
   // Mode placement : une carte vient d'être ajoutée, on choisit juste où la ranger
   // (clic sur une pochette vide = placement direct, pas de sélecteur de carte)
   pendingCard?: PickableCard | null
   onPlaced?: () => void
+  // Ouverture d'une carte : si fourni (depuis la galerie), délègue au Viewer3D
+  // complet de la galerie (avec toutes les infos + tags) via l'image de la carte.
+  // Sinon, on retombe sur un Viewer3D minimal interne.
+  onOpenCard?: (img: string) => boolean
 }) {
   const [binders, setBinders] = useState<Binder[]>([])
   const [loading, setLoading] = useState(true)
@@ -217,7 +221,7 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
             return (
               <div key={idx} className={`binder-slot-card${justInserted === k ? ' binder-slot-card-enter' : ''}`}
                 style={{ aspectRatio: '2.5/3.5', borderRadius: 4, overflow: 'hidden' }}
-                onClick={() => setViewerSlot(slot)}
+                onClick={() => { if (!onOpenCard || !onOpenCard(slot.img)) setViewerSlot(slot) }}
                 title={slot.nom || ''}
               >
                 <img src={slot.img} alt={slot.nom || ''} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', borderRadius: 4 }} />

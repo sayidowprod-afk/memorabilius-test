@@ -849,7 +849,15 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
 
         {activeTab === 'wishlist' && <PublicWishlist userId={userId} accent={accent} isOwner={isOwner} />}
         {activeTab === 'comments' && <GalerieComments galerieUserId={userId} accent={accent} isOwner={isOwner} />}
-        {activeTab === 'library' && <BinderLibrary userId={userId} isOwner={isOwner} accent={accent} />}
+        {activeTab === 'library' && <BinderLibrary userId={userId} isOwner={isOwner} accent={accent}
+          onOpenCard={(img) => {
+            // Retrouve la carte complète de la collection par son image, pour ouvrir
+            // le vrai Viewer3D de la galerie (toutes les infos + tags), pas une version minimale
+            const match = cards.find(c => c.f === img || c.b === img)
+            if (match) { setPopup(match); return true }
+            return false
+          }}
+        />}
 
         {activeTab === 'collection' && <>
         {/* Filtres de recherche */}
