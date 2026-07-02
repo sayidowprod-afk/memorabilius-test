@@ -12,10 +12,47 @@ export default function Notifications() {
   const [notifs, setNotifs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [pushPerm, setPushPerm] = useState<NotificationPermission | null>(null)
+  const [pushLoading, setPushLoading] = useState(false)
 
   useEffect(() => {
     if ('Notification' in window) setPushPerm(Notification.permission)
   }, [])
+
+  const handleEnablePush = async () => {
+    setPushLoading(true)
+    try {
+      // PWAInstall (qui enregistre normalement le SW) n'est monté que sur
+      // l'accueil — on force l'enregistrement ici sinon subscribePush() reste
+      // bloqué sur navigator.serviceWorker.ready si le SW n'existe pas encore
+      await navigator.serviceWorker.register('/sw.js')
+      const perm = await Notification.requestPermission()
+      setPushPerm(perm)
+      if (perm === 'granted') await subscribePush()
+    } finally {
+      setPushLoading(false)
+    }
+  }
+
+  const handleDisablePush = async () => {
+    setPushLoading(true)
+    try {
+      await navigator.serviceWorker.register('/sw.js')
+      const sw = await navigator.serviceWorker.ready
+      const sub = await sw.pushManager.getSubscription()
+      if (sub) {
+        const { data: { session } } = await supabase.auth.getSession()
+        await fetch('/api/push-subscribe', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ endpoint: sub.endpoint }),
+        })
+        await sub.unsubscribe()
+        setPushPerm(Notification.permission)
+      }
+    } finally {
+      setPushLoading(false)
+    }
+  }
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -57,20 +94,23 @@ export default function Notifications() {
     <div style={{ maxWidth: 700, margin: '40px auto', fontFamily: 'Inter, sans-serif' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <h1 style={{ fontWeight: 900, fontSize: 28, margin: 0 }}>{t('notif_title')}</h1>
-        {'Notification' in window && pushPerm !== 'granted' && pushPerm !== null && (
-          <button
-            onClick={async () => {
-              const perm = await Notification.requestPermission()
-              if (perm === 'granted') { await subscribePush(); setPushPerm('granted') }
-              else setPushPerm(perm)
-            }}
+        {'Notification' in window && pushPerm === 'denied' && (
+          <span style={{ fontSize: 12, color: '#e74c3c', fontWeight: 700 }}>🔕 Notifications bloquées dans le navigateur</span>
+        )}
+        {'Notification' in window && pushPerm !== 'granted' && pushPerm !== 'denied' && pushPerm !== null && (
+          <button onClick={handleEnablePush} disabled={pushLoading}
             style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', background: '#003DA6', color: 'white', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
           >
-            🔔 Activer les notifications push
+            {pushLoading ? '...' : '🔔 Activer les notifications push'}
           </button>
         )}
         {pushPerm === 'granted' && (
-          <span style={{ fontSize: 12, color: '#2ecc71', fontWeight: 700 }}>🔔 Notifications activées</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 12, color: '#2ecc71', fontWeight: 700 }}>🔔 Notifications activées</span>
+            <button onClick={handleDisablePush} disabled={pushLoading} style={{ padding: '6px 12px', background: '#f0f0f0', color: '#333', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+              {pushLoading ? '...' : 'Désactiver'}
+            </button>
+          </div>
         )}
       </div>
 
