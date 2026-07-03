@@ -12,7 +12,7 @@ import BookletViewer from '@/components/BookletViewer'
 
 interface Card {
   f: string; b: string; n: string; t: string; y: string
-  br: string; s: string; v: string; num: string; card_number?: string
+  br: string; s: string; v: string; num: string; card_number?: string; cert_number?: string
   auto: boolean; rc: boolean; patch: boolean; g: string
   isManuelle?: boolean; id_manuelle?: string; collection_tag?: string
   booklet?: boolean; is_horizontal?: boolean; il?: string; ir?: string
@@ -335,9 +335,9 @@ export default function Viewer3D({ popup, accent, onClose, onNext, onPrev, getTa
                 const isBGS = gradeInfo.company === 'BGS' || gradeInfo.company === 'BVG'
                 const isSGC = gradeInfo.company === 'SGC'
                 const isCGC = gradeInfo.company === 'CGC'
-                // Deterministic cert number from card data
+                // Vrai numéro de certification s'il est renseigné, sinon numéro synthétique (visuel)
                 const certSeed = (popup.n + popup.y + popup.s).split('').reduce((a, c) => a + c.charCodeAt(0), 0)
-                const certNum = String((certSeed * 7919 + 10000000) % 90000000 + 10000000).slice(0, 8)
+                const certNum = popup.cert_number?.trim() || String((certSeed * 7919 + 10000000) % 90000000 + 10000000).slice(0, 8)
                 const setLine = [popup.y, popup.br, popup.s].filter(Boolean).join(' ').toUpperCase()
 
                 return (
@@ -825,7 +825,9 @@ export default function Viewer3D({ popup, accent, onClose, onNext, onPrev, getTa
             const q = encodeURIComponent([popup.n, popup.y, popup.br, popup.s].filter(Boolean).join(' '))
             // Recherche PSA du site (résultats spécifiques à la carte : pop, APR, sets)
             const psaPopUrl  = `https://www.psacard.com/search?q=${q}`
-            const psaCertUrl = `https://www.psacard.com/certlookup`
+            // Vrai numéro de cert renseigné → lien direct ; sinon page de recherche par cert
+            const realCert = popup.cert_number?.trim()
+            const psaCertUrl = realCert ? `https://www.psacard.com/cert/${encodeURIComponent(realCert)}` : `https://www.psacard.com/certlookup`
             return (
               <div style={{ borderTop: '1px solid #eee', paddingTop: 12, marginTop: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 10, fontWeight: 800, color: '#bbb', textTransform: 'uppercase', letterSpacing: 1, marginRight: 4 }}>PSA</span>

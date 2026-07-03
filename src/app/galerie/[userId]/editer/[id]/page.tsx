@@ -26,7 +26,7 @@ export default function EditerCarte({ params }: { params: Promise<{ userId: stri
   const [previewIR, setPreviewIR] = useState<string | null>(null)
   const [form, setForm] = useState({
     nom: '', equipe: '', annee: '', marque: '', collection: '', variation: '',
-    grade: 'Raw', num: '', card_number: '', rc: false, auto: false, patch: false,
+    grade: 'Raw', cert_number: '', num: '', card_number: '', rc: false, auto: false, patch: false,
     image_recto: '', image_verso: '', collection_tag: '',
     booklet: false, is_horizontal: false, format: 'standard',
     image_interieur_gauche: '', image_interieur_droite: '',
@@ -52,7 +52,7 @@ export default function EditerCarte({ params }: { params: Promise<{ userId: stri
       setForm({
         nom: data.nom || '', equipe: data.equipe || '', annee: data.annee || '',
         marque: data.marque || '', collection: data.collection || '', variation: data.variation || '',
-        grade: data.grade || 'Raw', num: data.num || '', card_number: data.card_number || '',
+        grade: data.grade || 'Raw', cert_number: data.cert_number || '', num: data.num || '', card_number: data.card_number || '',
         rc: data.rc || false, auto: data.auto || false, patch: data.patch || false,
         image_recto: data.image_recto || '', image_verso: data.image_verso || '',
         collection_tag: data.collection_tag || '',
@@ -265,7 +265,7 @@ export default function EditerCarte({ params }: { params: Promise<{ userId: stri
     const { error } = await supabase.from('cartes_manuelles').update({
       nom: form.nom, equipe: form.equipe || null, annee: form.annee || null,
       marque: form.marque || null, collection: form.collection || null, variation: form.variation || null, grade: form.grade,
-      num: form.num || null, card_number: form.card_number || null, rc: form.rc, auto: form.auto, patch: form.patch,
+      num: form.num || null, card_number: form.card_number || null, cert_number: form.cert_number || null, rc: form.rc, auto: form.auto, patch: form.patch,
       image_recto: form.image_recto || null, image_verso: form.image_verso || null,
       collection_tag: form.collection_tag || null,
       format: form.format || 'standard',
@@ -428,6 +428,13 @@ export default function EditerCarte({ params }: { params: Promise<{ userId: stri
               <input value={form.num} onChange={e => setForm({ ...form, num: e.target.value })} placeholder={lang === 'fr' ? 'Ex : 48/99' : 'Ex: 48/99'} />
             </div>
           </div>
+
+          {form.grade.trim() && form.grade.trim().toLowerCase() !== 'raw' && (
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 6 }}>{lang === 'fr' ? 'N° de certification' : 'Cert number'}</label>
+              <input value={form.cert_number} onChange={e => setForm({ ...form, cert_number: e.target.value })} placeholder={lang === 'fr' ? 'Ex : 82659423 (au dos du slab)' : 'Ex: 82659423 (on the slab)'} />
+            </div>
+          )}
 
           <div>
             <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 6 }}>

@@ -20,9 +20,9 @@ export default function Tuto() {
       </div>
 
       <h1 style={{ fontWeight: 900, fontSize: 32, marginBottom: 8 }}>{t('tuto_title')}</h1>
-      <p style={{ color: '#666', marginBottom: 40, fontSize: 16 }}>{t('tuto_sub')}</p>
+      <p style={{ color: '#666', marginBottom: 24, fontSize: 16 }}>{t('tuto_sub')}</p>
 
-      {/* Étape 1 */}
+      {/* Étape 1 — commune */}
       <div style={{ background: 'white', borderRadius: 16, padding: 32, marginBottom: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderLeft: '4px solid #003DA6' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
           <div style={{ background: '#003DA6', color: 'white', width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 20, flexShrink: 0 }}>1</div>
@@ -35,6 +35,66 @@ export default function Tuto() {
         <Link href="/sinscrire" style={{ display: 'inline-block', background: '#003DA6', color: 'white', padding: '10px 20px', borderRadius: 8, fontWeight: 700, fontSize: 14 }}>
           👉 Créer mon compte →
         </Link>
+      </div>
+
+      {/* Choix de la méthode */}
+      <div style={{ background: '#f0f4ff', border: '1px solid #d6e0f5', borderRadius: 16, padding: '20px 24px', marginBottom: 32 }}>
+        <h2 style={{ fontWeight: 900, fontSize: 18, margin: '0 0 8px' }}>Deux façons de remplir votre galerie</h2>
+        <p style={{ color: '#555', lineHeight: 1.6, margin: 0, fontSize: 15 }}>
+          🃏 <strong>Import manuel</strong> — le plus simple : ajoutez vos cartes une par une depuis votre galerie, avec photo au choix (scan, appareil photo). Idéal pour commencer.<br />
+          📄 <strong>Import en masse (Google Sheet)</strong> — pour importer une grosse collection d'un coup via un fichier CSV.
+        </p>
+      </div>
+
+      {/* ── MÉTHODE 1 : IMPORT MANUEL ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+        <span style={{ fontSize: 22 }}>🃏</span>
+        <h2 style={{ fontWeight: 900, fontSize: 24, margin: 0 }}>Méthode 1 — Import manuel (recommandé pour débuter)</h2>
+      </div>
+
+      <div style={{ background: 'white', borderRadius: 16, padding: 32, marginBottom: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderLeft: '4px solid #2ecc71' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+          <div style={{ background: '#2ecc71', color: 'white', width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 20, flexShrink: 0 }}>A</div>
+          <h2 style={{ fontWeight: 900, fontSize: 20, margin: 0 }}>Ouvrez votre galerie et cliquez sur « Ajouter »</h2>
+        </div>
+        <p style={{ color: '#555', lineHeight: 1.7, marginBottom: 16 }}>
+          Depuis <strong>Ma galerie</strong>, cliquez sur le bouton <strong>➕ Ajouter</strong> en haut à droite pour créer une nouvelle carte.
+        </p>
+        <Link href="/profil" style={{ display: 'inline-block', background: '#2ecc71', color: 'white', padding: '10px 20px', borderRadius: 8, fontWeight: 700, fontSize: 14 }}>
+          👉 Aller à ma galerie →
+        </Link>
+      </div>
+
+      <div style={{ background: 'white', borderRadius: 16, padding: 32, marginBottom: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderLeft: '4px solid #2ecc71' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+          <div style={{ background: '#2ecc71', color: 'white', width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 20, flexShrink: 0 }}>B</div>
+          <h2 style={{ fontWeight: 900, fontSize: 20, margin: 0 }}>Ajoutez la photo de votre carte</h2>
+        </div>
+        <p style={{ color: '#555', lineHeight: 1.7, marginBottom: 12 }}>
+          Prenez la carte en photo ou importez un scan. Le <strong>détecteur de coins</strong> recadre automatiquement votre carte — ajustez les coins si besoin, puis validez.
+        </p>
+        <div style={{ background: '#fffbf0', border: '1px solid #ffe082', borderRadius: 8, padding: 12, fontSize: 13, color: '#7a6000' }}>
+          💡 Astuce : sur un fond uni et bien éclairé, la détection automatique est bien plus précise.
+        </div>
+      </div>
+
+      <div style={{ background: 'white', borderRadius: 16, padding: 32, marginBottom: 40, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderLeft: '4px solid #2ecc71' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+          <div style={{ background: '#2ecc71', color: 'white', width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 20, flexShrink: 0 }}>C</div>
+          <h2 style={{ fontWeight: 900, fontSize: 20, margin: 0 }}>Renseignez les infos et enregistrez</h2>
+        </div>
+        <p style={{ color: '#555', lineHeight: 1.7, marginBottom: 12 }}>
+          Complétez le joueur, l'équipe, l'année, la marque, la collection et la variation. Choisissez le <strong>format</strong> (standard, horizontale, slab gradée, japonaise…) et activez les badges <strong>RC / AUTO / PATCH</strong> si besoin. Pour une carte gradée, indiquez son <strong>numéro de certification</strong> pour un lien direct vers le grader.
+        </p>
+        <p style={{ color: '#555', lineHeight: 1.7, margin: 0 }}>
+          Enregistrez : la carte apparaît aussitôt dans votre galerie, et vous pouvez même la ranger dans un <strong>classeur</strong> de votre bibliothèque 📔.
+        </p>
+      </div>
+
+      {/* ── MÉTHODE 2 : IMPORT CSV ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+        <span style={{ fontSize: 22 }}>📄</span>
+        <h2 style={{ fontWeight: 900, fontSize: 24, margin: 0 }}>Méthode 2 — Import en masse via Google Sheet</h2>
       </div>
 
       {/* Étape 2 */}

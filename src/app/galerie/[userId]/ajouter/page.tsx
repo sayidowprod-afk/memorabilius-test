@@ -29,7 +29,7 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
   const [uploadingIR, setUploadingIR] = useState(false)
   const [form, setForm] = useState({
     nom: '', equipe: '', annee: '', marque: '', collection: '', variation: '',
-    grade: 'Raw', num: '', card_number: '', rc: false, auto: false, patch: false, booklet: false,
+    grade: 'Raw', cert_number: '', num: '', card_number: '', rc: false, auto: false, patch: false, booklet: false,
     is_horizontal: false, format: 'standard', collection_tag: '',
     image_recto: '', image_verso: '', image_interieur_gauche: '', image_interieur_droite: '',
   })
@@ -327,7 +327,7 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
     const { error } = await supabase.from('cartes_manuelles').insert({
       user_id: uid, nom: form.nom, equipe: form.equipe || null, annee: form.annee || null,
       marque: form.marque || null, collection: form.collection || null, variation: form.variation || null, grade: form.grade,
-      num: form.num || null, card_number: form.card_number || null,
+      num: form.num || null, card_number: form.card_number || null, cert_number: form.cert_number || null,
       rc: form.rc, auto: form.auto, patch: form.patch, booklet: form.booklet,
       format: form.format || 'standard',
       is_horizontal: form.format === 'horizontal',
@@ -535,6 +535,14 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
               <input value={form.num} onChange={e => setForm({ ...form, num: e.target.value })} placeholder={lang === 'fr' ? 'Ex : 48/99' : 'Ex: 48/99'} />
             </div>
           </div>
+
+          {/* N° de certification — affiché pour une carte gradée (grade ≠ Raw) */}
+          {form.grade.trim() && form.grade.trim().toLowerCase() !== 'raw' && (
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 6 }}>{lang === 'fr' ? 'N° de certification' : 'Cert number'}</label>
+              <input value={form.cert_number} onChange={e => setForm({ ...form, cert_number: e.target.value })} placeholder={lang === 'fr' ? 'Ex : 82659423 (au dos du slab)' : 'Ex: 82659423 (on the slab)'} />
+            </div>
+          )}
 
           <div>
             <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 6 }}>

@@ -92,7 +92,7 @@ function renderCardImage(card: { f: string; n: string; format?: string; is_horiz
 interface Card {
   id_manuelle?: string;
   f: string; b: string; n: string; t: string; y: string
-  br: string; s: string; v: string; num: string; card_number?: string
+  br: string; s: string; v: string; num: string; card_number?: string; cert_number?: string
   auto: boolean; rc: boolean; patch: boolean; g: string
   booklet?: boolean; is_horizontal?: boolean; format?: string; il?: string; ir?: string
   isManuelle?: boolean
@@ -303,7 +303,7 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
         b: m.image_verso || m.image_recto || 'https://placehold.co/300x420?text=No+Image',
         n: m.nom || '', t: m.equipe || '', y: m.annee || '',
         br: m.marque || '', s: m.collection || '', v: m.variation || '',
-        num: m.num || '', card_number: m.card_number || '', auto: m.auto || false, rc: m.rc || false,
+        num: m.num || '', card_number: m.card_number || '', cert_number: m.cert_number || '', auto: m.auto || false, rc: m.rc || false,
         patch: m.patch || false, g: m.grade || 'Raw', isManuelle: true,
         booklet: m.booklet || false, is_horizontal: m.is_horizontal || false, format: m.format || (m.is_horizontal ? 'horizontal' : 'standard'),
         il: m.image_interieur_gauche || '', ir: m.image_interieur_droite || '',
