@@ -56,7 +56,9 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Binder | null>(null)
   const [slots, setSlots] = useState<Map<string, Slot>>(new Map())
-  const [pageIndex, setPageIndex] = useState(1) // page gauche du double-feuillet (impaire : 1, 3, 5…)
+  // Page gauche du double-feuillet, PAIRE (0, 2, 4…). Comme un vrai classeur :
+  // 0 = intérieur de couverture (gauche) + page 1 seule à droite, puis 2–3, 4–5…
+  const [pageIndex, setPageIndex] = useState(0)
   const [isOpen, setIsOpen] = useState(false)   // classeur ouvert (pages) ou fermé (couverture)
   const [pickerTarget, setPickerTarget] = useState<{ page: number; idx: number } | null>(null)
   const [multiPicker, setMultiPicker] = useState(false)
@@ -130,7 +132,7 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
 
   const openBinder = async (binder: Binder) => {
     setSelected(binder)
-    setPageIndex(1)
+    setPageIndex(0)
     setIsOpen(false)
     const { data } = await supabase.from('binder_slots').select('*').eq('binder_id', binder.id)
     const map = new Map<string, Slot>()
@@ -381,15 +383,15 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
     if (c?.active) suppressClickUntil.current = Date.now() + 400
   }
 
-  // Bornes de navigation : pages 1..page_count en double-feuillets [g, g+1]
+  // Bornes de navigation : feuillets [g, g+1] avec g pair (0 = couverture + page 1)
   const canNext = selected ? pageIndex + 2 <= selected.page_count : false
-  const canPrev = pageIndex > 1
+  const canPrev = pageIndex > 0
 
   // Termine le feuilletage : rotation continue jusqu'à ±180° puis validation
   const finishFlip = (dir: 'next' | 'prev') => {
     setFlip(s => ({ dir, angle: dir === 'next' ? -180 : 180, anim: true, ...(s ? {} : {}) }))
     setTimeout(() => {
-      setPageIndex(p => dir === 'next' ? p + 2 : Math.max(1, p - 2))
+      setPageIndex(p => dir === 'next' ? p + 2 : Math.max(0, p - 2))
       setFlip(null)
     }, FLIP_MS)
   }
@@ -749,11 +751,35 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
     </div>
   )
 
+  // Intérieur de couverture (carton) : montré à gauche à l'ouverture (page 0) et
+  // à droite après la dernière page, comme les 2e/3e de couverture d'un vrai classeur.
+  const insideCoverFace = (side: 'left' | 'right') => (
+    <div style={{
+      width: pageW, height: pageH, boxSizing: 'border-box',
+      background: `linear-gradient(${side === 'left' ? '135deg' : '225deg'}, ${coverColor}, rgba(0,0,0,0.45))`,
+      borderRadius: side === 'left' ? '4px 2px 2px 4px' : '2px 4px 4px 2px',
+      position: 'relative', overflow: 'hidden',
+      boxShadow: 'inset 0 0 45px rgba(0,0,0,0.45)',
+    }}>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.22)', fontSize: 11, letterSpacing: '0.25em', fontWeight: 800, transform: 'rotate(-90deg)', whiteSpace: 'nowrap' }}>MEMORABILIUS</div>
+      <PlasticSheen />
+    </div>
+  )
+
+  // Rend un côté statique du feuillet : page plastique si la page existe, sinon
+  // intérieur de couverture (page 0 à gauche, au-delà de page_count à droite).
+  const renderStaticSide = (page: number, side: 'left' | 'right') => {
+    if (page < 1 || page > selected.page_count) {
+      return <div style={{ zIndex: 2 }}>{insideCoverFace(side)}</div>
+    }
+    return <div style={{ ...pageShellStyle(side), zIndex: 2 }}>{renderPocketGrid(page, side)}</div>
+  }
+
   // Ouvre le classeur : la couverture fermée pivote comme un vrai plat de classeur,
   // puis on affiche les pages.
   const openTheBinder = () => {
     if (isOpen || coverAnimating) return
-    setPageIndex(1)
+    setPageIndex(0)
     setCoverAnimating(true)
     requestAnimationFrame(() => requestAnimationFrame(() => setCoverAngle(-115)))
     setTimeout(() => { setIsOpen(true); setCoverAnimating(false); setCoverAngle(0) }, 520)
@@ -812,12 +838,8 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
             <div style={{ position: 'absolute', left: -wing, top: -6, bottom: -6, width: wing + 8, background: `linear-gradient(90deg, ${coverColor}, rgba(0,0,0,0.25))`, borderRadius: '8px 0 0 8px', zIndex: 1 }} />
             <div style={{ position: 'absolute', left: 2 * pageW - 8, top: -6, bottom: -6, width: wing + 8, background: `linear-gradient(90deg, rgba(0,0,0,0.25), ${coverColor})`, borderRadius: '0 8px 8px 0', zIndex: 1 }} />
 
-            <div style={{ ...pageShellStyle('left'), zIndex: 2 }}>
-              {renderPocketGrid(flippingLeft ? pageIndex - 2 : pageIndex, 'left')}
-            </div>
-            <div style={{ ...pageShellStyle('right'), zIndex: 2 }}>
-              {renderPocketGrid(flippingRight ? pageIndex + 3 : pageIndex + 1, 'right')}
-            </div>
+            {renderStaticSide(flippingLeft ? pageIndex - 2 : pageIndex, 'left')}
+            {renderStaticSide(flippingRight ? pageIndex + 3 : pageIndex + 1, 'right')}
 
             {/* creux central */}
             <div style={{ position: 'absolute', left: pageW - 3, top: 0, bottom: 0, width: 6, background: 'linear-gradient(90deg, rgba(0,0,0,0.14), transparent, rgba(0,0,0,0.14))', zIndex: 14, pointerEvents: 'none' }} />
@@ -864,7 +886,12 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
               ←<span className="binder-nav-label"> {canPrev ? 'Page précédente' : 'Fermer'}</span>
             </button>
             <span style={{ fontSize: 12, color: '#999', whiteSpace: 'nowrap' }}>
-              Pages {pageIndex}–{Math.min(pageIndex + 1, selected.page_count)} / {selected.page_count}
+              {(() => {
+                const l = pageIndex, r = pageIndex + 1, cnt = selected.page_count
+                const lOk = l >= 1 && l <= cnt, rOk = r >= 1 && r <= cnt
+                const label = lOk && rOk ? `Pages ${l}–${r}` : rOk ? `Page ${r}` : lOk ? `Page ${l}` : 'Couverture'
+                return `${label} / ${cnt}`
+              })()}
             </span>
             <div style={{ display: 'flex', gap: 8 }}>
               {isOwner && !canNext && (
