@@ -9,13 +9,14 @@ import CardValueModule from '@/components/CardValueModule'
 import SameCardCollectors from '@/components/SameCardCollectors'
 import CollectionTagSelect from '@/components/CollectionTagSelect'
 import BookletViewer from '@/components/BookletViewer'
+import { getFormat } from '@/lib/cardFormats'
 
 interface Card {
   f: string; b: string; n: string; t: string; y: string
   br: string; s: string; v: string; num: string; card_number?: string; cert_number?: string
   auto: boolean; rc: boolean; patch: boolean; g: string
   isManuelle?: boolean; id_manuelle?: string; collection_tag?: string
-  booklet?: boolean; is_horizontal?: boolean; il?: string; ir?: string
+  booklet?: boolean; is_horizontal?: boolean; format?: string; il?: string; ir?: string
 }
 
 export default function Viewer3D({ popup, accent, onClose, onNext, onPrev, getTags, userId, userSlug, isOwner, onCollectionTagChange, onAddToMyGallery, initialAddState }: {
@@ -65,6 +66,9 @@ export default function Viewer3D({ popup, accent, onClose, onNext, onPrev, getTa
   const [showVideo, setShowVideo] = useState(false)
   const [copied, setCopied] = useState(false)
   const [slabMode, setSlabMode] = useState(false)
+  // Format "slab" = photo réelle du slab entier (déjà recadrée aux proportions du boîtier)
+  const cardFmt = getFormat(popup.format)
+  const isSlabFmt = cardFmt.isSlab
   const [addState, setAddState] = useState<'idle' | 'loading' | 'added' | 'duplicate'>(initialAddState ?? 'idle')
   const { lang } = useLang()
 
@@ -263,7 +267,8 @@ export default function Viewer3D({ popup, accent, onClose, onNext, onPrev, getTa
         .viewer-info { flex: 0.8; padding: 30px; display: flex; flex-direction: column; justify-content: center; background: ${infoBg}; overflow-y: auto; color: ${textColor}; }
         .viewer-card { width: 560px; height: 784px; }
         .viewer-card--horizontal { width: min(784px, 54vw) !important; height: min(560px, 38.6vw) !important; }
-        @media (max-width: 1200px) { .viewer-card { width: 420px; height: 588px; } .viewer-card--horizontal { width: min(560px, 54vw) !important; height: min(400px, 38.6vw) !important; } }
+        .viewer-card--slab { width: 485px !important; height: 784px !important; }
+        @media (max-width: 1200px) { .viewer-card { width: 420px; height: 588px; } .viewer-card--horizontal { width: min(560px, 54vw) !important; height: min(400px, 38.6vw) !important; } .viewer-card--slab { width: 364px !important; height: 588px !important; } }
         @media (max-width: 600px) {
           .viewer-layout { flex-direction: column; }
           .viewer-zone { flex: 0 0 65% !important; width: 100% !important; }
@@ -271,6 +276,7 @@ export default function Viewer3D({ popup, accent, onClose, onNext, onPrev, getTa
           .viewer-info h2 { font-size: 1rem !important; margin: 2px 0 !important; }
           .viewer-card { width: 240px !important; height: 336px !important; }
           .viewer-card--horizontal { width: min(260px, 80vw) !important; height: min(186px, 57vw) !important; }
+          .viewer-card--slab { width: 208px !important; height: 336px !important; }
           .viewer-hint { display: none !important; }
         }
       `}</style>
@@ -300,8 +306,8 @@ export default function Viewer3D({ popup, accent, onClose, onNext, onPrev, getTa
           onTouchStart={onTouchStart} onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
         >
-          {/* Slab mode toggle */}
-          {gradeInfo && (
+          {/* Slab mode toggle — masqué pour le format "slab" (la photo est déjà le boîtier réel) */}
+          {gradeInfo && !isSlabFmt && (
             <button onClick={(e) => { e.stopPropagation(); setSlabMode(s => !s) }} style={{
               position: 'absolute', top: 12, left: 12, zIndex: 10,
               background: slabMode ? gradeInfo.color.top : 'rgba(0,0,0,0.45)',
@@ -312,7 +318,7 @@ export default function Viewer3D({ popup, accent, onClose, onNext, onPrev, getTa
               {slabMode ? '🃏 Carte seule' : `🏅 Slab ${gradeInfo.company}`}
             </button>
           )}
-          {gradeInfo && !slabMode && (
+          {gradeInfo && !slabMode && !isSlabFmt && (
             <div style={{
               position: 'absolute', bottom: 12, left: 12, zIndex: 10,
               background: gradeInfo.color.top, color: gradeInfo.color.text,
@@ -705,16 +711,32 @@ export default function Viewer3D({ popup, accent, onClose, onNext, onPrev, getTa
               })()
             ) : (
               /* ── CARD VIEW (original) ── */
-              <div ref={cardRef} className={`viewer-card${popup.is_horizontal ? ' viewer-card--horizontal' : ''}`} style={{
+              /* Le format "slab" est plus épais : demi-profondeur devant/derrière + 4 tranches acryliques */
+              (() => {
+                const half = isSlabFmt ? 11 : 0 // demi-épaisseur (px) — slab ≈ 22px d'épaisseur totale
+                const edge = isSlabFmt ? (
+                  <>
+                    {/* Tranches translucides (visibles à la rotation) */}
+                    <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: half * 2, transformOrigin: 'left center', transform: 'rotateY(-90deg)', background: 'linear-gradient(to left, rgba(175,202,235,0.85), rgba(238,248,255,0.97))' }} />
+                    <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: half * 2, transformOrigin: 'right center', transform: 'rotateY(90deg)', background: 'linear-gradient(to right, rgba(175,202,235,0.85), rgba(238,248,255,0.97))' }} />
+                    <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: half * 2, transformOrigin: 'top center', transform: 'rotateX(90deg)', background: 'linear-gradient(to top, rgba(175,202,235,0.85), rgba(238,248,255,0.97))' }} />
+                    <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: half * 2, transformOrigin: 'bottom center', transform: 'rotateX(-90deg)', background: 'linear-gradient(to bottom, rgba(175,202,235,0.85), rgba(238,248,255,0.97))' }} />
+                  </>
+                ) : null
+                return (
+              <div ref={cardRef} className={`viewer-card${popup.is_horizontal ? ' viewer-card--horizontal' : isSlabFmt ? ' viewer-card--slab' : ''}`} style={{
                 position: 'relative', transformStyle: 'preserve-3d', willChange: 'transform',
               }}>
-                <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
+                {edge}
+                <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden', transform: half ? `translateZ(${half}px)` : undefined }}>
                   <img src={popup.f} draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt={popup.n} />
                 </div>
-                <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: `rotateY(180deg)${half ? ` translateZ(${half}px)` : ''}`, boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
                   <img src={popup.b} draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt={popup.n} />
                 </div>
               </div>
+                )
+              })()
             )}
             </div>{/* /card-idle */}
           </div>

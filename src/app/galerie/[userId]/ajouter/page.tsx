@@ -271,7 +271,7 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
   const applyCropAndUpload = async () => {
     if (!cropModal || !containerRef.current || !imgRef.current) return
     const side = cropModal.side
-    const cropRatio = (side === 'il' || side === 'ir' || isHorizontalRef.current) ? 3.5 / 2.5 : CARD_RATIO
+    const cropRatio = (side === 'il' || side === 'ir') ? 3.5 / 2.5 : (isHorizontalRef.current ? 3.5 / 2.5 : getFormat(form.format).cropRatio)
     const container = containerRef.current
     const cw = container.clientWidth
     const ch = container.clientHeight
@@ -781,8 +781,9 @@ export default function AjouterCarte({ params }: { params: Promise<{ userId: str
             {(() => {
               const isInt = cropModal.side === 'il' || cropModal.side === 'ir'
               const isH = isInt || isHorizontalRef.current
-              const ar = isH ? '3.5/2.5' : '2.5/3.5'
-              const w = isH ? `min(90%, calc(82vh * ${3.5/2.5}))` : `min(82%, calc(90vh * ${CARD_RATIO}))`
+              const fmtRatio = getFormat(form.format).cropRatio
+              const ar = isH ? '3.5/2.5' : getFormat(form.format).displayRatio
+              const w = isH ? `min(90%, calc(82vh * ${3.5/2.5}))` : `min(82%, calc(90vh * ${fmtRatio}))`
               return (
             <div style={{
               position: 'absolute',

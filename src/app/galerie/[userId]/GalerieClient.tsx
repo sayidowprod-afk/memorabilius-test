@@ -66,15 +66,11 @@ function renderCardImage(card: { f: string; n: string; format?: string; is_horiz
   const ratio = fmt.isSlab ? cardDisplayRatio(card.format, card.is_horizontal) : '2.5/3.5'
 
   if (fmt.isSlab) {
+    // Photo réelle du slab entier, affichée telle quelle aux proportions du boîtier
     return (
-      <div style={{ aspectRatio: ratio, overflow: 'hidden', position: 'relative', background: '#111', borderRadius: 2 }}>
+      <div style={{ aspectRatio: ratio, overflow: 'hidden', position: 'relative', background: '#111' }}>
         <img src={card.f} alt={card.n} loading="lazy"
-          style={{ display: 'block', objectFit: 'cover', margin: '5px 5px 0', width: 'calc(100% - 10px)', height: 'calc(100% - 24px)' }} />
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 19,
-          background: 'linear-gradient(135deg, #c8a84b 0%, #f5d67a 45%, #c8a84b 100%)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ fontSize: 7, fontWeight: 900, letterSpacing: '0.12em', color: '#1a1a1a' }}>SLAB</span>
-        </div>
+          style={{ display: 'block', objectFit: 'cover', width: '100%', height: '100%' }} />
       </div>
     )
   }

@@ -12,7 +12,7 @@ export interface CardFormatDef {
 export const CARD_FORMATS: CardFormatDef[] = [
   { id: 'standard',   label: 'Standard',    icon: '🃏', cropRatio: 2.5/3.5, displayRatio: '2.5/3.5', isSlab: false },
   { id: 'horizontal', label: 'Horizontale', icon: '↔️', cropRatio: 3.5/2.5, displayRatio: '3.5/2.5', isSlab: false },
-  { id: 'slab',       label: 'Slab',        icon: '🔒', cropRatio: 2.5/3.5, displayRatio: '2.5/3.5', isSlab: true  },
+  { id: 'slab',       label: 'Slab',        icon: '🔒', cropRatio: 3.25/5.25, displayRatio: '3.25/5.25', isSlab: true  },
   { id: 'mini',       label: 'Mini',        icon: '🔲', cropRatio: 2.5/3.5, displayRatio: '2.5/3.5', isSlab: false },
   { id: 'oversized',  label: 'Oversized',   icon: '📐', cropRatio: 2.5/3.5, displayRatio: '2.5/3.5', isSlab: false },
   { id: 'square',     label: 'Carré',       icon: '⬛', cropRatio: 1,        displayRatio: '1/1',     isSlab: false },

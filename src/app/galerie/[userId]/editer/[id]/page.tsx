@@ -8,8 +8,6 @@ import CardScanner from '@/components/CardScanner'
 import CollectionTagSelect from '@/components/CollectionTagSelect'
 import { CARD_FORMATS, getFormat } from '@/lib/cardFormats'
 
-const CARD_RATIO = 2.5 / 3.5
-
 export default function EditerCarte({ params }: { params: Promise<{ userId: string; id: string }> }) {
   const { userId, id } = use(params)
   const router = useRouter()
@@ -76,7 +74,7 @@ export default function EditerCarte({ params }: { params: Promise<{ userId: stri
     const container = containerRef.current
     const cw = container.clientWidth
     const ch = container.clientHeight
-    const ratio = isHorizontalRef.current ? 3.5 / 2.5 : CARD_RATIO
+    const ratio = isHorizontalRef.current ? 3.5 / 2.5 : getFormat(form.format).cropRatio
     // Portrait : contrainte largeur (82vw) ou hauteur (90vh)
     // Paysage  : contrainte largeur (90vw) ou hauteur (82vh) — doit correspondre au CSS du cadre
     const frameW = isHorizontalRef.current
@@ -502,7 +500,7 @@ export default function EditerCarte({ params }: { params: Promise<{ userId: stri
             style={{ position: 'relative', width: '100%', flex: 1, overflow: 'hidden', cursor: isDragging.current ? 'grabbing' : 'grab', touchAction: 'none', userSelect: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <img ref={imgRef} src={cropModal.src} alt="To crop" onLoad={resetTransform} draggable={false}
               style={{ position: 'absolute', maxWidth: 'none', transform: `translate(${imgTransform.x}px, ${imgTransform.y}px) scale(${imgTransform.scale}) rotate(${rotation}deg)`, transformOrigin: 'center center', pointerEvents: 'none', transition: 'none' }} />
-            <div style={{ position: 'absolute', pointerEvents: 'none', width: isHorizontalRef.current ? `min(90%, calc(82vh * ${3.5/2.5}))` : `min(82%, calc(90vh * ${CARD_RATIO}))`, aspectRatio: isHorizontalRef.current ? '3.5/2.5' : '2.5/3.5', boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)', borderRadius: 6 }}>
+            <div style={{ position: 'absolute', pointerEvents: 'none', width: isHorizontalRef.current ? `min(90%, calc(82vh * ${3.5/2.5}))` : `min(82%, calc(90vh * ${getFormat(form.format).cropRatio}))`, aspectRatio: isHorizontalRef.current ? '3.5/2.5' : getFormat(form.format).displayRatio, boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)', borderRadius: 6 }}>
               {[
                 { top: -2, left: -2, borderTop: '3px solid white', borderLeft: '3px solid white', borderRadius: '4px 0 0 0' },
                 { top: -2, right: -2, borderTop: '3px solid white', borderRight: '3px solid white', borderRadius: '0 4px 0 0' },
