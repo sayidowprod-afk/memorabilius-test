@@ -7,6 +7,7 @@ import { fetchCsvCardsForProfiles } from '@/lib/csvCards'
 export interface PickableCard {
   key: string
   img: string
+  back?: string
   nom: string
   team?: string
   year?: string
@@ -49,7 +50,7 @@ export default function CardPicker({ userId, onSelect, onSelectMany, onClose, ex
   useEffect(() => {
     (async () => {
       const [{ data: manuelles }, { data: profile }] = await Promise.all([
-        supabase.from('cartes_manuelles').select('nom, image_recto, equipe, annee, marque, variation, rc, auto, patch, num').eq('user_id', userId).not('image_recto', 'is', null),
+        supabase.from('cartes_manuelles').select('nom, image_recto, image_verso, equipe, annee, marque, variation, rc, auto, patch, num').eq('user_id', userId).not('image_recto', 'is', null),
         supabase.from('profiles').select('id, display_name, avatar_url, lien_csv, couleur_bordure').eq('id', userId).single(),
       ])
       const seen = new Set<string>()
@@ -58,7 +59,7 @@ export default function CardPicker({ userId, onSelect, onSelectMany, onClose, ex
         if (!m.image_recto || seen.has(m.image_recto)) continue
         seen.add(m.image_recto)
         list.push({
-          key: m.image_recto, img: m.image_recto, nom: m.nom || '',
+          key: m.image_recto, img: m.image_recto, back: m.image_verso || undefined, nom: m.nom || '',
           team: m.equipe || '', year: (m.annee || '').toString(), brand: m.marque || '', variant: m.variation || '',
           rc: !!m.rc, auto: !!m.auto, patch: !!m.patch, num: !!(m.num && String(m.num).trim()),
         })

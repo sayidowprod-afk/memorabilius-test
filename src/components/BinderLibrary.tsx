@@ -16,6 +16,7 @@ interface Binder {
   cover_img: string | null
   page_count: number
   position: number
+  binder_type: 'portfolio' | 'rings'
 }
 
 interface Slot {
@@ -23,6 +24,7 @@ interface Slot {
   slot_index: number
   card_key: string
   img: string
+  img_back: string | null
   nom: string | null
 }
 
@@ -77,6 +79,7 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
   const [fName, setFName] = useState('')
   const [fSubtitle, setFSubtitle] = useState('')
   const [fLayout, setFLayout] = useState(9)
+  const [fType, setFType] = useState<'portfolio' | 'rings'>('portfolio')
   const [fColor, setFColor] = useState(BINDER_COLORS[0])
   const [fCover, setFCover] = useState<string | null>(null)
   const [uploadingCover, setUploadingCover] = useState(false)
@@ -136,16 +139,16 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
     setIsOpen(false)
     const { data } = await supabase.from('binder_slots').select('*').eq('binder_id', binder.id)
     const map = new Map<string, Slot>()
-    for (const s of data || []) map.set(slotKey(s.page_number, s.slot_index), s)
+    for (const s of data || []) map.set(slotKey(s.page_number, s.slot_index), { ...s, img_back: s.img_back ?? null })
     setSlots(map)
   }
 
   const openCreateForm = () => {
-    setFName(''); setFSubtitle(''); setFLayout(9); setFColor(BINDER_COLORS[0]); setFCover(null)
+    setFName(''); setFSubtitle(''); setFLayout(9); setFType('portfolio'); setFColor(BINDER_COLORS[0]); setFCover(null)
     setFormOpen('create')
   }
   const openEditForm = (b: Binder) => {
-    setFName(b.name); setFSubtitle(b.subtitle || ''); setFLayout(b.layout); setFColor(b.color || BINDER_COLORS[0]); setFCover(b.cover_img)
+    setFName(b.name); setFSubtitle(b.subtitle || ''); setFLayout(b.layout); setFType(b.binder_type || 'portfolio'); setFColor(b.color || BINDER_COLORS[0]); setFCover(b.cover_img)
     setFormOpen(b.id)
   }
 
@@ -163,7 +166,7 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
 
   const saveForm = async () => {
     if (!fName.trim()) return
-    const payload = { name: fName.trim(), subtitle: fSubtitle.trim() || null, color: fColor, cover_img: fCover }
+    const payload = { name: fName.trim(), subtitle: fSubtitle.trim() || null, color: fColor, cover_img: fCover, binder_type: fType }
     if (formOpen === 'create') {
       const { data, error } = await supabase.from('binders').insert({
         user_id: userId, layout: fLayout, position: binders.length, ...payload,
@@ -240,11 +243,11 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
     if (!selected) return
     const { error } = await supabase.from('binder_slots').insert({
       binder_id: selected.id, page_number: page, slot_index: idx,
-      card_key: card.key, img: card.img, nom: card.nom,
+      card_key: card.key, img: card.img, img_back: card.back || null, nom: card.nom,
     })
     if (error) { alert('Erreur : ' + error.message); return }
     const k = slotKey(page, idx)
-    setSlots(prev => new Map(prev).set(k, { page_number: page, slot_index: idx, card_key: card.key, img: card.img, nom: card.nom }))
+    setSlots(prev => new Map(prev).set(k, { page_number: page, slot_index: idx, card_key: card.key, img: card.img, img_back: card.back || null, nom: card.nom }))
     setJustInserted(k)
     setTimeout(() => setJustInserted(null), 550)
     setPickerTarget(null)
@@ -279,9 +282,9 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
         const k = slotKey(page, idx)
         if (slots.has(k) || localAdds.has(k)) continue
         const card = remaining.shift()!
-        const row = { binder_id: selected.id, page_number: page, slot_index: idx, card_key: card.key, img: card.img, nom: card.nom }
+        const row = { binder_id: selected.id, page_number: page, slot_index: idx, card_key: card.key, img: card.img, img_back: card.back || null, nom: card.nom }
         inserts.push(row)
-        localAdds.set(k, { page_number: page, slot_index: idx, card_key: card.key, img: card.img, nom: card.nom })
+        localAdds.set(k, { page_number: page, slot_index: idx, card_key: card.key, img: card.img, img_back: card.back || null, nom: card.nom })
       }
       page++
     }
@@ -315,8 +318,8 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
     // Persistance : on supprime puis réinsère les lignes concernées (contrainte unique)
     await supabase.from('binder_slots').delete().eq('binder_id', selected.id).eq('page_number', fromPage).eq('slot_index', fromIdx)
     if (toSlot) await supabase.from('binder_slots').delete().eq('binder_id', selected.id).eq('page_number', toPage).eq('slot_index', toIdx)
-    const rows = [{ binder_id: selected.id, page_number: toPage, slot_index: toIdx, card_key: fromSlot.card_key, img: fromSlot.img, nom: fromSlot.nom }]
-    if (toSlot) rows.push({ binder_id: selected.id, page_number: fromPage, slot_index: fromIdx, card_key: toSlot.card_key, img: toSlot.img, nom: toSlot.nom })
+    const rows = [{ binder_id: selected.id, page_number: toPage, slot_index: toIdx, card_key: fromSlot.card_key, img: fromSlot.img, img_back: fromSlot.img_back, nom: fromSlot.nom }]
+    if (toSlot) rows.push({ binder_id: selected.id, page_number: fromPage, slot_index: fromIdx, card_key: toSlot.card_key, img: toSlot.img, img_back: toSlot.img_back, nom: toSlot.nom })
     const { error } = await supabase.from('binder_slots').insert(rows)
     if (error) { alert('Erreur : ' + error.message); openBinder(selected) }
   }
@@ -383,8 +386,26 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
     if (c?.active) suppressClickUntil.current = Date.now() + 400
   }
 
+  // Type de classeur : 'rings' = feuilles simples, on voit le dos des cartes à gauche.
+  const isRings = selected?.binder_type === 'rings'
+
+  // Descripteur du contenu d'un côté du feuillet, selon le mode.
+  // null = intérieur de couverture (carton). En mode 'rings', une même feuille
+  // apparaît en recto (droite) puis en dos (gauche du feuillet suivant).
+  type FaceDesc = { page: number; face: 'front' | 'back' } | null
+  const leftFace = (pi: number): FaceDesc => {
+    if (!selected) return null
+    if (isRings) { const sheet = pi / 2; return sheet >= 1 && sheet <= selected.page_count ? { page: sheet, face: 'back' } : null }
+    return pi >= 1 && pi <= selected.page_count ? { page: pi, face: 'front' } : null
+  }
+  const rightFace = (pi: number): FaceDesc => {
+    if (!selected) return null
+    if (isRings) { const sheet = pi / 2 + 1; return sheet >= 1 && sheet <= selected.page_count ? { page: sheet, face: 'front' } : null }
+    return pi + 1 >= 1 && pi + 1 <= selected.page_count ? { page: pi + 1, face: 'front' } : null
+  }
+
   // Bornes de navigation : feuillets [g, g+1] avec g pair (0 = couverture + page 1)
-  const canNext = selected ? pageIndex + 2 <= selected.page_count : false
+  const canNext = selected ? (isRings ? pageIndex / 2 + 1 <= selected.page_count : pageIndex + 2 <= selected.page_count) : false
   const canPrev = pageIndex > 0
 
   // Termine le feuilletage : rotation continue jusqu'à ±180° puis validation
@@ -477,17 +498,59 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
     )
   }
 
-  const renderPocketGrid = (page: number, side: 'left' | 'right') => {
+  // Dos de carte générique (quand la vraie image de dos n'est pas disponible)
+  const cardBackPlaceholder = (
+    <div style={{
+      width: '100%', height: '100%',
+      background: 'repeating-linear-gradient(45deg, #2a3550 0 6px, #33405f 6px 12px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <div style={{ width: '58%', height: '58%', borderRadius: 4, border: '1px solid rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.35)', fontSize: 9, fontWeight: 900, letterSpacing: '0.15em' }}>DOS</div>
+    </div>
+  )
+
+  const renderPocketGrid = (page: number, side: 'left' | 'right', face: 'front' | 'back' = 'front') => {
     if (!selected) return null
     if (page < 1 || page > selected.page_count) return <div style={{ visibility: 'hidden' }} />
     const n = selected.layout
     const cols = COLS[n] || 3
+    const rows = Math.ceil(n / cols)
     const small = pageW < 180
+
+    // Ordre d'affichage des pochettes. Sur un dos, les colonnes sont inversées
+    // (miroir horizontal), comme quand on retourne une vraie feuille transparente.
+    const order: number[] = []
+    if (face === 'back') {
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) order.push(r * cols + (cols - 1 - c))
+    } else {
+      for (let i = 0; i < n; i++) order.push(i)
+    }
+
     const grid = (
       <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: small ? 5 : 8, alignContent: 'center', padding: small ? '6px 4px' : '10px 6px' }}>
-        {Array.from({ length: n }).map((_, idx) => {
+        {order.map(idx => {
           const k = slotKey(page, idx)
           const slot = slots.get(k)
+
+          // ── Face DOS : affichage seul (on range/déplace depuis le recto) ──
+          if (face === 'back') {
+            if (!slot) {
+              return <div key={idx} style={{ aspectRatio: '2.5/3.5', background: 'rgba(255,255,255,0.28)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.7), 0 0 0 1px rgba(150,165,180,0.4)' }} />
+            }
+            return (
+              <div key={idx} style={{ aspectRatio: '2.5/3.5', overflow: 'hidden', boxShadow: '0 0 0 1px rgba(150,165,180,0.4)', position: 'relative', cursor: 'pointer' }}
+                onClick={() => { if (flip || clickSuppressed()) return; if (!onOpenCard || !onOpenCard(slot.img)) setViewerSlot(slot) }}
+                title={slot.nom || ''}
+              >
+                {slot.img_back
+                  ? <img src={slot.img_back} alt={slot.nom || ''} loading="lazy" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+                  : cardBackPlaceholder}
+                <PlasticSheen />
+              </div>
+            )
+          }
+
+          // ── Face RECTO : interactive (ajout, déplacement, retrait) ──
           if (slot) {
             return (
               <div key={idx} data-pocket data-page={page} data-idx={idx}
@@ -542,8 +605,10 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
         })}
       </div>
     )
+    // Le côté de la reliure s'inverse sur un dos (la feuille est retournée)
+    const stripLeft = face === 'back' ? side === 'right' : side === 'left'
     return (
-      <div style={{ display: 'flex', flexDirection: side === 'left' ? 'row' : 'row-reverse', height: '100%', width: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: stripLeft ? 'row' : 'row-reverse', height: '100%', width: '100%' }}>
         {grid}
         <BindingStrip />
       </div>
@@ -608,6 +673,25 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
             </div>
           </div>
         )}
+
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 700, color: '#888', display: 'block', marginBottom: 6 }}>Type de classeur</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {([
+              { id: 'portfolio', icon: '📕', title: 'Portfolio', desc: 'On ne voit que le recto' },
+              { id: 'rings', icon: '🗂️', title: 'À anneaux', desc: 'On voit le dos des cartes' },
+            ] as const).map(t => (
+              <button key={t.id} type="button" onClick={() => setFType(t.id)} style={{
+                flex: 1, padding: '10px 8px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                border: fType === t.id ? `2px solid ${accent}` : '2px solid #e0e0e0',
+                background: fType === t.id ? `${accent}0d` : 'white',
+              }}>
+                <div style={{ fontSize: 15, fontWeight: 900, color: fType === t.id ? accent : '#333' }}>{t.icon} {t.title}</div>
+                <div style={{ fontSize: 10.5, color: '#888', marginTop: 2 }}>{t.desc}</div>
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div>
           <label style={{ fontSize: 12, fontWeight: 700, color: '#888', display: 'block', marginBottom: 6 }}>Couleur</label>
@@ -766,13 +850,18 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
     </div>
   )
 
-  // Rend un côté statique du feuillet : page plastique si la page existe, sinon
-  // intérieur de couverture (page 0 à gauche, au-delà de page_count à droite).
-  const renderStaticSide = (page: number, side: 'left' | 'right') => {
-    if (page < 1 || page > selected.page_count) {
-      return <div style={{ zIndex: 2 }}>{insideCoverFace(side)}</div>
-    }
-    return <div style={{ ...pageShellStyle(side), zIndex: 2 }}>{renderPocketGrid(page, side)}</div>
+  // Rend un côté statique du feuillet à partir de l'index de feuillet `pi` (pair).
+  // Page plastique si la face existe, sinon intérieur de couverture.
+  const renderStaticSide = (pi: number, side: 'left' | 'right') => {
+    const desc = side === 'left' ? leftFace(pi) : rightFace(pi)
+    if (!desc) return <div style={{ zIndex: 2 }}>{insideCoverFace(side)}</div>
+    return <div style={{ ...pageShellStyle(side), zIndex: 2 }}>{renderPocketGrid(desc.page, side, desc.face)}</div>
+  }
+
+  // Contenu d'une face du feuillet qui tourne (recto/dos selon le mode)
+  const renderFlipFace = (desc: FaceDesc, side: 'left' | 'right') => {
+    if (!desc) return <div style={{ visibility: 'hidden' }} />
+    return renderPocketGrid(desc.page, side, desc.face)
   }
 
   // Ouvre le classeur : la couverture fermée pivote comme un vrai plat de classeur,
@@ -839,7 +928,7 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
             <div style={{ position: 'absolute', left: 2 * pageW - 8, top: -6, bottom: -6, width: wing + 8, background: `linear-gradient(90deg, rgba(0,0,0,0.25), ${coverColor})`, borderRadius: '0 8px 8px 0', zIndex: 1 }} />
 
             {renderStaticSide(flippingLeft ? pageIndex - 2 : pageIndex, 'left')}
-            {renderStaticSide(flippingRight ? pageIndex + 3 : pageIndex + 1, 'right')}
+            {renderStaticSide(flippingRight ? pageIndex + 2 : pageIndex, 'right')}
 
             {/* creux central */}
             <div style={{ position: 'absolute', left: pageW - 3, top: 0, bottom: 0, width: 6, background: 'linear-gradient(90deg, rgba(0,0,0,0.14), transparent, rgba(0,0,0,0.14))', zIndex: 14, pointerEvents: 'none' }} />
@@ -857,11 +946,11 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
                 zIndex: 30,
               }}>
                 <div style={{ ...pageShellStyle(flip.dir === 'next' ? 'right' : 'left'), position: 'absolute', inset: 0, width: '100%', height: '100%', backfaceVisibility: 'hidden' }}>
-                  {renderPocketGrid(flip.dir === 'next' ? pageIndex + 1 : pageIndex, flip.dir === 'next' ? 'right' : 'left')}
+                  {renderFlipFace(flip.dir === 'next' ? rightFace(pageIndex) : leftFace(pageIndex), flip.dir === 'next' ? 'right' : 'left')}
                   <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'rgba(0,0,0,0.28)', opacity: shadowOpacity }} />
                 </div>
                 <div style={{ ...pageShellStyle(flip.dir === 'next' ? 'left' : 'right'), position: 'absolute', inset: 0, width: '100%', height: '100%', backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
-                  {renderPocketGrid(flip.dir === 'next' ? pageIndex + 2 : pageIndex - 1, flip.dir === 'next' ? 'left' : 'right')}
+                  {renderFlipFace(flip.dir === 'next' ? leftFace(pageIndex + 2) : rightFace(pageIndex - 2), flip.dir === 'next' ? 'left' : 'right')}
                   <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'rgba(0,0,0,0.28)', opacity: shadowOpacity }} />
                 </div>
               </div>
@@ -887,9 +976,15 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
             </button>
             <span style={{ fontSize: 12, color: '#999', whiteSpace: 'nowrap' }}>
               {(() => {
-                const l = pageIndex, r = pageIndex + 1, cnt = selected.page_count
-                const lOk = l >= 1 && l <= cnt, rOk = r >= 1 && r <= cnt
-                const label = lOk && rOk ? `Pages ${l}–${r}` : rOk ? `Page ${r}` : lOk ? `Page ${l}` : 'Couverture'
+                const cnt = selected.page_count
+                const l = leftFace(pageIndex), r = rightFace(pageIndex)
+                if (isRings) {
+                  const parts: string[] = []
+                  if (l) parts.push(`Feuille ${l.page} (dos)`)
+                  if (r) parts.push(`Feuille ${r.page} (recto)`)
+                  return `${parts.join(' · ') || 'Couverture'} / ${cnt}`
+                }
+                const label = l && r ? `Pages ${l.page}–${r.page}` : r ? `Page ${r.page}` : l ? `Page ${l.page}` : 'Couverture'
                 return `${label} / ${cnt}`
               })()}
             </span>
