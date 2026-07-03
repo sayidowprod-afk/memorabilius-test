@@ -32,7 +32,7 @@ const LAYOUTS = [4, 6, 9, 12, 16]
 const COLS: Record<number, number> = { 4: 2, 6: 2, 9: 3, 12: 3, 16: 4 }
 const BINDER_COLORS = ['#c0392b', '#e2b13c', '#1a1a1a', '#e8dcc4', '#1f3a5f', '#2c2c2c', '#6b2737', '#3d5a3d']
 const SHELF_ROW_SIZE = 12
-const PAGE_MAX_W = 300
+const PAGE_MAX_W = 620
 const PAGE_RATIO = 310 / 230 // hauteur / largeur d'une page
 const FLIP_MS = 620
 
@@ -94,12 +94,15 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
     if (!el) return
     const measure = () => {
       const avail = el.clientWidth - 32
-      setPageW(Math.max(120, Math.min(PAGE_MAX_W, Math.floor(avail / 2))))
+      const byWidth = Math.floor(avail / 2)                       // deux pages côte à côte
+      const byHeight = Math.floor((window.innerHeight * 0.74) / PAGE_RATIO) // ne dépasse pas l'écran
+      setPageW(Math.max(120, Math.min(PAGE_MAX_W, byWidth, byHeight)))
     }
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(el)
-    return () => ro.disconnect()
+    window.addEventListener('resize', measure)
+    return () => { ro.disconnect(); window.removeEventListener('resize', measure) }
   }, [selected])
 
   // Feuilletage à deux faces : la feuille tourne en continu de 0 à ±180°.
@@ -142,12 +145,13 @@ export default function BinderLibrary({ userId, isOwner, accent, pendingCard, on
     for (const s of data || []) map.set(slotKey(s.page_number, s.slot_index), { ...s, img_back: s.img_back ?? null })
     setSlots(map)
 
-    // Complète le dos (image_verso) pour les cartes rangées avant l'ajout de la colonne,
-    // en le récupérant depuis la collection à partir du recto (card_key = image_recto).
-    const missing = [...map.values()].filter(s => !s.img_back).map(s => s.card_key)
-    if (missing.length) {
+    // Complète le dos (image_verso) pour les cartes rangées avant l'ajout de la colonne.
+    // On récupère TOUTES les cartes du user (fiable) plutôt qu'un filtre .in() sur des
+    // URLs longues, qui dépassait la limite de longueur de requête et n'en renvoyait qu'une partie.
+    const needsBack = [...map.values()].some(s => !s.img_back)
+    if (needsBack) {
       const { data: cards } = await supabase.from('cartes_manuelles')
-        .select('image_recto, image_verso').in('image_recto', missing).not('image_verso', 'is', null)
+        .select('image_recto, image_verso').eq('user_id', userId).not('image_verso', 'is', null)
       if (cards && cards.length) {
         const versoByRecto = new Map(cards.map((c: any) => [c.image_recto, c.image_verso]))
         setSlots(prev => {
