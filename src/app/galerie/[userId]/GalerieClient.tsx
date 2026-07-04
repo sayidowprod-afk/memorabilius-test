@@ -537,7 +537,7 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
       <div style={{ maxWidth: 1400, margin: '0 auto', fontFamily: 'Inter, sans-serif', padding: '0 10px' }}>
 
         {/* Header profil */}
-        <div style={{ background: 'white', borderRadius: 16, padding: '24px 30px', marginBottom: 20, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap' }}>
+        <div style={{ background: profile?.page_frame_color || 'white', borderRadius: 16, padding: '24px 30px', marginBottom: 20, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap' }}>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap', flex: '1 1 300px' }}>
             <img
@@ -757,7 +757,7 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
                       onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-4px)')}
                       onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
                     >
-                      <div style={{ borderRadius: 8, overflow: 'hidden', background: 'white', position: 'relative' }}>
+                      <div style={{ borderRadius: 8, overflow: 'hidden', background: profile?.page_frame_color || 'white', position: 'relative' }}>
                       {isOwner && (
                         <button onClick={async e => {
                           e.stopPropagation()
@@ -867,7 +867,7 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
         })()}
 
         {/* Onglets Collection / Wishlist / Commentaires / Bibliothèque — scrollable sur mobile */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: '#f0f0f0', borderRadius: 10, padding: 4, maxWidth: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: profile?.page_frame_color || '#f0f0f0', borderRadius: 10, padding: 4, maxWidth: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {(['collection', 'wishlist', 'library', 'comments'] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} style={{
               padding: '8px 16px', border: 'none', borderRadius: 8, cursor: 'pointer',
@@ -896,7 +896,7 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
 
         {activeTab === 'collection' && <>
         {/* Filtres de recherche */}
-        <div style={{ background: '#fff', padding: 10, borderRadius: 8, marginBottom: 15, border: '1px solid #eee' }}>
+        <div style={{ background: profile?.page_frame_color || '#fff', padding: 10, borderRadius: 8, marginBottom: 15, border: '1px solid #eee' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8, marginBottom: 10 }}>
             <div><label style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: 3 }}>{t('gallery_search_label')}</label>
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('gallery_search')} /></div>
