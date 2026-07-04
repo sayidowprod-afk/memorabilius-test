@@ -14,12 +14,13 @@ const GRADIENT_PRESETS = [
 const SOLID_PRESETS = ['#0e1116', '#1D3F8B', '#C8102E', '#2e7d32', '#6b2737', '#111111', '#f5f5f5']
 
 // Éditeur de personnalisation de page (fond + couleur du pseudo).
-export default function PageCustomizer({ userId, initialBg, initialNameColor, onClose, onSaved }: {
+export default function PageCustomizer({ userId, initialBg, initialNameColor, initialFrameColor, onClose, onSaved }: {
   userId: string
   initialBg: string | null
   initialNameColor: string | null
+  initialFrameColor: string | null
   onClose: () => void
-  onSaved: (bg: string | null, nameColor: string | null) => void
+  onSaved: (bg: string | null, nameColor: string | null, frameColor: string | null) => void
 }) {
   const startsGrad = !!initialBg && initialBg.includes('gradient')
   const [mode, setMode] = useState<'solid' | 'gradient'>(startsGrad ? 'gradient' : 'solid')
@@ -29,6 +30,7 @@ export default function PageCustomizer({ userId, initialBg, initialNameColor, on
   const [angle, setAngle] = useState(135)
   const [preset, setPreset] = useState<string | null>(startsGrad ? initialBg : null)
   const [nameColor, setNameColor] = useState(initialNameColor || '#ffffff')
+  const [frameColor, setFrameColor] = useState(initialFrameColor || '#ffffff')
   const [saving, setSaving] = useState(false)
 
   const bgValue = mode === 'solid'
@@ -37,18 +39,18 @@ export default function PageCustomizer({ userId, initialBg, initialNameColor, on
 
   const save = async () => {
     setSaving(true)
-    const { error } = await supabase.from('profiles').update({ page_bg: bgValue, page_name_color: nameColor }).eq('id', userId)
+    const { error } = await supabase.from('profiles').update({ page_bg: bgValue, page_name_color: nameColor, page_frame_color: frameColor }).eq('id', userId)
     setSaving(false)
     if (error) { alert('Erreur : ' + error.message); return }
-    onSaved(bgValue, nameColor)
+    onSaved(bgValue, nameColor, frameColor)
     onClose()
   }
 
   const reset = async () => {
     setSaving(true)
-    await supabase.from('profiles').update({ page_bg: null, page_name_color: null }).eq('id', userId)
+    await supabase.from('profiles').update({ page_bg: null, page_name_color: null, page_frame_color: null }).eq('id', userId)
     setSaving(false)
-    onSaved(null, null)
+    onSaved(null, null, null)
     onClose()
   }
 
@@ -105,6 +107,12 @@ export default function PageCustomizer({ userId, initialBg, initialNameColor, on
         <div>
           <label style={{ fontSize: 12, fontWeight: 700, color: '#888', display: 'block', marginBottom: 8 }}>Couleur du pseudo</label>
           <input type="color" value={nameColor} onChange={e => setNameColor(e.target.value)} style={{ width: 48, height: 40, border: 'none', cursor: 'pointer' }} />
+        </div>
+
+        {/* Couleur interne des cadres de cartes */}
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 700, color: '#888', display: 'block', marginBottom: 8 }}>Couleur interne des cadres de cartes</label>
+          <input type="color" value={frameColor} onChange={e => setFrameColor(e.target.value)} style={{ width: 48, height: 40, border: 'none', cursor: 'pointer' }} />
         </div>
 
         <div style={{ display: 'flex', gap: 10 }}>

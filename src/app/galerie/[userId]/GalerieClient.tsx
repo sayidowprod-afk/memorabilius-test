@@ -1392,7 +1392,7 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
               onClick={() => editMode && isOwner ? toggleCardSelection(getCardId(d)) : (!editMode && setPopup(d))}
               style={{
               borderRadius: 8, padding: 8,
-              background: selectedCards.has(getCardId(d)) ? '#e8f0fe' : 'white',
+              background: selectedCards.has(getCardId(d)) ? '#e8f0fe' : (profile?.page_frame_color || 'white'),
               outline: selectedCards.has(getCardId(d)) ? '2px solid #003DA6' : 'none',
               cursor: editMode && isOwner && sortBy === 'default' ? 'pointer' : editMode ? 'default' : 'pointer',
               ...((privateCards.has(d.f) && isOwner)
@@ -1553,8 +1553,9 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
           userId={userId}
           initialBg={profile?.page_bg ?? null}
           initialNameColor={profile?.page_name_color ?? null}
+          initialFrameColor={profile?.page_frame_color ?? null}
           onClose={() => setCustomizeOpen(false)}
-          onSaved={(bg, nameColor) => setProfile((p: any) => p ? { ...p, page_bg: bg, page_name_color: nameColor } : p)}
+          onSaved={(bg, nameColor, frameColor) => setProfile((p: any) => p ? { ...p, page_bg: bg, page_name_color: nameColor, page_frame_color: frameColor } : p)}
         />
       )}
 
