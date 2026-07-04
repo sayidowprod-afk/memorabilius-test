@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import FederationLogo from '@/components/FederationLogo'
 
 const RED = '#C8102E'
 
@@ -23,8 +24,8 @@ export default function Footer() {
     <footer style={{ marginTop: 40, background: RED, color: 'white' }}>
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: '30px 20px 22px', display: 'flex', flexWrap: 'wrap', gap: 28, alignItems: 'center', justifyContent: 'space-between' }}>
 
-        {/* ── Marque (image complète, fond transparent) ── */}
-        <img src="/federation-carte-footer.png" alt="Fédération de la carte" style={{ height: 170, width: 'auto', display: 'block' }} />
+        {/* ── Marque : emblème + texte, recadré en CSS (image intacte) ── */}
+        <FederationLogo variant="footer" height={110} />
 
         {/* ── Avantages adhérents ── */}
         <div>
