@@ -198,7 +198,7 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
           if (data) setMonthlyBadges(data.map((b: any) => b.mois))
         })
         // Membre de la team « Fédération de la carte » ? (badge + personnalisation)
-        supabase.from('teams').select('id').eq('name', 'Fédération de la carte').limit(1).then(async ({ data: fed }) => {
+        supabase.from('teams').select('id').ilike('name', 'Fédération de la carte').limit(1).then(async ({ data: fed }) => {
           const fedId = fed?.[0]?.id
           if (!fedId) return
           const { data: mem } = await supabase.from('team_members').select('user_id').eq('team_id', fedId).eq('user_id', resolvedId).limit(1)
