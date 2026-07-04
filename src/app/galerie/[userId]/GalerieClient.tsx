@@ -21,6 +21,8 @@ import { useLang } from '@/lib/LangContext'
 import { getSpeciality, getTeamById } from '@/lib/sportsTeams'
 import { cardDisplayRatio, isHorizontalFormat, getFormat } from '@/lib/cardFormats'
 import TeamBadge from '@/components/TeamBadge'
+import FederationLogo from '@/components/FederationLogo'
+import PageCustomizer from '@/components/PageCustomizer'
 
 function SortableCard({ id, disabled, children, className, style, onClick }: {
   id: string; disabled: boolean; children: React.ReactNode
@@ -144,6 +146,8 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
   const [bulkNewTag, setBulkNewTag] = useState('')
   const [showBulkNewTag, setShowBulkNewTag] = useState(false)
   const [monthlyBadges, setMonthlyBadges] = useState<string[]>([])
+  const [isFederation, setIsFederation] = useState(false)
+  const [customizeOpen, setCustomizeOpen] = useState(false)
   const [csvTags, setCsvTags] = useState<Map<string, string>>(new Map())
   const [grailCards, setGrailCards] = useState<{ card_key: string; position: number }[]>([])
   const [grailSearch, setGrailSearch] = useState('')
@@ -155,6 +159,15 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
 
   const isOwner = currentUser === userId
   const { t, lang } = useLang()
+
+  // Personnalisation de page (membres Fédération) : fond appliqué au body
+  useEffect(() => {
+    const bg = profile?.page_bg
+    if (!bg) return
+    const prev = document.body.style.background
+    document.body.style.background = bg
+    return () => { document.body.style.background = prev }
+  }, [profile?.page_bg])
   const cardParam = searchParams.get('card')
 
   useEffect(() => {
@@ -183,6 +196,13 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
         else setLoaded(true)
         supabase.from('badges').select('mois').eq('user_id', resolvedId).eq('type', 'collectionneur_du_mois').order('mois', { ascending: false }).limit(6).then(({ data }) => {
           if (data) setMonthlyBadges(data.map((b: any) => b.mois))
+        })
+        // Membre de la team « Fédération de la carte » ? (badge + personnalisation)
+        supabase.from('teams').select('id').eq('name', 'Fédération de la carte').limit(1).then(async ({ data: fed }) => {
+          const fedId = fed?.[0]?.id
+          if (!fedId) return
+          const { data: mem } = await supabase.from('team_members').select('user_id').eq('team_id', fedId).eq('user_id', resolvedId).limit(1)
+          setIsFederation(!!mem?.length)
         })
         supabase.from('collection_tab_settings').select('tag, color, position').eq('user_id', resolvedId).then(({ data }) => {
           if (data) setTabSettings(new Map(data.map((r: any) => [r.tag, { color: r.color, position: r.position }])))
@@ -525,8 +545,14 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
             />
             <div style={{ minWidth: 200 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
-                <h1 className={profile?.is_donor ? 'holo-name' : ''} style={{ fontSize: 24, fontWeight: 900, margin: 0, color: profile?.is_donor ? undefined : undefined }}>{profile?.display_name || 'Collectionneur'}</h1>
+                <h1 className={(profile?.is_donor && !profile?.page_name_color) ? 'holo-name' : ''} style={{ fontSize: 24, fontWeight: 900, margin: 0, color: profile?.page_name_color || undefined }}>{profile?.display_name || 'Collectionneur'}</h1>
                 <OnlineIndicator lastSeen={profile?.last_seen} size={12} />
+                {/* Badge Fédération de la carte — toujours en premier */}
+                {isFederation && (
+                  <span className="sticker-badge" data-label="Fédération de la carte" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <FederationLogo variant="emblem" height={26} />
+                  </span>
+                )}
                 {monthlyBadges.length > 0 && (
                   <span className="sticker-badge" data-label={`Collectionneur du mois : ${monthlyBadges.join(', ')}`} style={{ fontSize: 26 }}>🏆</span>
                 )}
@@ -616,6 +642,17 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
                     fontWeight: 700, fontSize: 13, cursor: 'pointer', flex: '1 1 auto', textAlign: 'center', minWidth: 150
                   }}>
                     {editMode ? t('gallery_done') : t('gallery_privacy')}
+                  </button>
+                )}
+
+                {/* Personnalisation de page — réservée aux membres Fédération de la carte */}
+                {isOwner && isFederation && !editMode && (
+                  <button onClick={() => setCustomizeOpen(true)} style={{
+                    background: 'linear-gradient(135deg, #C8102E, #1D3F8B)', color: 'white',
+                    border: 'none', borderRadius: 8, padding: '10px 16px',
+                    fontWeight: 800, fontSize: 13, cursor: 'pointer', flex: '1 1 auto', textAlign: 'center', minWidth: 150,
+                  }}>
+                    🎨 Personnaliser ma page
                   </button>
                 )}
 
@@ -1508,6 +1545,16 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
         )}
         </>}
       </div>
+
+      {customizeOpen && isOwner && isFederation && (
+        <PageCustomizer
+          userId={userId}
+          initialBg={profile?.page_bg ?? null}
+          initialNameColor={profile?.page_name_color ?? null}
+          onClose={() => setCustomizeOpen(false)}
+          onSaved={(bg, nameColor) => setProfile((p: any) => p ? { ...p, page_bg: bg, page_name_color: nameColor } : p)}
+        />
+      )}
 
       {popup && (
         <Viewer3D popup={popup} accent={accent} onClose={() => setPopup(null)} getTags={getTags} userId={userId} userSlug={profile?.slug || userId}
