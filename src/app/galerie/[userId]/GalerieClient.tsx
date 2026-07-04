@@ -534,6 +534,10 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
 
   return (
     <>
+      {/* Motif de logos en fond (par-dessus la couleur --bg), personnalisation Fédération */}
+      {profile?.page_pattern && (
+        <div aria-hidden style={{ position: 'fixed', inset: 0, zIndex: -1, pointerEvents: 'none', backgroundImage: `url(${profile.page_pattern})`, backgroundRepeat: 'repeat', backgroundSize: '64px', opacity: 0.14 }} />
+      )}
       <div style={{ maxWidth: 1400, margin: '0 auto', fontFamily: 'Inter, sans-serif', padding: '0 10px' }}>
 
         {/* Header profil */}
@@ -1554,8 +1558,9 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
           initialBg={profile?.page_bg ?? null}
           initialNameColor={profile?.page_name_color ?? null}
           initialFrameColor={profile?.page_frame_color ?? null}
+          initialPattern={profile?.page_pattern ?? null}
           onClose={() => setCustomizeOpen(false)}
-          onSaved={(bg, nameColor, frameColor) => setProfile((p: any) => p ? { ...p, page_bg: bg, page_name_color: nameColor, page_frame_color: frameColor } : p)}
+          onSaved={(bg, nameColor, frameColor, pattern) => setProfile((p: any) => p ? { ...p, page_bg: bg, page_name_color: nameColor, page_frame_color: frameColor, page_pattern: pattern } : p)}
         />
       )}
 

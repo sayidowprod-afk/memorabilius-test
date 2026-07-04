@@ -2,6 +2,15 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '@/lib/supabase'
+import { SPORTS_TEAMS, teamLogoUrl, type Sport } from '@/lib/sportsTeams'
+
+const SPORTS: { id: Sport; label: string }[] = [
+  { id: 'nba', label: 'NBA' },
+  { id: 'nfl', label: 'NFL' },
+  { id: 'mlb', label: 'MLB' },
+  { id: 'nhl', label: 'NHL' },
+  { id: 'football', label: 'Foot' },
+]
 
 const GRADIENT_PRESETS = [
   'linear-gradient(135deg, #C8102E, #1D3F8B)',
@@ -14,13 +23,14 @@ const GRADIENT_PRESETS = [
 const SOLID_PRESETS = ['#0e1116', '#1D3F8B', '#C8102E', '#2e7d32', '#6b2737', '#111111', '#f5f5f5']
 
 // Éditeur de personnalisation de page (fond + couleur du pseudo).
-export default function PageCustomizer({ userId, initialBg, initialNameColor, initialFrameColor, onClose, onSaved }: {
+export default function PageCustomizer({ userId, initialBg, initialNameColor, initialFrameColor, initialPattern, onClose, onSaved }: {
   userId: string
   initialBg: string | null
   initialNameColor: string | null
   initialFrameColor: string | null
+  initialPattern: string | null
   onClose: () => void
-  onSaved: (bg: string | null, nameColor: string | null, frameColor: string | null) => void
+  onSaved: (bg: string | null, nameColor: string | null, frameColor: string | null, pattern: string | null) => void
 }) {
   const startsGrad = !!initialBg && initialBg.includes('gradient')
   const [mode, setMode] = useState<'solid' | 'gradient'>(startsGrad ? 'gradient' : 'solid')
@@ -31,6 +41,8 @@ export default function PageCustomizer({ userId, initialBg, initialNameColor, in
   const [preset, setPreset] = useState<string | null>(startsGrad ? initialBg : null)
   const [nameColor, setNameColor] = useState(initialNameColor || '#ffffff')
   const [frameColor, setFrameColor] = useState(initialFrameColor || '#ffffff')
+  const [pattern, setPattern] = useState<string | null>(initialPattern || null)
+  const [sport, setSport] = useState<Sport>('nba')
   const [saving, setSaving] = useState(false)
 
   const bgValue = mode === 'solid'
@@ -39,18 +51,18 @@ export default function PageCustomizer({ userId, initialBg, initialNameColor, in
 
   const save = async () => {
     setSaving(true)
-    const { error } = await supabase.from('profiles').update({ page_bg: bgValue, page_name_color: nameColor, page_frame_color: frameColor }).eq('id', userId)
+    const { error } = await supabase.from('profiles').update({ page_bg: bgValue, page_name_color: nameColor, page_frame_color: frameColor, page_pattern: pattern }).eq('id', userId)
     setSaving(false)
     if (error) { alert('Erreur : ' + error.message); return }
-    onSaved(bgValue, nameColor, frameColor)
+    onSaved(bgValue, nameColor, frameColor, pattern)
     onClose()
   }
 
   const reset = async () => {
     setSaving(true)
-    await supabase.from('profiles').update({ page_bg: null, page_name_color: null, page_frame_color: null }).eq('id', userId)
+    await supabase.from('profiles').update({ page_bg: null, page_name_color: null, page_frame_color: null, page_pattern: null }).eq('id', userId)
     setSaving(false)
-    onSaved(null, null, null)
+    onSaved(null, null, null, null)
     onClose()
   }
 
@@ -64,8 +76,9 @@ export default function PageCustomizer({ userId, initialBg, initialNameColor, in
         <h3 style={{ margin: 0, fontWeight: 900, fontSize: 16 }}>🎨 Personnaliser ma page</h3>
 
         {/* Aperçu */}
-        <div style={{ height: 90, borderRadius: 12, background: bgValue, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ fontWeight: 900, fontSize: 22, color: nameColor, textShadow: '0 1px 4px rgba(0,0,0,0.35)' }}>Pseudo</span>
+        <div style={{ height: 90, borderRadius: 12, background: bgValue, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {pattern && <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${pattern})`, backgroundRepeat: 'repeat', backgroundSize: '38px', opacity: 0.2 }} />}
+          <span style={{ position: 'relative', fontWeight: 900, fontSize: 22, color: nameColor, textShadow: '0 1px 4px rgba(0,0,0,0.35)' }}>Pseudo</span>
         </div>
 
         {/* Type de fond */}
@@ -113,6 +126,27 @@ export default function PageCustomizer({ userId, initialBg, initialNameColor, in
         <div>
           <label style={{ fontSize: 12, fontWeight: 700, color: '#888', display: 'block', marginBottom: 8 }}>Couleur interne des cadres de cartes</label>
           <input type="color" value={frameColor} onChange={e => setFrameColor(e.target.value)} style={{ width: 48, height: 40, border: 'none', cursor: 'pointer' }} />
+        </div>
+
+        {/* Motif de logos en fond */}
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 700, color: '#888', display: 'block', marginBottom: 8 }}>Motif de logos en fond (par-dessus la couleur)</label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+            {SPORTS.map(s => (
+              <button key={s.id} onClick={() => setSport(s.id)} style={{ padding: '5px 10px', borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: 'pointer', border: sport === s.id ? '2px solid #003DA6' : '2px solid #e0e0e0', background: sport === s.id ? '#003DA610' : 'white' }}>{s.label}</button>
+            ))}
+            <button onClick={() => setPattern(null)} style={{ padding: '5px 10px', borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: 'pointer', border: !pattern ? '2px solid #e74c3c' : '2px solid #e0e0e0', background: !pattern ? '#e74c3c11' : 'white', color: !pattern ? '#e74c3c' : '#333' }}>Aucun</button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, 44px)', gap: 6, maxHeight: 150, overflowY: 'auto' }}>
+            {SPORTS_TEAMS.filter(tm => tm.sport === sport).map(tm => {
+              const url = teamLogoUrl(tm)
+              return (
+                <button key={tm.id} onClick={() => setPattern(url)} title={tm.name} style={{ width: 44, height: 44, borderRadius: 8, cursor: 'pointer', background: 'white', padding: 3, border: pattern === url ? '2px solid #003DA6' : '2px solid #eee' }}>
+                  <img src={url} alt={tm.name} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: 10 }}>
