@@ -160,13 +160,15 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
   const isOwner = currentUser === userId
   const { t, lang } = useLang()
 
-  // Personnalisation de page (membres Fédération) : fond appliqué au body
+  // Personnalisation de page (membres Fédération) : le fond du body est en
+  // `var(--bg) !important` → on redéfinit la variable --bg (inline gagne).
   useEffect(() => {
     const bg = profile?.page_bg
     if (!bg) return
-    const prev = document.body.style.background
-    document.body.style.background = bg
-    return () => { document.body.style.background = prev }
+    const root = document.documentElement
+    const prev = root.style.getPropertyValue('--bg')
+    root.style.setProperty('--bg', bg)
+    return () => { root.style.setProperty('--bg', prev) }
   }, [profile?.page_bg])
   const cardParam = searchParams.get('card')
 
@@ -545,7 +547,7 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
             />
             <div style={{ minWidth: 200 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
-                <h1 className={(profile?.is_donor && !profile?.page_name_color) ? 'holo-name' : ''} style={{ fontSize: 24, fontWeight: 900, margin: 0, color: profile?.page_name_color || undefined }}>{profile?.display_name || 'Collectionneur'}</h1>
+                <h1 className={(profile?.is_donor && !profile?.page_name_color) ? 'holo-name' : ''} style={{ fontSize: 24, fontWeight: 900, margin: 0, color: profile?.page_name_color || undefined, textShadow: profile?.page_name_color ? '0 1px 2px rgba(0,0,0,0.45), 0 0 1px rgba(0,0,0,0.5)' : undefined }}>{profile?.display_name || 'Collectionneur'}</h1>
                 <OnlineIndicator lastSeen={profile?.last_seen} size={12} />
                 {/* Badge Fédération de la carte — toujours en premier */}
                 {isFederation && (
