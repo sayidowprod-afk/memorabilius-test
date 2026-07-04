@@ -32,10 +32,9 @@ export default function Footer() {
           <div style={{ fontWeight: 900, fontSize: 12, letterSpacing: '0.06em', marginBottom: 8, opacity: 0.95 }}>
             FONCTIONNALITÉS POUR LES ADHÉRENTS :
           </div>
-          {/* TODO: personnaliser ces avantages */}
           <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14, fontWeight: 600, lineHeight: 1.7 }}>
-            <li>Badge exclusif</li>
-            <li>Avantage à venir</li>
+            <li>Badge exclusif Fédération</li>
+            <li>Personnalisation complète de la galerie</li>
             <li>Avantage à venir</li>
           </ul>
         </div>
@@ -44,8 +43,8 @@ export default function Footer() {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
           <span style={{ fontWeight: 900, fontSize: 16, fontStyle: 'italic' }}>Devenir adhérent →</span>
           <div style={{ display: 'flex', gap: 10 }}>
-            <a href="#" aria-label="X" style={social}><XIcon /></a>
-            <a href="#" aria-label="Discord" style={social}><DiscordIcon /></a>
+            <a href="https://x.com/Fededelacarte" target="_blank" rel="noopener noreferrer" aria-label="X" style={social}><XIcon /></a>
+            <a href="https://discord.gg/6anaAXA3VK" target="_blank" rel="noopener noreferrer" aria-label="Discord" style={social}><DiscordIcon /></a>
           </div>
         </div>
       </div>
@@ -59,7 +58,7 @@ export default function Footer() {
             <Link href="/confidentialite" style={legalLink}>Confidentialité</Link>
             <Link href="/cgu" style={legalLink}>CGU</Link>
             <a href="https://ko-fi.com/gknnn_cards" target="_blank" rel="noopener noreferrer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'transparent', color: 'white', border: '1px solid rgba(255,255,255,0.7)', padding: '7px 14px', borderRadius: 20, fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>
+              style={{ ...legalLink, display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 800 }}>
               ☕ Soutenir le projet
             </a>
           </nav>

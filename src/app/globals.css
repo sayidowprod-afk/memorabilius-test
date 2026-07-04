@@ -289,3 +289,11 @@ img {
   .nav-hamburger { display: flex !important; }
   .nav-mobile-menu { display: flex !important; }
 }
+
+/* Pulse rouge au survol du logo Fédération dans le header */
+@keyframes fedPulse {
+  0%, 100% { filter: drop-shadow(0 0 1px rgba(200,16,46,0.45)); }
+  50%      { filter: drop-shadow(0 0 9px rgba(200,16,46,1)); }
+}
+.fed-logo-hover { display: inline-flex; cursor: pointer; transition: transform 0.15s; }
+.fed-logo-hover:hover { animation: fedPulse 1s ease-in-out infinite; transform: scale(1.08); }
