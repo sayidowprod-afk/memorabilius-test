@@ -24,7 +24,7 @@ export default function Footer() {
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: '30px 20px 22px', display: 'flex', flexWrap: 'wrap', gap: 28, alignItems: 'center', justifyContent: 'space-between' }}>
 
         {/* ── Marque (image complète, fond transparent) ── */}
-        <img src="/federation-carte-footer.png" alt="Fédération de la carte" style={{ height: 92, width: 'auto', display: 'block' }} />
+        <img src="/federation-carte-footer.png" alt="Fédération de la carte" style={{ height: 170, width: 'auto', display: 'block' }} />
 
         {/* ── Avantages adhérents ── */}
         <div>
