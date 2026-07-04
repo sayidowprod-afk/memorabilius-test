@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import dynamic from 'next/dynamic'
@@ -532,11 +532,33 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
 
   const accent = profile?.couleur_bordure || '#003DA6'
 
+  // Motif de logos en fond : semis ALÉATOIRE (positions stables via PRNG seedé par l'user)
+  const logoScatter = useMemo(() => {
+    const raw = profile?.page_pattern
+    if (!raw) return [] as { url: string; left: number; top: number; size: number; rot: number }[]
+    let logos: string[]
+    try { const a = JSON.parse(raw); logos = Array.isArray(a) ? a : [raw] } catch { logos = [raw] }
+    if (!logos.length) return []
+    let seed = 0; for (const c of (userId || 'x')) seed = (seed * 31 + c.charCodeAt(0)) >>> 0
+    const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296 }
+    return Array.from({ length: 64 }).map((_, i) => ({
+      url: logos[Math.floor(rnd() * logos.length)],
+      left: rnd() * 100,
+      top: rnd() * 100,
+      size: 34 + rnd() * 36,
+      rot: rnd() * 50 - 25,
+    }))
+  }, [profile?.page_pattern, userId])
+
   return (
     <>
       {/* Motif de logos en fond (par-dessus la couleur --bg), personnalisation Fédération */}
-      {profile?.page_pattern && (
-        <div aria-hidden style={{ position: 'fixed', inset: 0, zIndex: -1, pointerEvents: 'none', backgroundImage: `url(${profile.page_pattern})`, backgroundRepeat: 'repeat', backgroundSize: '64px', opacity: 0.14 }} />
+      {logoScatter.length > 0 && (
+        <div aria-hidden style={{ position: 'fixed', inset: 0, zIndex: -1, pointerEvents: 'none', overflow: 'hidden' }}>
+          {logoScatter.map((s, i) => (
+            <img key={i} src={s.url} alt="" loading="lazy" style={{ position: 'absolute', left: `${s.left}%`, top: `${s.top}%`, width: s.size, height: s.size, objectFit: 'contain', opacity: 0.13, transform: `translate(-50%,-50%) rotate(${s.rot}deg)` }} />
+          ))}
+        </div>
       )}
       <div style={{ maxWidth: 1400, margin: '0 auto', fontFamily: 'Inter, sans-serif', padding: '0 10px' }}>
 
