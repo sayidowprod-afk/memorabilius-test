@@ -58,8 +58,8 @@ export default function Footer() {
             <Link href="/mentions-legales" style={legalLink}>Mentions légales</Link>
             <Link href="/confidentialite" style={legalLink}>Confidentialité</Link>
             <Link href="/cgu" style={legalLink}>CGU</Link>
-            <a href="https://ko-fi.com/gknnn_cards" target="_blank" rel="noopener noreferrer" className="kofi-btn"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'white', color: RED, padding: '7px 14px', borderRadius: 20, fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>
+            <a href="https://ko-fi.com/gknnn_cards" target="_blank" rel="noopener noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'transparent', color: 'white', border: '1px solid rgba(255,255,255,0.7)', padding: '7px 14px', borderRadius: 20, fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>
               ☕ Soutenir le projet
             </a>
           </nav>
