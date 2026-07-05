@@ -290,10 +290,25 @@ img {
   .nav-mobile-menu { display: flex !important; }
 }
 
-/* Pulse rouge au survol du logo Fédération dans le header */
-@keyframes fedPulse {
-  0%, 100% { filter: drop-shadow(0 0 1px rgba(200,16,46,0.45)); }
-  50%      { filter: drop-shadow(0 0 9px rgba(200,16,46,1)); }
+/* Ondes rouges qui se diffusent dans la navbar au survol du logo Fédération */
+.fed-logo-hover { position: relative; display: inline-flex; cursor: pointer; transition: transform 0.2s; }
+.fed-logo-hover:hover { transform: scale(1.08); }
+.fed-ripple {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 40px; height: 40px;
+  margin: -20px 0 0 -20px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(200,16,46,0.55) 0%, rgba(200,16,46,0.28) 45%, rgba(200,16,46,0) 70%);
+  transform: scale(0);
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
 }
-.fed-logo-hover { display: inline-flex; cursor: pointer; transition: transform 0.15s; }
-.fed-logo-hover:hover { animation: fedPulse 1s ease-in-out infinite; transform: scale(1.08); }
+.fed-logo-hover:hover .fed-ripple { animation: fedRipple 1.8s cubic-bezier(0.22,0.61,0.36,1) infinite; }
+.fed-logo-hover:hover .fed-ripple:nth-child(2) { animation-delay: 0.6s; }
+.fed-logo-hover:hover .fed-ripple:nth-child(3) { animation-delay: 1.2s; }
+@keyframes fedRipple {
+  0%   { transform: scale(0.5); opacity: 0.75; }
+  100% { transform: scale(22);  opacity: 0; }
+}

@@ -76,10 +76,13 @@ export default function Navbar() {
 
   return (
     <>
-      <nav style={{ background: dark ? '#1a1a1a' : 'white', borderBottom: `1px solid ${dark ? '#2a2a2a' : '#eee'}`, padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60, position: 'sticky', top: 0, zIndex: 200 }}>
+      <nav style={{ background: dark ? '#1a1a1a' : 'white', borderBottom: `1px solid ${dark ? '#2a2a2a' : '#eee'}`, padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60, position: 'sticky', top: 0, zIndex: 200, overflow: 'hidden' }}>
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, background: dark ? 'white' : 'transparent', borderRadius: dark ? 8 : 0, padding: dark ? '3px 8px' : 0, transition: 'all 0.2s' }}>
           <img src="/memorabilius-logo.png" alt="Memorabilius" width={150} height={30} style={{ height: 30, width: 'auto' }} />
-          <span className="fed-logo-hover"><FederationLogo variant="emblem" height={34} /></span>
+          <span className="fed-logo-hover">
+            <span className="fed-ripple" /><span className="fed-ripple" /><span className="fed-ripple" />
+            <FederationLogo variant="emblem" height={34} />
+          </span>
         </Link>
 
         {/* Desktop */}
