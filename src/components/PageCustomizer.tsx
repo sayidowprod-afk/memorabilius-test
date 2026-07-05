@@ -84,7 +84,7 @@ export default function PageCustomizer({ userId, initialBg, initialNameColor, in
         {/* Aperçu */}
         <div style={{ height: 90, borderRadius: 12, background: bgValue, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {patterns.length > 0 && Array.from({ length: 14 }).map((_, i) => (
-            <img key={i} src={patterns[i % patterns.length]} alt="" style={{ position: 'absolute', left: `${(i * 37 + 11) % 100}%`, top: `${(i * 53 + 7) % 100}%`, width: 26, height: 26, objectFit: 'contain', opacity: 0.22, transform: `translate(-50%,-50%) rotate(${(i * 47) % 60 - 30}deg)` }} />
+            <img key={i} src={patterns[i % patterns.length]} alt="" style={{ position: 'absolute', left: `${(i * 37 + 11) % 100}%`, top: `${(i * 53 + 7) % 100}%`, width: 26, height: 26, objectFit: 'contain', opacity: 0.35, mixBlendMode: 'multiply', transform: `translate(-50%,-50%) rotate(${(i * 47) % 60 - 30}deg)` }} />
           ))}
           <span style={{ position: 'relative', fontWeight: 900, fontSize: 22, color: nameColor, textShadow: '0 1px 4px rgba(0,0,0,0.35)' }}>Pseudo</span>
         </div>

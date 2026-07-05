@@ -556,7 +556,7 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
       {logoScatter.length > 0 && (
         <div aria-hidden style={{ position: 'fixed', inset: 0, zIndex: -1, pointerEvents: 'none', overflow: 'hidden' }}>
           {logoScatter.map((s, i) => (
-            <img key={i} src={s.url} alt="" loading="lazy" style={{ position: 'absolute', left: `${s.left}%`, top: `${s.top}%`, width: s.size, height: s.size, objectFit: 'contain', opacity: 0.13, transform: `translate(-50%,-50%) rotate(${s.rot}deg)` }} />
+            <img key={i} src={s.url} alt="" loading="lazy" style={{ position: 'absolute', left: `${s.left}%`, top: `${s.top}%`, width: s.size, height: s.size, objectFit: 'contain', opacity: 0.2, mixBlendMode: 'multiply', transform: `translate(-50%,-50%) rotate(${s.rot}deg)` }} />
           ))}
         </div>
       )}
