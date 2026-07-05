@@ -54,7 +54,8 @@ export default function Footer() {
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.25)' }}>
         <div style={{ maxWidth: 1400, margin: '0 auto', padding: '12px 20px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13 }}>© {year} Memorabilius</span>
-          <nav style={{ display: 'flex', flexWrap: 'wrap', gap: 18, alignItems: 'center' }}>
+          {/* div (pas <nav>) : globals.css force un fond blanc !important sur tous les <nav> */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18, alignItems: 'center' }}>
             <Link href="/mentions-legales" style={legalLink}>Mentions légales</Link>
             <Link href="/confidentialite" style={legalLink}>Confidentialité</Link>
             <Link href="/cgu" style={legalLink}>CGU</Link>
@@ -62,7 +63,7 @@ export default function Footer() {
               style={{ ...legalLink, display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 800 }}>
               ☕ Soutenir le projet
             </a>
-          </nav>
+          </div>
         </div>
       </div>
     </footer>
