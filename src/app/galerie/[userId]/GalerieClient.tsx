@@ -707,7 +707,8 @@ export default function GalerieClient({ userId, initialCardUrl }: { userId: stri
                   </button>
                 )}
 
-                {!editMode && (
+                {/* Export (CSV / PDF / images) — réservé aux membres Fédération de la carte */}
+                {!editMode && isFederation && (
                   <GalerieExport
                     cards={cards}
                     profileName={profile?.display_name || ''}
