@@ -33,9 +33,10 @@ export default function Footer() {
             FONCTIONNALITÉS POUR LES ADHÉRENTS :
           </div>
           <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14, fontWeight: 600, lineHeight: 1.7 }}>
-            <li>Badge exclusif Fédération</li>
+            <li>Badge de Membre</li>
             <li>Personnalisation complète de la galerie</li>
-            <li>Avantage à venir</li>
+            <li>Export CSV/Sheets/PDF/Scans</li>
+            <li>Concours Spéciaux</li>
           </ul>
         </div>
 
