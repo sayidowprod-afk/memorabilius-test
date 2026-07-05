@@ -5,8 +5,11 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useLang } from '@/lib/LangContext'
 import LinkifiedText from '@/components/LinkifiedText'
+import TeamContests from '@/components/TeamContests'
+import TeamTrades from '@/components/TeamTrades'
 
 const ACCENT = '#003DA6'
+const FED_RED = '#C8102E'
 const EMOJIS = ['👍', '❤️', '🔥', '😂', '😮', '🏀', '💎', '🐐']
 
 export default function TeamPage({ params }: { params: Promise<{ teamId: string }> }) {
@@ -27,7 +30,7 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
   const [isMember, setIsMember] = useState(false)
   const [isChef, setIsChef] = useState(false)
   const [hasCandidature, setHasCandidature] = useState(false)
-  const [activeTab, setActiveTab] = useState<'feed' | 'membres' | 'galerie' | 'chat' | 'candidatures'>('feed')
+  const [activeTab, setActiveTab] = useState<'feed' | 'membres' | 'galerie' | 'chat' | 'candidatures' | 'trades' | 'concours'>('feed')
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
 
@@ -397,10 +400,14 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
 
   if (loading) return <p style={{ textAlign: 'center', padding: 60, color: '#bbb' }}>Chargement...</p>
 
+  // Team « Fédération de la Carte » : nom en rouge + onglets exclusifs (trades, concours)
+  const isFed = (team?.name || '').toLowerCase() === 'fédération de la carte'
+
   const tabs = [
     { key: 'feed', label: '📰 Feed' },
     { key: 'membres', label: `👥 ${t('teams_members')} (${members.length})` },
     { key: 'galerie', label: '🖼️ Galerie' },
+    ...(isFed ? [{ key: 'trades', label: '🔄 Trades' }, { key: 'concours', label: '🏆 Concours' }] : []),
     ...(isMember ? [{ key: 'chat', label: '💬 Chat' }] : []),
     ...(isChef ? [{ key: 'candidatures', label: `📋 Candidatures (${candidatures.length})` }] : []),
   ]
@@ -435,7 +442,7 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
           }
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <h1 style={{ fontWeight: 900, fontSize: 24, margin: 0 }}>{team.name}</h1>
+              <h1 style={{ fontWeight: 900, fontSize: 24, margin: 0, color: isFed ? FED_RED : undefined }}>{team.name}</h1>
               {isChef && <Link href={`/teams/${teamId}/editer`} style={{ background: '#f0f0f0', color: '#444', padding: '4px 12px', borderRadius: 6, fontWeight: 700, fontSize: 12, textDecoration: 'none' }}>{t('teams_modify')}</Link>}
             </div>
             {team.description && <p style={{ color: '#666', fontSize: 14, margin: '4px 0 0' }}>{team.description}</p>}
@@ -691,6 +698,16 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* ── TRADES (Fédération uniquement) ── */}
+      {activeTab === 'trades' && isFed && (
+        <TeamTrades teamId={parseInt(teamId)} currentUser={currentUser} isMember={isMember} />
+      )}
+
+      {/* ── CONCOURS (Fédération uniquement) ── */}
+      {activeTab === 'concours' && isFed && (
+        <TeamContests teamId={parseInt(teamId)} currentUser={currentUser} isChef={isChef} isMember={isMember} />
       )}
 
       {/* ── GALERIE COMMUNE ── */}

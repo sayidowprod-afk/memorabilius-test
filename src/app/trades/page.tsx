@@ -90,6 +90,7 @@ export default function Trades() {
       .from('trades')
       .select('*, profiles(id, display_name, avatar_url, instagram, twitter, discord)')
       .eq('statut', 'actif')
+      .is('team_id', null)
       .order('created_at', { ascending: false })
     setTrades(data || [])
     setLoading(false)

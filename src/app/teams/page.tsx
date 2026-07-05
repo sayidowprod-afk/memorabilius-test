@@ -137,7 +137,7 @@ export default function Teams() {
                         </div>
                       )}
                       <div>
-                        <Link href={`/teams/${team.id}`} style={{ fontWeight: 800, color: '#121212', display: 'block' }}>{team.name}</Link>
+                        <Link href={`/teams/${team.id}`} style={{ fontWeight: 800, color: (team.name || '').toLowerCase() === 'fédération de la carte' ? '#C8102E' : '#121212', display: 'block' }}>{team.name}</Link>
                         {team.description && <p style={{ fontSize: 11, color: '#999', margin: 0 }}>{team.description}</p>}
                       </div>
                     </div>
