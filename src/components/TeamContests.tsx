@@ -27,6 +27,8 @@ export default function TeamContests({ teamId, currentUser, isChef, isMember }: 
 }) {
   const [contests, setContests] = useState<Contest[]>([])
   const [entries, setEntries] = useState<Record<number, Entry[]>>({})
+  const [voteCount, setVoteCount] = useState<Record<number, number>>({}) // entry_id -> nb votes
+  const [myVote, setMyVote] = useState<Record<number, number>>({})       // contest_id -> entry_id voté
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
   const [form, setForm] = useState({ title: '', description: '', start: '', end: '' })
@@ -37,14 +39,38 @@ export default function TeamContests({ teamId, currentUser, isChef, isMember }: 
     setContests(cs || [])
     const ids = (cs || []).map(c => c.id)
     if (ids.length) {
-      const { data: es } = await supabase.from('contest_entries').select('*, profiles(display_name, avatar_url)').in('contest_id', ids)
+      // Participations (sans jointure : contest_entries n'a pas de FK vers profiles)
+      const { data: es } = await supabase.from('contest_entries').select('*').in('contest_id', ids)
+      const list = (es || []) as Entry[]
+      const uids = [...new Set(list.map(e => e.user_id))]
+      const { data: profs } = uids.length ? await supabase.from('profiles').select('id, display_name, avatar_url').in('id', uids) : { data: [] as any[] }
+      const pmap = new Map((profs || []).map((p: any) => [p.id, p]))
       const map: Record<number, Entry[]> = {}
-      for (const e of (es || []) as any[]) { (map[e.contest_id] ||= []).push(e) }
+      for (const e of list) { e.profiles = pmap.get(e.user_id) || null; (map[e.contest_id] ||= []).push(e) }
       setEntries(map)
-    }
+
+      // Votes
+      const { data: vs } = await supabase.from('contest_votes').select('contest_id, entry_id, voter_id').in('contest_id', ids)
+      const counts: Record<number, number> = {}, mine: Record<number, number> = {}
+      for (const v of (vs || []) as any[]) {
+        counts[v.entry_id] = (counts[v.entry_id] || 0) + 1
+        if (v.voter_id === currentUser) mine[v.contest_id] = v.entry_id
+      }
+      setVoteCount(counts); setMyVote(mine)
+    } else { setEntries({}); setVoteCount({}); setMyVote({}) }
     setLoading(false)
   }
   useEffect(() => { load() }, [teamId])
+
+  const vote = async (contestId: number, entryId: number) => {
+    if (!currentUser) return
+    if (myVote[contestId] === entryId) {
+      await supabase.from('contest_votes').delete().eq('contest_id', contestId).eq('voter_id', currentUser)
+    } else {
+      await supabase.from('contest_votes').upsert({ contest_id: contestId, entry_id: entryId, voter_id: currentUser }, { onConflict: 'contest_id,voter_id' })
+    }
+    load()
+  }
 
   const createContest = async () => {
     if (!form.title.trim() || !form.start || !form.end) { alert('Titre, date de début et de fin requis'); return }
@@ -114,21 +140,38 @@ export default function TeamContests({ teamId, currentUser, isChef, isMember }: 
                 )}
                 {st.key === 'a_venir' && <p style={{ color: '#e67e22', fontSize: 13, fontWeight: 700, margin: '0 0 12px' }}>Le concours n'a pas encore commencé.</p>}
 
-                {es.length > 0 ? (
+                {es.length > 0 ? (() => {
+                  const maxVotes = Math.max(0, ...es.map(e => voteCount[e.id] || 0))
+                  const canVote = st.key === 'en_cours' && isMember && currentUser
+                  return (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 12 }}>
-                    {es.map(e => (
-                      <div key={e.id} style={{ border: e.user_id === currentUser ? `2px solid ${RED}` : '1px solid #eee', borderRadius: 10, overflow: 'hidden' }}>
+                    {es.map(e => {
+                      const n = voteCount[e.id] || 0
+                      const isWinner = st.key === 'termine' && maxVotes > 0 && n === maxVotes
+                      const votedByMe = myVote[c.id] === e.id
+                      return (
+                      <div key={e.id} style={{ position: 'relative', border: isWinner ? '2px solid #f1c40f' : e.user_id === currentUser ? `2px solid ${RED}` : '1px solid #eee', borderRadius: 10, overflow: 'hidden', boxShadow: isWinner ? '0 0 0 3px #f1c40f55' : undefined }}>
+                        {isWinner && <div style={{ position: 'absolute', top: 6, left: 6, background: '#f1c40f', color: '#3d2f00', fontSize: 11, fontWeight: 900, padding: '2px 8px', borderRadius: 20, zIndex: 2 }}>🏆 Gagnant</div>}
                         <div style={{ aspectRatio: '2.5/3.5', background: '#f2f2f2' }}>
                           {e.card_img && <img src={e.card_img} alt={e.card_nom || ''} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />}
                         </div>
                         <div style={{ padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 6 }}>
                           {e.profiles?.avatar_url && <img src={e.profiles.avatar_url} alt="" style={{ width: 18, height: 18, borderRadius: '50%', objectFit: 'cover' }} />}
-                          <span style={{ fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.profiles?.display_name || 'Membre'}</span>
+                          <span style={{ fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{e.profiles?.display_name || 'Membre'}</span>
+                          <button
+                            onClick={() => canVote && vote(c.id, e.id)}
+                            disabled={!canVote}
+                            title={canVote ? (votedByMe ? 'Retirer mon vote' : 'Voter pour cette carte') : 'Vote fermé'}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 3, border: 'none', borderRadius: 20, padding: '3px 8px', fontSize: 12, fontWeight: 800, cursor: canVote ? 'pointer' : 'default', background: votedByMe ? RED : '#f0f0f0', color: votedByMe ? 'white' : '#555' }}>
+                            👍 {n}
+                          </button>
                         </div>
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
-                ) : <p style={{ color: '#bbb', fontSize: 13, margin: 0 }}>Aucune participation.</p>}
+                  )
+                })() : <p style={{ color: '#bbb', fontSize: 13, margin: 0 }}>Aucune participation.</p>}
               </div>
             </div>
           )
